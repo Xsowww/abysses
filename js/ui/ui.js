@@ -4,7 +4,7 @@ import { settings, saveSettings, hasSave, loadGame, deleteSave } from '../core/s
 import { sfx, unlockAudio, applyVolumes } from '../core/audio.js';
 import { playMusic, playAmbience } from '../core/music.js';
 import { PROLOGUE, LORE, LORE_BY_ID, npcTalk } from '../data/story.js';
-import { icon, itemIconName, itemIcon } from './icons.js';
+import { icon, itemIconName, itemIcon, pixIcon } from './icons.js';
 import { startTitleBg, stopTitleBg } from './titlebg.js';
 import { drawHero } from '../game/hero.js';
 import { hasSprite, drawSprite, walkFrame } from '../game/sprites.js';
@@ -447,7 +447,7 @@ export class UI {
       const blocked = s === 'offhand' && isTwoHanded(pd.equipment.weapon);
       const phIcon = s === 'weapon' ? (pd.cls === 'rodeur' ? 'arc' : 'epee') : s === 'offhand' ? (pd.cls === 'rodeur' ? 'quiver' : 'offhand') : s;
       const label = s === 'offhand' ? (pd.cls === 'rodeur' ? 'Carquois' : 'Bouclier') : SLOTS[s].label;
-      return `<div class="eq-cell" style="grid-area:${s}">${this.cell(it, 'equip:' + s, it ? '' : `<span class="ph-icon">${icon(phIcon)}</span>`)}<div class="eq-label">${blocked ? 'deux mains' : label}</div></div>`;
+      return `<div class="eq-cell eq-${s}" style="grid-area:${s}">${this.cell(it, 'equip:' + s, it ? '' : `<span class="ph-icon">${icon(phIcon)}</span>`)}<div class="eq-label">${blocked ? 'deux mains' : label}</div></div>`;
     }).join('')}</div>`;
   }
 
@@ -1004,23 +1004,24 @@ export class UI {
     const h = this.el.hud;
     h.innerHTML = `
       <div id="vitals">
-        <div class="lvl"><div class="ring"></div><div class="gem"></div><div class="num"></div></div>
+        <div class="lvl"><div class="num"></div></div>
         <div class="bars">
-          <div class="vbar hp"><div class="trail"></div><div class="fill"></div><span class="val"></span></div>
-          <div class="vbar sta"><div class="trail"></div><div class="fill"></div></div>
+          <div class="vbar hp"><div class="track"><div class="trail"></div><div class="fill"></div></div><span class="val"></span></div>
+          <div class="vbar sta"><div class="track"><div class="trail"></div><div class="fill"></div></div></div>
+          <div class="xpbar" title="Expérience"><div class="ring"></div></div>
           <div id="buffs"></div>
         </div>
       </div>
-      <div id="hud-map"><div class="mm-frame frame"><canvas id="minimap" width="200" height="200"></canvas></div><div class="map-hint"></div></div>
+      <div id="hud-map"><div class="mm-frame"><canvas id="minimap" width="200" height="200"></canvas></div><div class="map-hint"></div></div>
       <div id="tracker"></div>
       <div id="boss-bar" class="hidden"><div class="bb-name"></div><div class="bb-bar"><div class="bb-trail"></div><div class="bb-fill"></div></div></div>
       <div id="channel" class="hidden"><div class="ch-label"></div><div class="ch-bar"><div class="ch-fill"></div></div></div>
       <div id="prompt" class="hidden"></div>
       <div id="skills"><div class="cross"></div><div class="items"></div></div>
-      <div id="purse"><div class="purse-box">${icon('gold')}<span class="n"></span></div><div class="purse-run"></div></div>
+      <div id="purse"><div class="purse-box">${pixIcon('dc_gold_4') || icon('gold')}<span class="n"></span></div><div class="purse-run"></div></div>
       <div id="keys-hint"></div>`;
     this.hud = {
-      lvlNum: $('.lvl .num', h), lvlRing: $('.lvl .ring', h),
+      lvlNum: $('.lvl .num', h), lvlRing: $('.xpbar .ring', h),
       hpBar: $('.vbar.hp', h), hpFill: $('.vbar.hp .fill', h), hpTrail: $('.vbar.hp .trail', h), hpText: $('.vbar.hp .val', h),
       staBar: $('.vbar.sta', h), staFill: $('.vbar.sta .fill', h), staTrail: $('.vbar.sta .trail', h),
       buffs: $('#buffs'), tracker: $('#tracker'),

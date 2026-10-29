@@ -1,0 +1,540 @@
+{
+ "panel": {
+  "file": "panel.png",
+  "w": 96,
+  "h": 96,
+  "slice": [
+   32,
+   32,
+   32,
+   32
+  ],
+  "content_inset": [
+   10,
+   10,
+   10,
+   10
+  ],
+  "notes": "Fenêtre principale : cadre de pierre à coins gothiques, intérieur noir opaque (#161413). border-image-slice 32 fill ; padding conseillé ≈ 10–12 px × échelle (le cadre fait ~6 px, les ornements d’angle ~18 px)."
+ },
+ "panel_inner": {
+  "file": "panel_inner.png",
+  "w": 96,
+  "h": 96,
+  "slice": [
+   24,
+   24,
+   24,
+   24
+  ],
+  "content_inset": [
+   6,
+   6,
+   6,
+   6
+  ],
+  "notes": "Sous-panneau / section : pierre biseautée, intérieur gris-brun (#2d2a27), petits entrelacs aux coins. slice 24 fill ; bord ~5 px."
+ },
+ "panel_parchment": {
+  "file": "panel_parchment.png",
+  "w": 96,
+  "h": 96,
+  "slice": [
+   16,
+   22,
+   16,
+   22
+  ],
+  "notes": "Parchemin (rouleaux en haut/bas) pour lore / inscriptions — à utiliser avec parcimonie. Texte foncé (#2a1f19)."
+ },
+ "panel_blood": {
+  "file": "panel_blood.png",
+  "w": 96,
+  "h": 96,
+  "slice": [
+   32,
+   32,
+   32,
+   32
+  ],
+  "notes": "Variante intérieur sang (#561813) – alertes, mort, boss."
+ },
+ "tooltip": {
+  "file": "tooltip.png",
+  "w": 48,
+  "h": 48,
+  "slice": [
+   18,
+   18,
+   18,
+   18
+  ],
+  "content_inset": [
+   9,
+   9,
+   9,
+   9
+  ],
+  "notes": "Infobulle : version compacte du cadre principal (coins 18 px). slice 18 fill ; padding ≈ 9 px × échelle (le texte doit dégager les ornements d’angle)."
+ },
+ "header": {
+  "file": "header.png",
+  "w": 96,
+  "h": 32,
+  "slice": [
+   12,
+   32,
+   12,
+   32
+  ],
+  "notes": "Plaque de titre gothique (3-slice horizontal). Hauteur fixe 32 px × échelle conseillée ; texte centré dans x 30..66."
+ },
+ "button": {
+  "file": "button.png",
+  "w": 96,
+  "h": 24,
+  "slice": [
+   6,
+   12,
+   6,
+   12
+  ],
+  "content_inset": [
+   6,
+   6,
+   6,
+   6
+  ],
+  "notes": "Bouton normal (face de fer sombre). 96×24, slice [6,12,6,12] fill ; contenu y 6..17."
+ },
+ "button_hover": {
+  "file": "button_hover.png",
+  "w": 96,
+  "h": 24,
+  "slice": [
+   6,
+   12,
+   6,
+   12
+  ],
+  "content_inset": [
+   6,
+   6,
+   6,
+   6
+  ],
+  "notes": "Survol : liseré braise. 96×24, slice [6,12,6,12] fill ; contenu y 6..17."
+ },
+ "button_pressed": {
+  "file": "button_pressed.png",
+  "w": 96,
+  "h": 24,
+  "slice": [
+   6,
+   12,
+   6,
+   12
+  ],
+  "content_inset": [
+   6,
+   6,
+   6,
+   6
+  ],
+  "notes": "Enfoncé. 96×24, slice [6,12,6,12] fill ; contenu y 6..17."
+ },
+ "button_disabled": {
+  "file": "button_disabled.png",
+  "w": 96,
+  "h": 24,
+  "slice": [
+   6,
+   12,
+   6,
+   12
+  ],
+  "content_inset": [
+   6,
+   6,
+   6,
+   6
+  ],
+  "notes": "Désactivé. 96×24, slice [6,12,6,12] fill ; contenu y 6..17."
+ },
+ "button_blood": {
+  "file": "button_blood.png",
+  "w": 96,
+  "h": 24,
+  "slice": [
+   6,
+   12,
+   6,
+   12
+  ],
+  "notes": "Bouton « sang » (action dangereuse / confirmation)."
+ },
+ "button_blood_hover": {
+  "file": "button_blood_hover.png",
+  "w": 96,
+  "h": 24,
+  "slice": [
+   6,
+   12,
+   6,
+   12
+  ],
+  "notes": "Survol du bouton sang (braise)."
+ },
+ "slot": {
+  "file": "slot.png",
+  "w": 32,
+  "h": 32,
+  "slice": [
+   8,
+   8,
+   8,
+   8
+  ],
+  "notes": "Case d’inventaire normale. 32×32 (cadre visible 1..30, intérieur noir). Taille fixe conseillée (icône 32×32 par-dessus ou 24×24 centrée) ; slice [8,8,8,8] fill si on l’agrandit."
+ },
+ "slot_hover": {
+  "file": "slot_hover.png",
+  "w": 32,
+  "h": 32,
+  "slice": [
+   8,
+   8,
+   8,
+   8
+  ],
+  "notes": "Survol (liseré braise). 32×32 (cadre visible 1..30, intérieur noir). Taille fixe conseillée (icône 32×32 par-dessus ou 24×24 centrée) ; slice [8,8,8,8] fill si on l’agrandit."
+ },
+ "slot_selected": {
+  "file": "slot_selected.png",
+  "w": 32,
+  "h": 32,
+  "slice": [
+   8,
+   8,
+   8,
+   8
+  ],
+  "notes": "Sélectionnée (or vif). 32×32 (cadre visible 1..30, intérieur noir). Taille fixe conseillée (icône 32×32 par-dessus ou 24×24 centrée) ; slice [8,8,8,8] fill si on l’agrandit."
+ },
+ "slot_invalid": {
+  "file": "slot_invalid.png",
+  "w": 32,
+  "h": 32,
+  "slice": [
+   8,
+   8,
+   8,
+   8
+  ],
+  "notes": "Invalide / objet maudit (rouge sang). 32×32 (cadre visible 1..30, intérieur noir). Taille fixe conseillée (icône 32×32 par-dessus ou 24×24 centrée) ; slice [8,8,8,8] fill si on l’agrandit."
+ },
+ "slot_disabled": {
+  "file": "slot_disabled.png",
+  "w": 32,
+  "h": 32,
+  "slice": [
+   8,
+   8,
+   8,
+   8
+  ],
+  "notes": "Désactivée. 32×32 (cadre visible 1..30, intérieur noir). Taille fixe conseillée (icône 32×32 par-dessus ou 24×24 centrée) ; slice [8,8,8,8] fill si on l’agrandit."
+ },
+ "skill_slot": {
+  "file": "skill_slot.png",
+  "w": 32,
+  "h": 32,
+  "slice": [
+   8,
+   8,
+   8,
+   8
+  ],
+  "notes": "Case de compétence (pierre biseautée sombre) 32×32."
+ },
+ "skill_slot_active": {
+  "file": "skill_slot_active.png",
+  "w": 32,
+  "h": 32,
+  "slice": [
+   8,
+   8,
+   8,
+   8
+  ],
+  "notes": "Case de compétence active / sélectionnée (biseau braise)."
+ },
+ "equip_head": {
+  "file": "equip_head.png",
+  "w": 32,
+  "h": 32,
+  "notes": "Emplacement d’équipement vide (head), même cadre que slot.png."
+ },
+ "equip_neck": {
+  "file": "equip_neck.png",
+  "w": 32,
+  "h": 32,
+  "notes": "Emplacement d’équipement vide (neck), même cadre que slot.png."
+ },
+ "equip_chest": {
+  "file": "equip_chest.png",
+  "w": 32,
+  "h": 32,
+  "notes": "Emplacement d’équipement vide (chest), même cadre que slot.png."
+ },
+ "equip_legs": {
+  "file": "equip_legs.png",
+  "w": 32,
+  "h": 32,
+  "notes": "Emplacement d’équipement vide (legs), même cadre que slot.png."
+ },
+ "equip_feet": {
+  "file": "equip_feet.png",
+  "w": 32,
+  "h": 32,
+  "notes": "Emplacement d’équipement vide (feet), même cadre que slot.png."
+ },
+ "equip_weapon": {
+  "file": "equip_weapon.png",
+  "w": 32,
+  "h": 32,
+  "notes": "Emplacement d’équipement vide (weapon), même cadre que slot.png."
+ },
+ "equip_offhand": {
+  "file": "equip_offhand.png",
+  "w": 32,
+  "h": 32,
+  "notes": "Emplacement d’équipement vide (offhand), même cadre que slot.png."
+ },
+ "equip_ring": {
+  "file": "equip_ring.png",
+  "w": 32,
+  "h": 32,
+  "notes": "Emplacement d’équipement vide (ring), même cadre que slot.png."
+ },
+ "bar_frame": {
+  "file": "bar_frame.png",
+  "w": 94,
+  "h": 16,
+  "slice": [
+   3,
+   20,
+   4,
+   7
+  ],
+  "fill_box": {
+   "x": 7,
+   "y": 3,
+   "w": 67,
+   "h": 9
+  },
+  "notes": "Jauge (vie / endurance / xp) avec crâne à droite, intérieur transparent. 94×16, slice [3,20,4,7] (sans fill). Remplissage à placer dessous/à l’intérieur : fill_box."
+ },
+ "bar_frame_thin": {
+  "file": "bar_frame_thin.png",
+  "w": 94,
+  "h": 17,
+  "notes": "Jauge fine à deux crânes (barre de vie d’ennemi / boss, cible). Pas de 9-slice propre (crânes sur les bords) : étirer seulement la partie centrale."
+ },
+ "bar_fill_health": {
+  "file": "bar_fill_health.png",
+  "w": 4,
+  "h": 9,
+  "repeat": "repeat-x",
+  "notes": "Remplissage vie (9 px de haut, répéter en x)."
+ },
+ "bar_fill_stamina": {
+  "file": "bar_fill_stamina.png",
+  "w": 4,
+  "h": 9,
+  "repeat": "repeat-x",
+  "notes": "Remplissage endurance (mousse/olive)."
+ },
+ "bar_fill_xp": {
+  "file": "bar_fill_xp.png",
+  "w": 4,
+  "h": 9,
+  "repeat": "repeat-x",
+  "notes": "Remplissage expérience (braise/laiton)."
+ },
+ "bar_fill_mana": {
+  "file": "bar_fill_mana.png",
+  "w": 4,
+  "h": 9,
+  "repeat": "repeat-x",
+  "notes": "Remplissage alternatif (abysse) – mana / focus."
+ },
+ "bar_empty": {
+  "file": "bar_empty.png",
+  "w": 4,
+  "h": 9,
+  "repeat": "repeat-x",
+  "notes": "Fond de jauge vide."
+ },
+ "divider": {
+  "file": "divider.png",
+  "w": 96,
+  "h": 20,
+  "slice": [
+   0,
+   11,
+   0,
+   11
+  ],
+  "notes": "Séparateur orné (double filet à croix fleuronnées). 3-slice horizontal : slice [0,11,0,11], hauteur fixe 20 px × échelle."
+ },
+ "close": {
+  "file": "close.png",
+  "w": 32,
+  "h": 32,
+  "notes": "Bouton fermer (X) 32×32 – état 0."
+ },
+ "close_hover": {
+  "file": "close_hover.png",
+  "w": 32,
+  "h": 32,
+  "notes": "Bouton fermer (X) 32×32 – état 1."
+ },
+ "close_pressed": {
+  "file": "close_pressed.png",
+  "w": 32,
+  "h": 32,
+  "notes": "Bouton fermer (X) 32×32 – état 2."
+ },
+ "close_disabled": {
+  "file": "close_disabled.png",
+  "w": 32,
+  "h": 32,
+  "notes": "Bouton fermer (X) 32×32 – état 3."
+ },
+ "portrait_frame": {
+  "file": "portrait_frame.png",
+  "w": 66,
+  "h": 72,
+  "opening": {
+   "x": 14,
+   "y": 11,
+   "w": 38,
+   "h": 56
+  },
+  "notes": "Cadre de portrait en ogive avec crânes (66×72). Ouverture transparente : x 14..51, y 11..66 (placer le portrait dessous)."
+ },
+ "minimap_frame": {
+  "file": "minimap_frame.png",
+  "w": 79,
+  "h": 82,
+  "opening": {
+   "cx": 40,
+   "cy": 40,
+   "d": 51
+  },
+  "notes": "Anneau de boussole à pointes (N/E/S/W) pour la minimap (79×82), ouverture circulaire transparente centrée en (40,40), diamètre ≈ 51 px (x/y 15..65)."
+ },
+ "cursor": {
+  "file": "cursor.png",
+  "w": 17,
+  "h": 17,
+  "hotspot": [
+   1,
+   1
+  ],
+  "notes": "Pointeur de menu 17×17 (état 0). Pointe en haut à gauche."
+ },
+ "cursor_click": {
+  "file": "cursor_click.png",
+  "w": 17,
+  "h": 17,
+  "hotspot": [
+   1,
+   1
+  ],
+  "notes": "Pointeur de menu 17×17 (état 1). Pointe en haut à gauche."
+ },
+ "cursor_hover": {
+  "file": "cursor_hover.png",
+  "w": 17,
+  "h": 17,
+  "hotspot": [
+   1,
+   1
+  ],
+  "notes": "Pointeur de menu 17×17 (état 2). Pointe en haut à gauche."
+ },
+ "cursor_disabled": {
+  "file": "cursor_disabled.png",
+  "w": 17,
+  "h": 17,
+  "hotspot": [
+   1,
+   1
+  ],
+  "notes": "Pointeur de menu 17×17 (état 3). Pointe en haut à gauche."
+ },
+ "target_frame": {
+  "file": "target_frame.png",
+  "w": 315,
+  "h": 64,
+  "frames": 5,
+  "frame_w": 63,
+  "notes": "Cadre de ciblage animé à crâne : 5 images de 63×64 en bande horizontale (sélection de cible / objet interactif)."
+ },
+ "crosshair": {
+  "file": "crosshair.png",
+  "w": 15,
+  "h": 15,
+  "hotspot": [
+   7,
+   7
+  ],
+  "notes": "Réticule de visée 15×15 (cœur os, contour encre, point braise). Centre = (7,7)."
+ },
+ "crosshair_hit": {
+  "file": "crosshair_hit.png",
+  "w": 15,
+  "h": 15,
+  "hotspot": [
+   7,
+   7
+  ],
+  "notes": "Réticule rouge (cible touchée / à portée)."
+ },
+ "crosshair_alt": {
+  "file": "crosshair_alt.png",
+  "w": 13,
+  "h": 13,
+  "hotspot": [
+   6,
+   6
+  ],
+  "notes": "Réticule alternatif (cercle à croix)."
+ },
+ "palette": {
+  "bone": "#f3ead8",
+  "bone_dim": "#b3a994",
+  "stone_light": "#857c6d",
+  "stone": "#5f594f",
+  "iron": "#48433d",
+  "iron_dark": "#2d2a27",
+  "ink": "#161413",
+  "outline": "#0b0a0a",
+  "gold": "#e0ae6a",
+  "ember": "#b9803f",
+  "ember_dark": "#8a552b",
+  "parchment_ink": "#2a1f19",
+  "blood_light": "#c4493a",
+  "blood": "#9a2c22",
+  "blood_dark": "#561813",
+  "text_title": "#e0ae6a",
+  "text_body": "#d6cebd",
+  "text_muted": "#857c6d",
+  "text_disabled": "#5f594f",
+  "text_danger": "#c4493a",
+  "notes": "Couleurs échantillonnées sur les pièces recolorées. Toutes les pièces sont en pixels natifs : afficher à ×2 ou ×3 avec image-rendering: pixelated et border-image-width = slice × échelle."
+ },
+ "_source": "Tiny RPG – Dark Dwellers GUI (tiopalada, CC0) recoloré vers la palette du jeu ; réticules dérivés de Pixel Crosshairs (Donitz, CC0). Voir credits.json."
+}

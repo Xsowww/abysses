@@ -525,7 +525,7 @@ export class Renderer {
     ctx.textBaseline = 'middle';
     for (const o of s.interactables) {
       if (o.type !== 'npc' || !inView(o.x, o.y)) continue;
-      ctx.font = "14px 'Jacquard 24', serif";
+      ctx.font = "600 13px 'Pixelify Sans', sans-serif";
       ctx.fillStyle = 'rgba(0,0,0,0.7)';
       ctx.fillText(o.label, o.x + 1, o.y - 29);
       ctx.fillStyle = '#f0e0b8';
@@ -536,7 +536,7 @@ export class Renderer {
       const mark = this.questMark(game, o.id);
       if (mark) {
         const bob = Math.sin(time * 4) * 3;
-        ctx.font = "26px 'Jacquard 24', serif";
+        ctx.font = "600 26px 'Pixelify Sans', sans-serif";
         ctx.fillStyle = 'rgba(0,0,0,0.7)';
         ctx.fillText(mark.c, o.x + 1, o.y - 49 + bob);
         ctx.fillStyle = mark.color;

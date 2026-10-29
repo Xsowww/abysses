@@ -26,7 +26,10 @@ Jeu web 2D vue du dessus (action-RPG / roguelite à extraction). JavaScript pur 
 - **Crédits obligatoires** (licences CC-BY / CC-BY-SA) : écran « Crédits » du menu, lu depuis `assets/credits.json`, régénéré par `python3 -I tools/build_credits.py .` (sprites, tuiles, sons, musiques). Tout nouvel asset doit y être ajouté.
 
 ## Direction artistique
-Sobre et sombre (Souls-like) : polices *IM Fell English SC* (titres) et *EB Garamond* (texte), palette os / encre / braise (variables CSS dans `css/style.css`), pas d’arrondis ni de dégradés vifs. Cadres à coins ornés (`.frame`), séparateurs `.rule`, grain de film (`#grain`). Éviter tout retour à un style « interface générique ».
+Sombre, pixel art (Souls-like). Polices : *Jacquard 24* (gothique pixel) réservée aux grands titres (logo, noms de zones, bannières, boss, noms de classes) — illisible en petit ; *Pixelify Sans* pour tout le reste (pas d’italique : `font-synthesis: none`). Interface habillée avec le pack pixel art `assets/ui/` (« Tiny RPG Dark Dwellers GUI », CC0, recoloré ; métadonnées et découpes 9-slice dans `assets/ui/ui.json`) via `border-image`, affiché à ×2 (×3 pour jauges/carte) avec `image-rendering: pixelated` — voir la section « HABILLAGE PIXEL ART » à la fin de `css/style.css`. Palette : or `#e0ae6a`, os `#d6cebd`, braise, sang. Viseur et curseurs : `assets/ui/*_x2|x3.png`. Éviter tout retour à un style « interface générique » (traits fins, dégradés CSS).
+
+## Performances
+Le monde est dessiné dans `#game` à sa résolution native (`renderer.k`, ≈ 1 pixel du jeu = 1 pixel du canvas) puis agrandi sans lissage ; les textes nets passent par `#overlay` (`renderOverlay`). Le brouillard est composé en très basse résolution. Le HUD n’écrit dans le DOM que ce qui change. Éviter les `filter` / `mix-blend-mode` CSS plein écran.
 
 ## Règles de jeu importantes (décidées avec l’utilisateur)
 - L’équipement **porté** n’est jamais perdu, même s’il a été trouvé pendant l’expédition.

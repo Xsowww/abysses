@@ -471,3 +471,189 @@ canvas#game.dying { filter: grayscale(1) brightness(0.6) contrast(1.1); }
 .sk > .pix { width: 70%; }
 
 canvas#overlay { position: fixed; inset: 0; width: 100vw; height: 100vh; display: block; pointer-events: none; z-index: 1; }
+
+/* =====================================================================
+   HABILLAGE PIXEL ART (assets/ui — « Tiny RPG Dark Dwellers GUI », CC0, recoloré)
+   Les pièces sont affichées à ×2 (×3 pour les jauges et la carte) sans lissage.
+   ===================================================================== */
+:root { --gold: #e0ae6a; --gold2: #f3ead8; --muted: #857c6d; --ink-ui: #161413; }
+html, body { cursor: url('../assets/ui/cursor_x2.png') 2 2, default; }
+button, .slot:not(.empty), .tab, .opt, .mi, .btn, [data-action] { cursor: url('../assets/ui/cursor_hover_x2.png') 2 2, pointer; }
+canvas#game { cursor: url('../assets/ui/crosshair_x3.png') 22 22, crosshair; }
+img, .pix, .ui-px { image-rendering: pixelated; }
+
+/* Cadres */
+.frame { background: none; border: 20px solid transparent; border-image: url('../assets/ui/panel.png') 32 fill / 64px / 0 round; box-shadow: 0 24px 70px rgba(0, 0, 0, 0.85); image-rendering: pixelated; }
+.frame::before, .frame::after { display: none; }
+#tooltip.frame { border-width: 12px; border-image: url('../assets/ui/tooltip.png') 18 fill / 36px / 0 round; padding: 6px 8px; }
+.panel { image-rendering: pixelated; }
+.panel-body { padding: 8px 18px 12px; }
+.ph { padding: 4px 20px 6px; }
+
+/* Plaque de titre */
+.ph-title { display: inline-flex; align-items: center; justify-content: center; min-width: 220px; height: 64px; padding: 0 76px; border: 0 solid transparent; border-width: 24px 64px; border-image: url('../assets/ui/header.png') 12 32 fill / 24px 64px / 0 stretch; box-sizing: border-box; font-family: var(--body); font-weight: 600; font-size: 22px; letter-spacing: .06em; color: var(--gold); text-shadow: 0 2px 0 #000; line-height: 1; }
+.panel .ph-title { padding: 0; }
+.ph-sub { font-style: normal; color: var(--muted); font-size: 14px; margin-top: 4px; }
+.ph .x { right: 8px; top: 2px; width: 32px; height: 32px; font-size: 0; background: url('../assets/ui/close.png') 0 0 / 32px 32px no-repeat; image-rendering: pixelated; }
+.ph .x:hover { background-image: url('../assets/ui/close_hover.png'); }
+.ph .x:active { background-image: url('../assets/ui/close_pressed.png'); }
+
+/* Séparateur */
+.rule { height: 20px; margin: 2px 22px; background: none; border: 0 solid transparent; border-width: 0 22px; border-image: url('../assets/ui/divider.png') 0 11 fill / 0 22px / 0 stretch; image-rendering: pixelated; opacity: .85; }
+.rule::after { display: none; }
+h3 { font-family: var(--body); font-weight: 600; color: var(--gold); letter-spacing: .04em; font-size: 15px; text-shadow: 0 2px 0 #000; }
+h3::after { height: 2px; background: linear-gradient(90deg, #3a3530, transparent); }
+
+/* Boutons, onglets, choix de menu */
+.btn, .tab, .mi, .opt { font-family: var(--body); font-weight: 500; letter-spacing: .02em; color: #cfc6b4; text-shadow: 0 2px 0 #000; border: 12px solid transparent; border-width: 12px 24px; border-image: url('../assets/ui/button.png') 6 12 fill / 12px 24px / 0 stretch; background: none; padding: 0 6px; min-height: 48px; line-height: 24px; image-rendering: pixelated; transition: none; }
+.btn::before, .btn::after, .mi::before, .mi::after, .opt::before, .tab.on::after { display: none; }
+.btn:hover:not(:disabled), .tab:hover, .mi:hover, .opt:hover { border-image-source: url('../assets/ui/button_hover.png'); color: var(--gold2); background: none; letter-spacing: .02em; }
+.btn:active:not(:disabled), .mi:active, .opt:active, .tab:active { border-image-source: url('../assets/ui/button_pressed.png'); }
+.btn:disabled { opacity: 1; color: #5f594f; border-image-source: url('../assets/ui/button_disabled.png'); }
+.btn.main, .mi.main { color: var(--gold); }
+.btn.danger { border-image-source: url('../assets/ui/button_blood.png'); color: #f3ead8; }
+.btn.danger:hover:not(:disabled) { border-image-source: url('../assets/ui/button_blood_hover.png'); }
+.btn.small { font-size: 13px; min-height: 40px; border-width: 8px 16px; border-image-width: 8px 16px; padding: 0 2px; line-height: 24px; }
+.btn.big { font-size: 19px; }
+.btn.key { min-width: 140px; border-width: 8px 16px; border-image-width: 8px 16px; min-height: 40px; color: var(--bone); }
+.btn.key.waiting { color: var(--gold); border-image-source: url('../assets/ui/button_hover.png'); }
+.tabs { gap: 8px; margin-top: 8px; }
+.tab { font-size: 16px; padding: 0 4px; color: var(--muted); }
+.tab.on { border-image-source: url('../assets/ui/button_hover.png'); color: var(--gold); }
+.tab kbd { vertical-align: 1px; }
+.menu { gap: 10px; }
+.mi { min-width: 300px; font-size: 19px; color: #b8af9e; padding: 0 10px; }
+.mi .sub { font-style: normal; font-size: 12px; color: var(--muted); line-height: 16px; }
+.opts { gap: 6px; }
+.opt { text-align: left; font-size: 16px; padding: 0 8px; }
+kbd, .key { font-family: var(--body); font-weight: 600; border-radius: 0; background: #1d1a17; border: 2px solid #4d463e; border-bottom-color: #0b0a0a; border-right-color: #0b0a0a; color: var(--gold2); line-height: 16px; }
+
+/* Emplacements d'objets */
+.slot { border: 8px solid transparent; border-image: url('../assets/ui/slot.png') 8 fill / 16px / 0 stretch; background: none; box-shadow: none; image-rendering: pixelated; }
+.slot:not(.empty):not(.locked):hover { border-image-source: url('../assets/ui/slot_hover.png'); }
+.slot.selected { border-image-source: url('../assets/ui/slot_selected.png'); box-shadow: none; }
+.slot.locked { border-image-source: url('../assets/ui/slot_disabled.png'); background: none; color: #4d463e; }
+.slot:not(.empty):not(.locked)::after { left: 2px; right: 2px; bottom: 0; height: 2px; }
+.grid { gap: 2px; }
+.grid.pocket .slot { border-color: transparent; }
+.eq-cell .slot { width: 64px; height: 64px; }
+.eq-head .slot.empty { border-image-source: url('../assets/ui/equip_head.png'); }
+.eq-amulet .slot.empty { border-image-source: url('../assets/ui/equip_neck.png'); }
+.eq-chest .slot.empty { border-image-source: url('../assets/ui/equip_chest.png'); }
+.eq-legs .slot.empty { border-image-source: url('../assets/ui/equip_legs.png'); }
+.eq-feet .slot.empty { border-image-source: url('../assets/ui/equip_feet.png'); }
+.eq-weapon .slot.empty { border-image-source: url('../assets/ui/equip_weapon.png'); }
+.eq-offhand .slot.empty { border-image-source: url('../assets/ui/equip_offhand.png'); }
+.eq-ring .slot.empty { border-image-source: url('../assets/ui/equip_ring.png'); }
+.eq-head .ph-icon, .eq-amulet .ph-icon, .eq-chest .ph-icon, .eq-legs .ph-icon, .eq-feet .ph-icon, .eq-weapon .ph-icon, .eq-offhand .ph-icon, .eq-ring .ph-icon { display: none; }
+.eq-label { font-style: normal; font-size: 12px; color: var(--muted); }
+.paperdoll::before { display: none; }
+
+/* Encarts (détail, quêtes, règles, cartes de voie) */
+.detail, .quest-box, .rules, .spec-card, .sb-slot { border: 8px solid transparent; border-image: url('../assets/ui/panel_inner.png') 24 fill / 24px / 0 round; background: none; image-rendering: pixelated; }
+.spec-card { border-top-width: 8px; }
+.empty-detail { font-style: normal; }
+.pf { border-top: 2px solid #26221e; padding: 8px 20px 4px; }
+
+/* Infobulle */
+.tt-name { font-family: var(--body); font-weight: 600; font-size: 17px; text-shadow: 0 2px 0 #000; }
+.tt-sub, .tt-lore, .npc-line, .sum-sub, .tagline, .cc-title, .ch-label, .msg-label, .msg-text, #subtitle .line, #area .a-sub, .story-text, .lore-text, .hint, .tr-q b, .jq-head b, .bb-name, .si-info .dim, .done-list, .tier-label span, .cr-note, .purse-run, .name-row { font-style: normal; }
+.tt-sub, .tt-lore { border-color: #2c2824; }
+.tt-aff div::before { content: '+ '; font-size: 12px; color: var(--gold); vertical-align: 0; }
+
+/* ---------- HUD ---------- */
+#vitals { top: 14px; left: 16px; gap: 6px; align-items: flex-start; }
+.lvl { width: 66px; height: 72px; background: url('../assets/ui/portrait_frame.png') 0 0 / 66px 72px no-repeat; image-rendering: pixelated; }
+.lvl .ring, .lvl .gem { display: none; }
+.lvl .num { top: 14px; font-family: var(--goth); font-size: 30px; color: var(--gold); text-shadow: 0 2px 0 #000; }
+.bars { gap: 0; padding-top: 4px; }
+.vbar { height: auto; background: none; border: none; box-shadow: none; }
+.vbar.hp, .vbar.sta { box-sizing: content-box; border-style: solid; border-color: transparent; image-rendering: pixelated; }
+.vbar.hp { height: 27px; border-width: 9px 60px 12px 21px; border-image: url('../assets/ui/bar_frame.png') 3 20 4 7 / 9px 60px 12px 21px / 0 stretch; }
+.vbar.sta { height: 18px; border-width: 6px 40px 8px 14px; border-image: url('../assets/ui/bar_frame.png') 3 20 4 7 / 6px 40px 8px 14px / 0 stretch; margin-top: -2px; }
+.vbar .track { position: absolute; inset: 0; background: url('../assets/ui/bar_empty.png') 0 0 / 12px 100% repeat-x; }
+.vbar .trail, .vbar .fill { position: absolute; left: 0; top: 0; bottom: 0; }
+.vbar.hp .fill { background: url('../assets/ui/bar_fill_health.png') 0 0 / 12px 100% repeat-x; }
+.vbar.sta .fill { background: url('../assets/ui/bar_fill_stamina.png') 0 0 / 8px 100% repeat-x; }
+.vbar .trail { background: rgba(243, 234, 216, 0.55); }
+.vbar.sta .trail { background: rgba(243, 234, 216, 0.4); }
+.vbar .val { left: 0; width: 100%; top: 50%; text-align: center; transform: translateY(-50%); font-size: 13px; font-weight: 600; color: var(--gold2); text-shadow: 0 2px 0 #000, 0 0 3px #000; }
+.xpbar { position: relative; width: 120px; height: 6px; margin: 2px 0 0 16px; background: #0b0a0a; border: 2px solid #3a3530; border-top-color: #0b0a0a; }
+.xpbar .ring { position: absolute; left: 0; top: 0; bottom: 0; width: var(--xp, 0%); background: url('../assets/ui/bar_fill_xp.png') 0 0 / 4px 100% repeat-x; }
+#buffs { margin: 8px 0 0 12px; }
+.buff { border: 6px solid transparent; border-image: url('../assets/ui/skill_slot.png') 8 fill / 12px / 0 stretch; background: none; width: 34px; height: 34px; }
+
+/* Compétences : croix d'emplacements */
+#skills { left: 18px; bottom: 18px; gap: 16px; }
+.cross { width: 204px; height: 204px; }
+.cross .s-up { left: 70px; top: 0; } .cross .s-left { left: 0; top: 70px; } .cross .s-right { left: 140px; top: 70px; } .cross .s-down { left: 70px; top: 140px; }
+.cross .s-mid { left: 78px; top: 78px; width: 48px; height: 48px; transform: none; font-size: 22px; }
+.cross .s-mid > svg, .cross .s-mid > .key { transform: none; }
+.s-mid .key { display: none; }
+.sk { width: 64px; height: 64px; border: 8px solid transparent; border-image: url('../assets/ui/skill_slot.png') 8 fill / 16px / 0 stretch; background: none; box-shadow: none; image-rendering: pixelated; }
+.sk.s-mid { border-image-source: url('../assets/ui/skill_slot_active.png'); border-width: 6px; border-image-width: 12px; }
+.sk .cd { background: rgba(8, 7, 7, 0.82); border-top: 2px solid var(--gold); }
+.sk .key { bottom: -6px; }
+.sk .count { top: -4px; right: -2px; font-size: 14px; color: var(--gold2); text-shadow: 0 2px 0 #000; }
+.items { gap: 6px; }
+
+/* Or */
+#purse { right: 18px; bottom: 18px; }
+.purse-box { gap: 8px; padding: 0 8px; border: 12px solid transparent; border-image: url('../assets/ui/tooltip.png') 18 fill / 36px / 0 round; background: none; image-rendering: pixelated; }
+.purse-box .pix { width: 32px; filter: none; }
+.purse-box .n { font-size: 24px; color: var(--gold); text-shadow: 0 2px 0 #000; }
+
+/* Mini-carte ronde */
+#hud-map { top: 10px; right: 12px; }
+#hud-map .mm-frame { position: relative; width: 237px; height: 246px; padding: 0; background: url('../assets/ui/minimap_frame.png') 0 0 / 237px 246px no-repeat; image-rendering: pixelated; }
+#hud-map:not(.big) #minimap { position: absolute; left: 44px; top: 44px; width: 153px; height: 153px; border-radius: 50%; z-index: -1; }
+#hud-map .mm-frame { isolation: isolate; }
+#hud-map.big .mm-frame { width: auto; height: auto; border: 20px solid transparent; border-image: url('../assets/ui/panel.png') 32 fill / 64px / 0 round; background: none; }
+#hud-map.big #minimap { position: static; border-radius: 0; }
+.map-hint { margin-top: -6px; margin-right: 18px; color: var(--muted); }
+#tracker { top: 262px; right: 18px; }
+.tr-title { font-family: var(--body); font-weight: 600; color: var(--gold); font-size: 14px; letter-spacing: .04em; text-shadow: 0 2px 0 #000; }
+
+/* Barre du boss */
+#boss-bar { bottom: 96px; }
+.bb-name { font-family: var(--goth); font-size: 30px; color: var(--gold); text-shadow: 0 2px 0 #000, 0 0 12px #000; text-align: center; }
+.bb-bar { height: 21px; background: url('../assets/ui/bar_empty.png') 0 0 / 8px 100% repeat-x; border: 0 solid transparent; border-width: 9px 60px 12px 21px; border-image: url('../assets/ui/bar_frame.png') 3 20 4 7 / 9px 60px 12px 21px / 0 stretch; box-shadow: none; background-clip: padding-box; image-rendering: pixelated; }
+.bb-fill { background: url('../assets/ui/bar_fill_health.png') 0 0 / 8px 100% repeat-x; }
+.bb-trail { background: rgba(243, 234, 216, 0.55); }
+
+/* Invite d'action, incantation, messages */
+#prompt { border: 12px solid transparent; border-image: url('../assets/ui/tooltip.png') 18 fill / 36px / 0 round; background: none; padding: 0 14px; font-size: 16px; line-height: 28px; image-rendering: pixelated; }
+#prompt::before, #prompt::after { display: none; }
+.ch-bar { height: 12px; border: 2px solid #3a3530; background: #0b0a0a; }
+.ch-fill { background: url('../assets/ui/bar_fill_mana.png') 0 0 / 8px 100% repeat-x; }
+#keys-hint { color: var(--muted); }
+.toast.title { font-family: var(--body); font-weight: 600; color: var(--gold); }
+
+/* Écrans */
+.class-card { border: 20px solid transparent; border-image: url('../assets/ui/panel.png') 32 fill / 64px / 0 round; background: none; image-rendering: pixelated; transition: transform .2s; }
+.class-card.sel { border-image-source: url('../assets/ui/panel_blood.png'); box-shadow: 0 0 40px rgba(160, 40, 30, 0.25); }
+.cc-name { font-family: var(--goth); font-size: 38px; letter-spacing: .02em; color: var(--gold); text-shadow: 0 2px 0 #000; }
+.cc-title { color: #d9824e; }
+.name-row input { font-family: var(--body); border-bottom: 2px solid #4d463e; }
+.class-screen h1 { font-size: 56px; letter-spacing: .02em; color: var(--bone); }
+.tagline { font-size: 18px; }
+.summary h1 { font-family: var(--goth); letter-spacing: .04em; }
+.story-title { font-family: var(--body); font-weight: 600; letter-spacing: .25em; color: var(--gold); }
+.depth-name, .spec-name, .pts, .tier-label { font-family: var(--body); font-weight: 600; color: var(--gold); }
+.cr-h { font-family: var(--body); font-weight: 600; color: var(--gold); }
+
+/* Talents : emplacements carrés */
+.talent .t-ico::before { inset: 0; transform: none; border: 6px solid transparent; border-image: url('../assets/ui/skill_slot.png') 8 fill / 12px / 0 stretch; background: none; box-shadow: none; }
+.talent.learnable .t-ico::before { border-image-source: url('../assets/ui/skill_slot_active.png'); box-shadow: none; }
+.talent.has .t-ico::before { border-image-source: url('../assets/ui/slot_selected.png'); background: none; }
+.talent.learnable:hover .t-ico::before { background: none; }
+
+/* Barres de défilement pixel */
+.panel-body::-webkit-scrollbar { width: 10px; }
+.panel-body::-webkit-scrollbar-track { background: #0b0a0a; border-left: 2px solid #26221e; }
+.panel-body::-webkit-scrollbar-thumb { background: #4d463e; border: 2px solid #0b0a0a; }
+* { scrollbar-color: #4d463e #0b0a0a; }
+input[type=range] { accent-color: #b9803f; }
+.class-screen h1 { font-family: var(--body); font-weight: 600; font-size: 34px; color: var(--gold); text-shadow: 0 3px 0 #000; }
+.logo-rule { height: 20px; background: none; border: 0 solid transparent; border-width: 0 22px; border-image: url('../assets/ui/divider.png') 0 11 fill / 0 22px / 0 stretch; image-rendering: pixelated; margin: 16px auto 10px; }
+.logo-rule::after { display: none; }

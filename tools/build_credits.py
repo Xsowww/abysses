@@ -27,7 +27,7 @@ items.sort(key=lambda i: i['what'])
 if items:
     out.append({'title': 'Personnages', 'note': 'Liberated Pixel Cup (LPC) — Universal LPC Spritesheet Character Generator. Licences CC-BY-SA 3.0 / OGA-BY 3.0 / GPL 3.0.', 'items': items})
 
-for folder, title in (('tiles', 'Décors (LPC, OpenGameArt)'), ('icons', 'Icônes d’objets'), ('sfx', 'Bruitages'), ('music', 'Musiques')):
+for folder, title in (('tiles', 'Décors (LPC, OpenGameArt)'), ('icons', 'Icônes d’objets'), ('ui', 'Interface'), ('sfx', 'Bruitages'), ('music', 'Musiques')):
     p = os.path.join(A, folder, 'credits.json')
     if os.path.exists(p):
         with open(p, encoding='utf-8') as f:

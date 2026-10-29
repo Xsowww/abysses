@@ -1,0 +1,21 @@
+[
+ {
+  "what": "Interface : cadres, panneaux, boutons, cases d'inventaire et d'équipement, jauges, séparateur, bouton fermer, cadre de portrait, boussole/minimap, pointeurs, cadre de ciblage (assets/ui/*.png sauf crosshair*). Recoloration vers la palette du jeu et petits assemblages (infobulle) par Les Abysses.",
+  "authors": "Gabriel « tiopalada » Lima",
+  "license": "CC0 1.0",
+  "url": "https://opengameart.org/content/tiny-rpg-dark-dwellers-gui",
+  "notes": "Tiny RPG – Dark Dwellers GUI v1.0 (README : « marked CC0 1.0 »). Attribution non obligatoire mais faite par courtoisie."
+ },
+ {
+  "what": "Réticules de visée (assets/ui/crosshair.png, crosshair_hit.png, crosshair_alt.png) — dérivés : contour ajouté et recoloration.",
+  "authors": "Donitz",
+  "license": "CC0",
+  "url": "https://opengameart.org/content/pixel-crosshairs"
+ },
+ {
+  "what": "Remplissages de jauges (assets/ui/bar_fill_*.png, bar_empty.png) — dégradés de 9 px créés pour Les Abysses à partir de la palette.",
+  "authors": "Les Abysses",
+  "license": "CC0",
+  "url": ""
+ }
+]
