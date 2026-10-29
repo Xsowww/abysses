@@ -1,1 +1,29 @@
-{}
+{
+ "title": [
+  "title.ogg"
+ ],
+ "village": [
+  "village.ogg"
+ ],
+ "dungeon": [
+  "dungeon.ogg",
+  "dungeon2.ogg"
+ ],
+ "boss": [
+  "boss.ogg"
+ ],
+ "amb_village": [
+  "amb_village.ogg"
+ ],
+ "amb_dungeon": [
+  "amb_dungeon.ogg"
+ ],
+ "vol": {
+  "title": 0.8,
+  "village": 0.6,
+  "dungeon": 0.75,
+  "boss": 0.7,
+  "amb_village": 0.5,
+  "amb_dungeon": 0.6
+ }
+}

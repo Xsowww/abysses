@@ -521,7 +521,7 @@ export class Game {
     const debris = e.type === 'acolyte' ? '#3a2850' : e.type === 'rat' ? '#3e2f26' : '#b9b19c';
     this.fx.burst(e.x, e.y, debris, e.boss ? 60 : 14, e.boss ? 300 : 170, e.boss ? 1.2 : 0.8, e.boss ? 5 : 4, { drag: 4 });
     this.fx.burst(e.x, e.y, '#4a4440', 8, 60, 0.9, 6, { drag: 2, grav: -20 });
-    sfx(e.boss ? 'bossRoar' : e.type === 'rat' ? 'ratDie' : 'enemyDie', { x: e.x, y: e.y });
+    sfx(e.boss ? 'bossRoar' : e.type === 'rat' ? 'ratDie' : e.type === 'acolyte' ? 'enemyDie' : 'bones', { x: e.x, y: e.y });
     this.addXp(e.xp, e.x, e.y);
     this.pd.stats.kills++;
     if (s.runStats) s.runStats.kills++;

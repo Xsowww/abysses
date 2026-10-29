@@ -1,1 +1,177 @@
-{}
+{
+ "step_stone": [
+  "step_stone_1.ogg",
+  "step_stone_2.ogg",
+  "step_stone_3.ogg",
+  "step_stone_4.ogg"
+ ],
+ "step_dirt": [
+  "step_dirt_1.ogg",
+  "step_dirt_2.ogg",
+  "step_dirt_3.ogg",
+  "step_dirt_4.ogg"
+ ],
+ "swing": [
+  "swing_1.ogg",
+  "swing_2.ogg",
+  "swing_3.ogg"
+ ],
+ "heavy": [
+  "heavy_1.ogg",
+  "heavy_2.ogg"
+ ],
+ "hit": [
+  "hit_1.ogg",
+  "hit_2.ogg",
+  "hit_3.ogg",
+  "hit_4.ogg"
+ ],
+ "crit": [
+  "crit_1.ogg",
+  "crit_2.ogg"
+ ],
+ "hurt": [
+  "hurt_1.ogg",
+  "hurt_2.ogg",
+  "hurt_3.ogg"
+ ],
+ "block": [
+  "block_1.ogg",
+  "block_2.ogg"
+ ],
+ "roll": [
+  "roll_1.ogg",
+  "roll_2.ogg"
+ ],
+ "pickup": [
+  "pickup_1.ogg",
+  "pickup_2.ogg"
+ ],
+ "coin": [
+  "coin_1.ogg",
+  "coin_2.ogg",
+  "coin_3.ogg"
+ ],
+ "arrow": [
+  "arrow_1.ogg",
+  "arrow_2.ogg",
+  "arrow_3.ogg"
+ ],
+ "arrowHit": [
+  "arrowhit_1.ogg",
+  "arrowhit_2.ogg"
+ ],
+ "bones": [
+  "bones_1.ogg",
+  "bones_2.ogg",
+  "bones_3.ogg"
+ ],
+ "alert": [
+  "alert_1.ogg",
+  "alert_2.ogg",
+  "alert_3.ogg"
+ ],
+ "enemyDie": [
+  "enemydie_1.ogg",
+  "enemydie_2.ogg",
+  "enemydie_3.ogg"
+ ],
+ "ghoul": [
+  "ghoul_1.ogg",
+  "ghoul_2.ogg"
+ ],
+ "bossRoar": [
+  "bossroar_1.ogg",
+  "bossroar_2.ogg"
+ ],
+ "cast": [
+  "cast_1.ogg",
+  "cast_2.ogg"
+ ],
+ "boom": [
+  "boom_1.ogg",
+  "boom_2.ogg"
+ ],
+ "chest": [
+  "chest_1.ogg"
+ ],
+ "page": [
+  "page_1.ogg",
+  "page_2.ogg"
+ ],
+ "ui": [
+  "ui_1.ogg",
+  "ui_2.ogg"
+ ],
+ "error": [
+  "error_1.ogg"
+ ],
+ "potion": [
+  "potion_1.ogg"
+ ],
+ "bell": [
+  "bell_1.ogg"
+ ],
+ "levelup": [
+  "levelup_1.ogg"
+ ],
+ "quest": [
+  "quest_1.ogg"
+ ],
+ "portal": [
+  "portal_1.ogg"
+ ],
+ "trap": [
+  "trap_1.ogg"
+ ],
+ "heart": [
+  "heart_1.ogg"
+ ],
+ "ratDie": [
+  "ghoul_1.ogg",
+  "ghoul_2.ogg"
+ ],
+ "enemyArrow": [
+  "arrow_1.ogg",
+  "arrow_2.ogg"
+ ],
+ "death": [
+  "death_1.ogg"
+ ],
+ "vol": {
+  "step_stone": 0.22,
+  "step_dirt": 0.22,
+  "swing": 0.5,
+  "heavy": 0.65,
+  "hit": 0.7,
+  "crit": 0.85,
+  "hurt": 0.55,
+  "block": 0.6,
+  "roll": 0.4,
+  "pickup": 0.5,
+  "coin": 0.45,
+  "arrow": 0.45,
+  "enemyArrow": 0.4,
+  "arrowHit": 0.5,
+  "bones": 0.6,
+  "alert": 0.4,
+  "enemyDie": 0.55,
+  "ghoul": 0.55,
+  "ratDie": 0.55,
+  "bossRoar": 0.9,
+  "cast": 0.5,
+  "boom": 0.75,
+  "chest": 0.6,
+  "page": 0.45,
+  "ui": 0.35,
+  "error": 0.45,
+  "potion": 0.6,
+  "bell": 0.75,
+  "levelup": 0.6,
+  "quest": 0.55,
+  "portal": 0.55,
+  "trap": 0.55,
+  "heart": 0.5,
+  "death": 0.7
+ }
+}

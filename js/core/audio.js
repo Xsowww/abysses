@@ -304,6 +304,8 @@ const SOUNDS = {
   chest(d) { growl(d, { f: 140, f2: 190, dur: 0.5, vol: 0.05, formants: [500, 1500] }); metal(d, { t: 0.35, f: 700, dur: 0.3, vol: 0.06 }); },
   bell(d) { metal(d, { f: 98, dur: 7, vol: 0.25, bright: 0.7 }); metal(d, { t: 0.02, f: 196.5, dur: 5, vol: 0.08 }); },
   heart(d) { osc(d, { f: 55, f2: 40, dur: 0.12, vol: 0.3 }); osc(d, { t: 0.18, f: 50, f2: 38, dur: 0.12, vol: 0.22 }); },
+  bones(d) { bones(d, { n: 9, spread: 0.3, vol: 0.14 }); },
+  ghoul(d) { growl(d, { f: 120, f2: 90, dur: 0.5, vol: 0.1 }); },
   slash(d) { nz(d, { dur: 0.08, f: 3000, f2: 1200, q: 2, vol: 0.15 }); },
 };
 
