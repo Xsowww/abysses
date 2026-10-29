@@ -279,21 +279,69 @@ const AMBIENCES = {
   },
 };
 
+// ---------- Morceaux enregistrés (assets/music/manifest.json) ----------
+// Format : { "village": ["village.ogg"], "dungeon": ["crypte1.ogg", "crypte2.ogg"], "amb_dungeon": [...], "vol": { "boss": 0.8 } }
+// Un nom absent du manifeste (ou un fichier introuvable) retombe sur la musique générée.
+let fileManifest = null;
+const bufCache = {};
+const manifestReady = fetch('assets/music/manifest.json', { cache: 'no-cache' })
+  .then((r) => (r.ok ? r.json() : {})).catch(() => ({})).then((m) => { fileManifest = m || {}; });
+
+function loadBuffer(ctx, file) {
+  if (!bufCache[file]) {
+    bufCache[file] = fetch('assets/music/' + file).then((r) => { if (!r.ok) throw new Error(file); return r.arrayBuffer(); })
+      .then((ab) => ctx.decodeAudioData(ab)).catch(() => null);
+  }
+  return bufCache[file];
+}
+
+function fileFor(key, arg) {
+  const list = fileManifest && fileManifest[key];
+  if (!list || !list.length) return null;
+  // profondeur : un morceau par palier, en boucle sur la liste
+  const i = typeof arg === 'number' ? (arg - 1) % list.length : Math.floor(Math.random() * list.length);
+  return list[Math.max(0, i)];
+}
+
+// Joue un fichier en boucle dans 'dst'. Retourne { tick, stop } comme les pistes générées.
+function fileInstrument(A, dst, file, onFail) {
+  const { ctx } = A;
+  let src = null, stopped = false;
+  loadBuffer(ctx, file).then((buf) => {
+    if (stopped) return;
+    if (!buf) { onFail(); return; }
+    src = ctx.createBufferSource();
+    src.buffer = buf;
+    src.loop = true;
+    src.connect(dst);
+    src.start();
+  });
+  return { tick() {}, stop() { stopped = true; if (src) try { src.stop(); } catch (e) { /* déjà arrêté */ } } };
+}
+
 // ---------- Gestion / fondus ----------
 function startLayer(kind, name, arg) {
   const A = getAudio();
   if (!A) return null;
   const { ctx, B } = A;
   const lib = kind === 'music' ? TRACKS : AMBIENCES;
-  if (!lib[name]) return null;
+  const key = kind === 'music' ? name : 'amb_' + name;
+  const file = fileFor(key, arg);
+  if (!lib[name] && !file) return null;
   const gain = ctx.createGain();
+  const vol = (fileManifest && fileManifest.vol && fileManifest.vol[key]) || 1;
   gain.gain.value = 0.0001;
-  gain.gain.linearRampToValueAtTime(1, ctx.currentTime + 2.5);
+  gain.gain.linearRampToValueAtTime(file ? vol : 1, ctx.currentTime + 2.5);
   gain.connect(kind === 'music' ? B.music : B.amb);
-  // un peu de réverbération pour la musique
-  const send = ctx.createGain(); send.gain.value = kind === 'music' ? 0.35 : 0.2;
+  // un peu de réverbération pour la musique générée (les fichiers ont déjà la leur)
+  const send = ctx.createGain(); send.gain.value = file ? 0.06 : (kind === 'music' ? 0.35 : 0.2);
   gain.connect(send).connect(B.verbSend);
-  const inst = lib[name](A, gain, arg);
+  let inst;
+  if (file) {
+    // en cas d'échec de chargement, on bascule sur la version générée
+    const fallback = () => { if (lib[name]) { inst = lib[name](A, gain, arg); } };
+    inst = fileInstrument(A, gain, file, fallback);
+  } else inst = lib[name](A, gain, arg);
   const timer = setInterval(() => inst.tick(ctx.currentTime), 200);
   inst.tick(ctx.currentTime);
   return {
@@ -312,22 +360,22 @@ function startLayer(kind, name, arg) {
 export function playMusic(name, arg) {
   wanted.music = name;
   wanted.depth = arg;
-  onAudioReady(() => {
+  onAudioReady(() => manifestReady.then(() => {
     if (wanted.music !== name) return;
     if (current && current.name === name && current.arg === arg) return;
     if (current) current.stop(name === null ? 3 : 2);
     current = name ? startLayer('music', name, arg) : null;
-  });
+  }));
 }
 
 export function playAmbience(name) {
   wanted.amb = name;
-  onAudioReady(() => {
+  onAudioReady(() => manifestReady.then(() => {
     if (wanted.amb !== name) return;
     if (currentAmb && currentAmb.name === name) return;
     if (currentAmb) currentAmb.stop(2);
     currentAmb = name ? startLayer('amb', name) : null;
-  });
+  }));
 }
 
 export function stopAll(fade = 2) {

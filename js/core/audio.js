@@ -95,20 +95,21 @@ export function setListener(x, y) { listener.x = x; listener.y = y; }
 export function setSurface(s) { surface = s; }
 
 // ---------- Échantillons optionnels ----------
+const sampleVol = {}; // nom -> volume (clé "vol" du manifeste)
 async function loadSamples() {
   try {
     const res = await fetch('assets/sfx/manifest.json', { cache: 'no-cache' });
     if (!res.ok) return;
-    const man = await res.json(); // { "hit": ["hit1.ogg", "hit2.ogg"], ... }
-    for (const name in man) {
-      samples[name] = [];
-      for (const f of man[name]) {
-        try {
-          const r = await fetch('assets/sfx/' + f);
-          samples[name].push(await ctx.decodeAudioData(await r.arrayBuffer()));
-        } catch (e) { /* fichier manquant */ }
-      }
-    }
+    // { "hit": ["hit1.ogg", "hit2.ogg"], ..., "vol": { "hit": 0.8 } }
+    const man = await res.json();
+    Object.assign(sampleVol, man.vol || {});
+    delete man.vol;
+    const decode = (f) => fetch('assets/sfx/' + f).then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(f)))
+      .then((ab) => ctx.decodeAudioData(ab)).catch(() => null);
+    await Promise.all(Object.entries(man).map(async ([name, files]) => {
+      const bufs = await Promise.all(files.map(decode));
+      samples[name] = bufs.filter(Boolean);
+    }));
   } catch (e) { /* pas de manifeste : synthèse uniquement */ }
 }
 
@@ -328,11 +329,14 @@ export function sfx(name, opts = null) {
   const wet = opts && opts.dry ? 0 : 1;
   g.connect(out(sp.pan, wet));
   // Échantillon réel si disponible
-  const smp = samples[name];
+  // les pas existent par surface (step_stone, step_dirt…)
+  const key = name === 'step' && samples['step_' + surface] && samples['step_' + surface].length ? 'step_' + surface : name;
+  const smp = samples[key];
   if (smp && smp.length) {
     const s = ctx.createBufferSource();
     s.buffer = smp[Math.floor(Math.random() * smp.length)];
-    s.playbackRate.value = R(0.94, 1.06);
+    s.playbackRate.value = R(0.94, 1.06) * (opts && opts.rate ? opts.rate : 1);
+    if (sampleVol[key] !== undefined) g.gain.value = vol * sampleVol[key];
     s.connect(g);
     s.start();
     return;
