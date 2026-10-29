@@ -116,7 +116,7 @@ export class Effects {
     for (const t of this.texts) {
       const a = Math.min(1, t.life / t.max * 2);
       ctx.globalAlpha = a;
-      ctx.font = `${t.bold ? '600 ' : ''}${t.size}px 'EB Garamond', Georgia, serif`;
+      ctx.font = `${t.bold ? '600 ' : ''}${t.size}px 'Pixelify Sans', sans-serif`;
       ctx.lineWidth = 3;
       ctx.strokeStyle = 'rgba(0,0,0,0.85)';
       ctx.strokeText(t.str, t.x, t.y);

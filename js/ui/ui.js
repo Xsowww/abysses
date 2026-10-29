@@ -849,7 +849,7 @@ export class UI {
         g.beginPath(); g.ellipse(180, 205, 110, 40, 0, 0, Math.PI * 2); g.stroke();
         if (CLASSES[id].locked) {
           g.fillStyle = 'rgba(214,206,189,0.15)';
-          g.font = "120px 'IM Fell English SC', Georgia";
+          g.font = "120px 'Jacquard 24', serif";
           g.textAlign = 'center'; g.textBaseline = 'middle';
           g.fillText('?', 180, 180);
           continue;

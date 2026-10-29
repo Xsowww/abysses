@@ -382,7 +382,7 @@ export class Renderer {
     g.fillStyle = 'rgba(0,0,0,0.35)';
     g.fillRect(x - 4, y + (hh - 22) / 2 - 5, w + 8, 3);
     // enseigne
-    g.font = "15px 'IM Fell English SC', Georgia, serif";
+    g.font = "15px 'Jacquard 24', serif";
     g.textAlign = 'center';
     g.fillStyle = 'rgba(0,0,0,0.6)';
     g.fillText(h.name, x + w / 2 + 1, y + (hh - 22) / 2 + 17);
@@ -525,18 +525,18 @@ export class Renderer {
     ctx.textBaseline = 'middle';
     for (const o of s.interactables) {
       if (o.type !== 'npc' || !inView(o.x, o.y)) continue;
-      ctx.font = "14px 'IM Fell English SC', Georgia, serif";
+      ctx.font = "14px 'Jacquard 24', serif";
       ctx.fillStyle = 'rgba(0,0,0,0.7)';
       ctx.fillText(o.label, o.x + 1, o.y - 29);
       ctx.fillStyle = '#f0e0b8';
       ctx.fillText(o.label, o.x, o.y - 30);
-      ctx.font = "italic 11px 'EB Garamond', Georgia, serif";
+      ctx.font = "11px 'Pixelify Sans', sans-serif";
       ctx.fillStyle = '#a89878';
       ctx.fillText(o.npc.title, o.x, o.y - 19);
       const mark = this.questMark(game, o.id);
       if (mark) {
         const bob = Math.sin(time * 4) * 3;
-        ctx.font = "26px 'IM Fell English SC', Georgia, serif";
+        ctx.font = "26px 'Jacquard 24', serif";
         ctx.fillStyle = 'rgba(0,0,0,0.7)';
         ctx.fillText(mark.c, o.x + 1, o.y - 49 + bob);
         ctx.fillStyle = mark.color;
@@ -544,7 +544,7 @@ export class Renderer {
       }
     }
     // Étiquettes du butin proche
-    ctx.font = "12px 'EB Garamond', Georgia, serif";
+    ctx.font = "12px 'Pixelify Sans', sans-serif";
     for (const d of s.drops) {
       if (!d.item || d.item.kind !== 'equip' || dist(d.x, d.y, p.x, p.y) > 170) continue;
       const name = itemName(d.item);
@@ -1160,7 +1160,7 @@ export class Renderer {
     if (s.boss && !s.boss.dead && explored(s.boss.x, s.boss.y)) {
       const [mx, my] = toM(s.boss.x, s.boss.y);
       g.fillStyle = '#ff4030';
-      g.font = `${big ? 16 : 12}px Georgia`;
+      g.font = `${big ? 16 : 12}px 'Pixelify Sans', sans-serif`;
       g.textAlign = 'center';
       g.textBaseline = 'middle';
       g.fillText('☠', mx, my);
