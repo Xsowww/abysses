@@ -4,6 +4,7 @@ import { unlockAudio } from './core/audio.js';
 import { UI } from './ui/ui.js';
 import { Game } from './game/game.js';
 import { loadSprites } from './game/sprites.js';
+import { loadTiles } from './game/tiles.js';
 
 const canvas = document.getElementById('game');
 input.attach(canvas);
@@ -43,4 +44,4 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-loadSprites().finally(() => { ui.showTitle(); requestAnimationFrame(frame); });
+Promise.all([loadSprites(), loadTiles()]).finally(() => { ui.showTitle(); requestAnimationFrame(frame); });

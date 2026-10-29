@@ -4,7 +4,7 @@ export const TILE = 32;
 
 export const T = {
   VOID: 0, FLOOR: 1, WALL: 2,
-  GRASS: 3, PATH: 4, PLAZA: 5, WATER: 6, HOUSE: 7, FENCE: 8, TREE: 9, PORTAL_FLOOR: 10,
+  GRASS: 3, PATH: 4, PLAZA: 5, WATER: 6, HOUSE: 7, FENCE: 8, TREE: 9, PORTAL_FLOOR: 10, PROP: 11,
 };
 
 export const TILE_PROPS = {
@@ -19,6 +19,7 @@ export const TILE_PROPS = {
   [T.FENCE]: { solid: true, opaque: false },
   [T.TREE]: { solid: true, opaque: false },
   [T.PORTAL_FLOOR]: { solid: false, opaque: false },
+  [T.PROP]: { solid: true, opaque: false },
 };
 
 export class TileMap {

@@ -114,6 +114,10 @@ export class Game {
     s.map = v.map;
     s.houses = v.houses;
     s.braziers = v.braziers;
+    s.ground = v.ground;
+    s.props = v.props;
+    s.fences = v.fences;
+    s.flowers = v.flowers;
     s.interactables = [
       ...v.interactables,
       ...v.npcs.map((n) => ({ type: 'npc', id: n.id, x: n.x, y: n.y, r: 14, label: NPCS[n.id].name, npc: NPCS[n.id], face: Math.PI / 2 })),
@@ -147,6 +151,8 @@ export class Game {
     s.map = d.map;
     s.torches = d.torches;
     s.decor = d.decor;
+    s.props = d.props;
+    s.wallDecor = d.wallDecor;
     s.bossRoom = d.bossRoom;
     s.runStats = { kills: 0, xp: 0, items: 0, startTime: this.time };
     const lvl = enemyLevel(depth);
@@ -272,8 +278,14 @@ export class Game {
       fx0 += Math.cos(p.aim || 0) * 55 + (p.vx || 0) * 0.18;
       fy0 += Math.sin(p.aim || 0) * 40 + (p.vy || 0) * 0.18;
     }
-    const tx = fx0 - this.renderer.w / z / 2;
-    const ty = fy0 - this.renderer.h / z / 2;
+    let tx = fx0 - this.renderer.w / z / 2;
+    let ty = fy0 - this.renderer.h / z / 2;
+    if (s.type === 'village') {
+      // Le village ne montre jamais le vide au-delà de la lisière
+      const mw = s.map.w * TILE - this.renderer.w / z, mh = s.map.h * TILE - this.renderer.h / z;
+      if (mw > 0) tx = clamp(tx, 0, mw);
+      if (mh > 0) ty = clamp(ty, 0, mh);
+    }
     // Ressort amorti (pas d'à-coups)
     this.camV = this.camV || { x: 0, y: 0 };
     const kS = 28, kD = 2 * Math.sqrt(kS);

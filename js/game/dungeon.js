@@ -77,6 +77,76 @@ export function generateDungeon(depth) {
   for (let x = 0; x < W; x++) { map.set(x, 0, T.WALL); map.set(x, H - 1, T.WALL); }
   for (let y = 0; y < H; y++) { map.set(0, y, T.WALL); map.set(W - 1, y, T.WALL); }
 
+  // ---------- Mobilier (objets solides dessinés triés en profondeur) ----------
+  const props = [];      // { name, x, y (base, px), flip }
+  const wallDecor = [];  // { name, tx, ty } : posé sur la face d'un mur (cellule de mur au-dessus d'un sol)
+  const isW = (x, y) => map.get(x, y) === T.WALL;
+  const isF = (x, y) => map.get(x, y) === T.FLOOR;
+  // Peut-on poser un objet de largeur w (cases) en (x, y) sans boucher un passage ?
+  const free = (x, y, w = 1) => {
+    for (let i = -1; i <= w; i++) for (let j = -1; j <= 1; j++) {
+      const t = map.get(x + i, y + j);
+      if (t === T.PROP) return false;
+    }
+    for (let i = 0; i < w; i++) if (!isF(x + i, y)) return false;
+    return true;
+  };
+  const putProp = (name, x, y, w = 1, flip = false) => {
+    if (!free(x, y, w)) return false;
+    for (let i = 0; i < w; i++) map.set(x + i, y, T.PROP);
+    props.push({ name, x: (x + w / 2) * TILE, y: (y + 1) * TILE - 1, flip });
+    return true;
+  };
+  // Le long du mur nord d'une salle : cases dont le mur au-dessus est plein sur w+2 cases (pas d'ouverture).
+  const northSpots = (r, w = 1) => {
+    const out = [];
+    for (let x = r.x + 1; x <= r.x + r.w - 1 - w; x++) {
+      let ok = true;
+      for (let i = -1; i <= w; i++) if (!isW(x + i, r.y - 1)) ok = false;
+      if (ok) out.push(x);
+    }
+    return out;
+  };
+  const STYLES = ['hall', 'crypt', 'ossuary', 'shrine', 'store', 'bare'];
+  rooms.forEach((r, idx) => {
+    const isStart = idx === startIdx, isBoss = idx === bossIdx;
+    const style = isBoss ? 'boss' : isStart ? 'start' : pick(STYLES);
+    const big = r.w >= 10 && r.h >= 8;
+    // Colonnes
+    if (isBoss || (style === 'hall' && big)) {
+      const name = pick(['colA', 'colB', 'pillar']);
+      const ix = isBoss ? 3 : 2, iy = isBoss ? 3 : 2;
+      for (const [x, y] of [[r.x + ix, r.y + iy], [r.x + r.w - 1 - ix, r.y + iy], [r.x + ix, r.y + r.h - 1 - iy], [r.x + r.w - 1 - ix, r.y + r.h - 1 - iy]]) {
+        putProp(chance(0.2) && !isBoss ? 'colbroken' : name, x, y);
+      }
+    }
+    // Objets contre le mur nord
+    const spots = shuffle(northSpots(r));
+    const along = (names, n) => { for (let k = 0; k < n && spots.length; k++) { const nm = pick(names); const w = nm === 'sarco' || nm === 'barrels' || nm === 'gargoyle' ? 2 : nm === 'plaque' ? 3 : 1; putProp(nm, spots.pop(), r.y, w); } };
+    if (style === 'crypt') along(['coffin', 'coffin', 'sarco', 'tomb'], randInt(2, 4));
+    else if (style === 'shrine') along(['statue', 'obelisk', 'statue', 'armor'], randInt(2, 3));
+    else if (style === 'store') along(['barrels', 'barrel', 'crate_gold', 'armorpile'], randInt(2, 4));
+    else if (style === 'ossuary') along(['skulls', 'bonepile'], randInt(1, 2));
+    else if (style === 'boss') along(['gargoyle', 'statue', 'gargoyle'], 2);
+    else if (style === 'hall' && chance(0.5)) along(['armor', 'statue'], 2);
+    // Décor mural : chaînes, squelettes enchaînés, soupiraux, torches éteintes
+    for (let x = r.x; x < r.x + r.w; x++) {
+      if (!isW(x, r.y - 1) || !isF(x, r.y) || map.get(x, r.y) === T.PROP) continue;
+      const roll = Math.random();
+      if (style === 'ossuary' && roll < 0.25) wallDecor.push({ name: 'chained', tx: x, ty: r.y - 1 });
+      else if (roll < 0.06) wallDecor.push({ name: 'chains', tx: x, ty: r.y - 1 });
+      else if (roll < 0.1) wallDecor.push({ name: 'cellwin', tx: x, ty: r.y - 1 });
+    }
+  });
+
+  // Toiles d'araignée dans les coins (sol avec murs au nord et à l'ouest/est)
+  const flatDecor = [];
+  for (let y = 1; y < H - 1; y++) for (let x = 1; x < W - 1; x++) {
+    if (!isF(x, y) || !isW(x, y - 1)) continue;
+    if (isW(x - 1, y) && chance(0.55)) flatDecor.push({ kind: 'web1', x: (x + 0.5) * TILE, y: (y + 0.5) * TILE });
+    else if (isW(x + 1, y) && chance(0.55)) flatDecor.push({ kind: 'web2', x: (x + 0.5) * TILE, y: (y + 0.5) * TILE });
+  }
+
   const toPx = (c) => ({ x: (c.x + 0.5) * TILE, y: (c.y + 0.5) * TILE });
   const randomFloorIn = (r, margin = 1) => {
     for (let k = 0; k < 30; k++) {
@@ -145,8 +215,9 @@ export function generateDungeon(depth) {
   const decor = [];
   for (let k = 0; k < 60 + depth * 10; k++) {
     const x = randInt(1, W - 2), y = randInt(1, H - 2);
-    if (map.get(x, y) === T.FLOOR) decor.push({ x: (x + rand(0.2, 0.8)) * TILE, y: (y + rand(0.2, 0.8)) * TILE, kind: pick(['bone', 'bone', 'rubble', 'skull', 'crack']), rot: rand(0, 6.28) });
+    if (map.get(x, y) === T.FLOOR) decor.push({ x: (x + rand(0.3, 0.7)) * TILE, y: (y + rand(0.3, 0.7)) * TILE, kind: pick(['bones', 'bones', 'rubble', 'skull', 'crack', 'rock', 'blood1', 'ashes', 'roots', 'skeleton', 'bonepile', 'slime']), rot: rand(0, 6.28), flip: chance(0.5) });
   }
+  decor.push(...flatDecor);
 
   return {
     map,
@@ -160,5 +231,7 @@ export function generateDungeon(depth) {
     spawns,
     torches,
     decor,
+    props,
+    wallDecor,
   };
 }

@@ -3,6 +3,7 @@ import { TILE, T } from './world.js';
 import { hash2, TAU, clamp, dist } from '../core/util.js';
 import { itemColor, itemName } from '../data/items.js';
 import { hasSprite, drawSprite, dirFromAngle } from './sprites.js';
+import { hasTiles, drawT, drawProp, tileMeta } from './tiles.js';
 
 const LIGHT_SCALE = 0.5;
 
@@ -66,6 +67,15 @@ export class Renderer {
 
   // ---------- Carte pré-calculée ----------
   buildCache(scene) {
+    // Objets en relief (triés en profondeur avec les personnages)
+    scene.propEnts = (scene.props || []).map((p) => ({
+      x: p.x, y: p.y, prop: true,
+      draw: p.anim
+        ? (ctx, time) => drawProp(ctx, p.anim[Math.floor(time * p.fps + p.x * 0.01) % p.anim.length], p.x, p.y, p.flip)
+        : (ctx) => drawProp(ctx, p.name, p.x, p.y, p.flip),
+    }));
+    if (hasTiles() && scene.type === 'dungeon') { this.buildDungeonTiles(scene); return; }
+    if (hasTiles() && scene.type === 'village' && scene.ground) { this.buildVillageTiles(scene); return; }
     const map = scene.map;
     const c = document.createElement('canvas');
     c.width = map.w * TILE;
@@ -84,11 +94,145 @@ export class Renderer {
     map.cache = c;
   }
 
+  // ---------- Donjon en tuiles LPC ----------
+  buildDungeonTiles(scene) {
+    const map = scene.map;
+    const c = document.createElement('canvas');
+    c.width = map.w * TILE;
+    c.height = map.h * TILE;
+    const g = c.getContext('2d');
+    g.imageSmoothingEnabled = false;
+    g.fillStyle = '#000';
+    g.fillRect(0, 0, c.width, c.height);
+    const wall = (x, y) => { const t = map.get(x, y); return t === T.WALL || t === T.VOID || t === undefined; };
+    const open = (x, y) => !wall(x, y);
+    const faceLow = (x, y) => wall(x, y) && open(x, y + 1);
+    const faceHigh = (x, y) => wall(x, y) && !faceLow(x, y) && faceLow(x, y + 1);
+    const top = (x, y) => wall(x, y) && !faceLow(x, y) && !faceHigh(x, y);
+    const near = (x, y) => { for (let j = -2; j <= 2; j++) for (let i = -2; i <= 2; i++) if (open(x + i, y + j)) return true; return false; };
+    const theme = (scene.depth || 1) % 3; // 1 : pavés, 2 : dalles, 0 : grotte
+    const br = scene.bossRoom;
+    const inBoss = (x, y) => br && x >= br.x && x < br.x + br.w && y >= br.y && y < br.y + br.h;
+    const T32 = TILE;
+    // Sols
+    for (let ty = 0; ty < map.h; ty++) for (let tx = 0; tx < map.w; tx++) {
+      if (wall(tx, ty)) continue;
+      const x = tx * T32, y = ty * T32, h = hash2(tx, ty, 1);
+      if (inBoss(tx, ty)) drawT(g, 'f_flag', x, y, [(tx % 3) * 32, (ty % 3) * 32, 32, 32]);
+      else if (theme === 1) drawT(g, h < 0.12 ? 'f_cobble2' : 'f_cobble', x, y);
+      else if (theme === 2) {
+        drawT(g, 'f_flag', x, y, [(tx % 3) * 32, (ty % 3) * 32, 32, 32]);
+      } else drawT(g, h < 0.1 ? 'f_dirt' : 'f_cave', x, y);
+    }
+    // Dessus des murs : noir + bordure de pierre côté ouvert
+    for (let ty = 0; ty < map.h; ty++) for (let tx = 0; tx < map.w; tx++) {
+      if (!top(tx, ty) || !near(tx, ty)) continue;
+      const x = tx * T32, y = ty * T32;
+      const n = !top(tx, ty - 1), so = !top(tx, ty + 1), w = !top(tx - 1, ty), e = !top(tx + 1, ty);
+      if (w) drawT(g, 'top', x, y, [0, 32, 8, 32]);
+      if (e) drawT(g, 'top', x + 24, y, [88, 32, 8, 32]);
+      if (n) drawT(g, 'top', x, y, [32, 0, 32, 11]);
+      if (so) drawT(g, 'top', x, y + 24, [32, 88, 32, 8]);
+      if (n && w) drawT(g, 'top', x, y, [0, 0, 11, 11]);
+      if (n && e) drawT(g, 'top', x + 21, y, [85, 0, 11, 11]);
+      if (so && w) drawT(g, 'top', x, y + 24, [0, 88, 8, 8]);
+      if (so && e) drawT(g, 'top', x + 24, y + 24, [88, 88, 8, 8]);
+      if (!n && !w && !top(tx - 1, ty - 1)) drawT(g, 'topin', x, y, [0, 0, 8, 8]);
+      if (!n && !e && !top(tx + 1, ty - 1)) drawT(g, 'topin', x + 24, y, [56, 0, 8, 8]);
+      if (!so && !w && !top(tx - 1, ty + 1)) drawT(g, 'topin', x, y + 24, [0, 56, 8, 8]);
+      if (!so && !e && !top(tx + 1, ty + 1)) drawT(g, 'topin', x + 24, y + 24, [56, 56, 8, 8]);
+    }
+    // Faces de mur (briques), sur deux cases de haut
+    for (let ty = 0; ty < map.h; ty++) for (let tx = 0; tx < map.w; tx++) {
+      const col = (tx % 3) * 32;
+      if (faceHigh(tx, ty)) drawT(g, 'face3', tx * T32, ty * T32, [col, 0, 32, 32]);
+      else if (faceLow(tx, ty)) drawT(g, 'face3', tx * T32, ty * T32, [col, 64, 32, 32]);
+    }
+    // Décor mural
+    for (const d of scene.wallDecor || []) {
+      const x = d.tx * T32, y = d.ty * T32;
+      if (d.name === 'chained') drawT(g, 'chained', x, y - 30);
+      else if (d.name === 'cellwin') drawT(g, 'cellwin', x, y - 26);
+      else drawT(g, d.name, x, y - 6);
+    }
+    this.drawWallShadows(g, map);
+    // Décor au sol
+    for (const d of scene.decor || []) {
+      if (!tileMeta(d.kind)) continue;
+      drawT(g, d.kind, Math.round(d.x - 16), Math.round(d.y - 16), null, d.flip);
+    }
+    // Patine : couleurs ternies et froides
+    g.globalCompositeOperation = 'saturation';
+    g.fillStyle = 'rgba(128,128,128,0.4)';
+    g.fillRect(0, 0, c.width, c.height);
+    g.globalCompositeOperation = 'multiply';
+    g.fillStyle = 'rgb(176,170,186)';
+    g.fillRect(0, 0, c.width, c.height);
+    g.globalCompositeOperation = 'source-over';
+    map.cache = c;
+  }
+
+  // ---------- Village en tuiles LPC ----------
+  buildVillageTiles(scene) {
+    const map = scene.map;
+    const W = map.w, H = map.h;
+    const c = document.createElement('canvas');
+    c.width = W * TILE;
+    c.height = H * TILE;
+    const g = c.getContext('2d');
+    g.imageSmoothingEnabled = false;
+    const G = (x, y) => (x < 0 || y < 0 || x >= W || y >= H ? 'g' : scene.ground[y * W + x]);
+    // Herbe partout
+    for (let ty = 0; ty < H; ty++) for (let tx = 0; tx < W; tx++) {
+      const h = hash2(tx, ty, 4);
+      drawT(g, h < 0.5 ? 'g_plain' : 'g' + Math.floor(hash2(tx, ty, 5) * 3), tx * TILE, ty * TILE);
+    }
+    for (const f of scene.flowers || []) drawT(g, 'g_flowers', f.x * TILE, f.y * TILE, [Math.floor(hash2(f.x, f.y, 6) * 3) * 32, 0, 32, 32]);
+    // Terre : raccords automatiques avec l'herbe (bords et coins)
+    for (let ty = 0; ty < H; ty++) for (let tx = 0; tx < W; tx++) {
+      const k = G(tx, ty);
+      const x = tx * TILE, y = ty * TILE;
+      if (k === 'c') { drawT(g, hash2(tx, ty, 8) < 0.1 ? 'f_cobble2' : 'f_cobble', x, y); continue; }
+      if (k === 'f') { drawT(g, 'f_flag', x, y, [(tx % 3) * 32, (ty % 3) * 32, 32, 32]); continue; }
+      if (k !== 'd') continue;
+      const d = (i, j) => G(tx + i, ty + j) !== 'g';
+      const n = d(0, -1), s2 = d(0, 1), w = d(-1, 0), e = d(1, 0);
+      const col = !w && e ? 0 : w && !e ? 2 : 1;
+      const row = !n && s2 ? 0 : n && !s2 ? 2 : 1;
+      drawT(g, 'd_patch', x, y, [col * 32, row * 32, 32, 32]);
+      if (col === 1 && row === 1) {
+        // coins rentrants
+        if (!d(1, 1)) drawT(g, 'd_inner', x, y, [0, 0, 32, 32]);
+        else if (!d(-1, 1)) drawT(g, 'd_inner', x, y, [32, 0, 32, 32]);
+        else if (!d(1, -1)) drawT(g, 'd_inner', x, y, [0, 32, 32, 32]);
+        else if (!d(-1, -1)) drawT(g, 'd_inner', x, y, [32, 32, 32, 32]);
+      }
+    }
+    // Clôtures
+    for (const f of scene.fences || []) drawT(g, f.name, f.x * TILE, f.y * TILE, [32, 0, 32, 32]);
+    // Ombre douce sous les maisons et les arbres
+    g.fillStyle = 'rgba(0,0,0,0.28)';
+    for (const p of scene.props || []) {
+      const m = tileMeta(p.name);
+      if (!m) continue;
+      g.beginPath(); g.ellipse(p.x + 4, p.y - 2, m[2] * 0.42, 7, 0, 0, TAU); g.fill();
+    }
+    // Patine nocturne
+    g.globalCompositeOperation = 'saturation';
+    g.fillStyle = 'rgba(128,128,128,0.35)';
+    g.fillRect(0, 0, c.width, c.height);
+    g.globalCompositeOperation = 'multiply';
+    g.fillStyle = 'rgb(150,160,182)';
+    g.fillRect(0, 0, c.width, c.height);
+    g.globalCompositeOperation = 'source-over';
+    map.cache = c;
+  }
+
   drawTile(g, map, tx, ty, type) {
     const t = map.get(tx, ty);
     const x = tx * TILE, y = ty * TILE;
     const h = hash2(tx, ty, 1), h2 = hash2(tx, ty, 2), h3 = hash2(tx, ty, 3);
-    if (t === T.FLOOR) {
+    if (t === T.FLOOR || t === T.PROP) {
       const l = 15 + h * 4;
       g.fillStyle = `hsl(35, 5%, ${l - 6}%)`;
       g.fillRect(x, y, TILE, TILE);
@@ -286,7 +430,7 @@ export class Renderer {
     const inView = (x, y, m = 80) => x > cx - m && x < cx + vw + m && y > cy - m && y < cy + vh + m;
 
     // Fontaine animée (village)
-    if (s.type === 'village') this.drawVillageDynamic(ctx, s, time);
+    if (s.type === 'village' && !hasTiles()) this.drawVillageDynamic(ctx, s, time);
 
     // Pièges posés
     for (const t of s.traps) if (inView(t.x, t.y)) this.drawTrap(ctx, t, time);
@@ -298,13 +442,20 @@ export class Renderer {
     for (const d of s.drops) if (inView(d.x, d.y)) this.drawDrop(ctx, d, time);
 
     // Torches / braseros
-    for (const t of s.torches) if (inView(t.x, t.y)) this.drawFlame(ctx, t.x, t.y - 6, time, 0.8);
-    for (const b of s.braziers) if (inView(b.x, b.y)) this.drawBrazier(ctx, b, time);
+    if (hasTiles()) {
+      for (const t of s.torches) if (inView(t.x, t.y)) drawT(ctx, 'torch' + (Math.floor(time * 8 + t.x) % 3), t.x - 16, t.y - 34);
+    } else for (const t of s.torches) if (inView(t.x, t.y)) this.drawFlame(ctx, t.x, t.y - 6, time, 0.8);
+    for (const b of s.braziers) {
+      if (b.lamp || b.camp || !inView(b.x, b.y)) continue;
+      if (hasTiles()) drawT(ctx, 'fire' + (Math.floor(time * 9 + b.x) % 4), b.x - 16, b.y - 22);
+      else this.drawBrazier(ctx, b, time);
+    }
 
     // Entités triées par y
     const ents = [];
     for (const e of s.enemies) if ((!e.dead || e.deadT > 0) && inView(e.x, e.y)) ents.push(e);
     ents.push(game.player);
+    for (const pe of s.propEnts || []) if (inView(pe.x, pe.y, 120)) ents.push(pe);
     ents.sort((a, b) => a.y - b.y);
     for (const e of ents) e.draw(ctx, time);
 
@@ -428,7 +579,7 @@ export class Renderer {
     // Braises qui s'échappent des torches et braseros
     if (!this.embers) this.embers = [];
     const em = this.embers;
-    const sources = [...s.torches, ...s.braziers];
+    const sources = [...s.torches, ...s.braziers.filter((b) => !b.lamp)];
     for (const t of sources) {
       if (t.x < cx - 50 || t.x > cx + vw + 50 || t.y < cy - 50 || t.y > cy + vh + 50) continue;
       if (Math.random() < 0.06) em.push({ x: t.x + (Math.random() - 0.5) * 6, y: t.y - 10, vx: (Math.random() - 0.5) * 10, vy: -20 - Math.random() * 25, life: 1 + Math.random() * 1.2 });
@@ -596,7 +747,7 @@ export class Renderer {
     const flick = (k) => 1 + Math.sin(time * 9 + k) * 0.04 + Math.sin(time * 23 + k * 3) * 0.03;
     if (!p.dead || s.type === 'village') lights.push({ x: p.x, y: p.y, r: (s.type === 'dungeon' ? 340 : 280) * flick(0), a: 1, c: 'warm', g: 0.1 });
     for (const t of s.torches) lights.push({ x: t.x, y: t.y, r: 190 * flick(t.x), a: 0.85, c: 'warm', g: 0.18 });
-    for (const b of s.braziers) lights.push({ x: b.x, y: b.y, r: 230 * flick(b.y), a: 0.9, c: 'warm', g: 0.22 });
+    for (const b of s.braziers) lights.push(b.lamp ? { x: b.x, y: b.y, r: 170 * flick(b.x), a: 0.85, c: 'warm', g: 0.2 } : { x: b.x, y: b.y, r: (b.camp ? 270 : 230) * flick(b.y), a: 0.9, c: 'warm', g: 0.22 });
     for (const o of s.interactables) {
       if (o.type === 'extract') lights.push({ x: o.x, y: o.y, r: 200, a: 0.8, c: 'green', g: 0.3 });
       else if (o.type === 'portal') lights.push({ x: o.x, y: o.y, r: 220, a: 0.8, c: 'purple', g: 0.35 });
@@ -925,7 +1076,7 @@ export class Renderer {
         const t = map.tiles[i];
         let r = 0, gg = 0, b = 0, a = 0;
         if (map.explored[i]) {
-          if (t === T.FLOOR || t === T.PLAZA || t === T.PATH || t === T.PORTAL_FLOOR) { r = 105; gg = 100; b = 92; a = 255; }
+          if (t === T.FLOOR || t === T.PROP || t === T.PLAZA || t === T.PATH || t === T.PORTAL_FLOOR) { r = 105; gg = 100; b = 92; a = 255; }
           else if (t === T.GRASS) { r = 45; gg = 70; b = 40; a = 255; }
           else if (t === T.WATER) { r = 50; gg = 90; b = 140; a = 255; }
           else if (t === T.HOUSE) { r = 110; gg = 60; b = 50; a = 255; }

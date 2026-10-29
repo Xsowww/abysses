@@ -45,10 +45,14 @@ Dans l’inventaire : **clic** pour sélectionner, **clic droit** pour l’actio
 - Le **butin trouvé** dans le sac (marqué d’un **!** orange) et l’**or ramassé** pendant l’expédition sont **perdus** si vous mourez.
 - Pour rentrer avec votre butin : **point d’extraction** (pilier vert, 4 s d’incantation), **portail** qui apparaît après le boss, ou **pierre de retour** (5 s). Une incantation est interrompue si vous êtes touché ou si vous bougez.
 
-## Contenu (v0.3)
+## Contenu (v0.4)
+
+- **Graphismes pixel art** (Liberated Pixel Cup) : personnages animés, donjon en briques et dalles avec mobilier (colonnes, cercueils, statues, ossuaires), village de Cendrebourg redessiné (chaumières, forêt, puits, étals, cimetière, fontaine).
+- **Vrais sons et musiques** : bruitages enregistrés (OpenGameArt) et musiques de Kevin MacLeod. Liste complète des auteurs dans le menu **Crédits**.
+
 
 - **Histoire** (Acte I, « La Cloche Noire ») : prologue, trame principale en 9 quêtes, dialogues, 5 Gardiens nommés, 12 fragments de lore à collectionner, inscriptions au sol.
-- **Son** : bruitages synthétisés (métal, os, cordes d’arc, pas), réverbération de crypte, sons spatialisés, musique et ambiances générées en direct (village, crypte, boss). De vrais fichiers audio peuvent être ajoutés dans `assets/sfx/` (voir `LISEZMOI.md`).
+- **Son** : réverbération de crypte, sons spatialisés, pas selon le sol.
 - **Mise en scène** : ralentis, caméra sur les boss, morts animées, colonnes de lumière, images rémanentes, braises, flash de dégâts.
 - **Progression lente** : plusieurs heures pour atteindre le niveau 10, butin et or plus rares.
 
