@@ -2,6 +2,7 @@
 import { TILE, T } from './world.js';
 import { hash2, TAU, clamp, dist } from '../core/util.js';
 import { itemColor, itemName } from '../data/items.js';
+import { hasSprite, drawSprite, dirFromAngle } from './sprites.js';
 
 const LIGHT_SCALE = 0.5;
 
@@ -303,7 +304,7 @@ export class Renderer {
     // Entités triées par y
     const ents = [];
     for (const e of s.enemies) if ((!e.dead || e.deadT > 0) && inView(e.x, e.y)) ents.push(e);
-    if (!game.player.dead) ents.push(game.player);
+    ents.push(game.player);
     ents.sort((a, b) => a.y - b.y);
     for (const e of ents) e.draw(ctx, time);
 
@@ -742,7 +743,13 @@ export class Renderer {
 
   drawInteractable(ctx, o, time, game) {
     const x = o.x, y = o.y;
-    if (o.type === 'npc') {
+    if (o.type === 'npc' && hasSprite(o.id)) {
+      const p = game.player;
+      const near = dist(x, y, p.x, p.y) < 220;
+      const dir = near ? dirFromAngle(Math.atan2(p.y - y, p.x - x)) : 2;
+      const casting = o.id === 'maelis' && !near;
+      drawSprite(ctx, o.id, x, y + 8, casting ? { anim: 'cast', frame: 1 + (time * 1.5) % 2, dir: 2 } : { anim: 'walk', frame: 0, dir, squashY: 1 + 0.012 * Math.sin(time * 2 + x) });
+    } else if (o.type === 'npc') {
       const N = o.npc;
       ctx.fillStyle = 'rgba(0,0,0,0.45)';
       ctx.beginPath(); ctx.ellipse(x + 2, y + 9, 15, 7, 0, 0, TAU); ctx.fill();

@@ -2,6 +2,9 @@
 import { ENEMIES, scaleFor } from '../data/enemies.js';
 import { rand, TAU, dist, angleDiff, chance, weightedPick } from '../core/util.js';
 import { sfx } from '../core/audio.js';
+import { hasSprite, drawSprite, dirFromAngle, walkFrame } from './sprites.js';
+
+const SPRITE_OF = { rat: 'goule', squelette: 'squelette', archer: 'archer', acolyte: 'acolyte', gardien: 'gardien' };
 
 export class Enemy {
   constructor(type, x, y, level, elite = false) {
@@ -369,7 +372,62 @@ export class Enemy {
   }
 
   // ---------------- RENDU ----------------
+  // Animation du sprite selon l'état de l'IA
+  spriteState(time) {
+    const name = SPRITE_OF[this.type];
+    const dir = dirFromAngle(this.angle);
+    const D = this.def;
+    if (this.dead) {
+      const k = 1 - Math.max(0, this.deadT) / (this.deathMax || 0.7);
+      return { anim: 'hurt', frame: Math.min(5.99, k * 9), dir: 0, alpha: k > 0.75 ? 1 - (k - 0.75) * 4 : 1 };
+    }
+    if (this.spawnT > 0) return { anim: 'hurt', frame: 5.99 * (this.spawnT / 0.7), dir: 0 }; // se relève du sol
+    if (this.stun > 0) return { anim: 'walk', frame: 0, dir, rot: Math.sin(time * 9) * 0.05 };
+    const tp = this.tele ? Math.min(1, this.tele.t / this.tele.dur) : 0;
+    const ranged = D.ai === 'ranged';
+    if (this.boss && this.dashing) return { anim: 'run', frame: walkFrame(name, 'run', time * 16), dir };
+    if (this.lunge) return { anim: 'attack', frame: 3 + Math.min(2.99, this.lunge.t * 14), dir };
+    if (this.state === 'windup') return { anim: 'attack', frame: ranged ? tp * 8.99 : tp * 2.6, dir };
+    if (this.state === 'cast') return { anim: 'attack', frame: Math.min(6.99, (1 - this.t / 0.7) * 7), dir };
+    if (this.state === 'recover') {
+      const k = Math.max(0, Math.min(1, 1 - this.t / 0.45));
+      return { anim: 'attack', frame: ranged ? 9 + k * 3.99 : 3 + k * 2.99, dir };
+    }
+    if (this.state === 'chase' || (this.mvx && Math.abs(this.mvx) + Math.abs(this.mvy) > 20)) {
+      const fast = this.speed * this.speedMult() > 120;
+      return { anim: fast ? 'run' : 'walk', frame: walkFrame(name, fast ? 'run' : 'walk', this.walkT * (fast ? 0.9 : 1.2)), dir };
+    }
+    return { anim: 'walk', frame: 0, dir, squashY: 1 + 0.012 * Math.sin(time * 2 + this.x) };
+  }
+
   draw(ctx, time) {
+    const sprName = SPRITE_OF[this.type];
+    if (hasSprite(sprName)) {
+      const sc = this.boss ? 1.7 : this.elite ? 1.14 : 1;
+      if (!this.dead && this.elite) {
+        ctx.strokeStyle = `rgba(200,150,70,${0.3 + 0.2 * Math.sin(time * 4)})`;
+        ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.ellipse(this.x, this.y, 18 * sc, 7 * sc, 0, 0, Math.PI * 2); ctx.stroke();
+      }
+      if (!this.dead && this.poison) {
+        ctx.fillStyle = 'rgba(110,150,60,0.25)';
+        ctx.beginPath(); ctx.ellipse(this.x, this.y, 16 * sc, 6 * sc, 0, 0, Math.PI * 2); ctx.fill();
+      }
+      const st = this.spriteState(time);
+      drawSprite(ctx, sprName, this.x, this.y + this.r * 0.55, {
+        ...st, scale: sc, flash: this.flash > 0 && !this.dead ? this.flash : 0,
+        squashX: (st.squashX || 1) * (1 + (this.squash || 0) * 0.12), squashY: (st.squashY || 1) * (1 - (this.squash || 0) * 0.1),
+        shadow: !this.dead || this.deadT > 0.2,
+      });
+      if (this.stun > 0 && !this.dead) {
+        ctx.fillStyle = '#c9b06a';
+        for (let i = 0; i < 3; i++) {
+          const a = time * 6 + (i * TAU) / 3;
+          ctx.beginPath(); ctx.arc(this.x + Math.cos(a) * 10 * sc, this.y - 50 * sc + Math.sin(a) * 3, 2, 0, TAU); ctx.fill();
+        }
+      }
+      return;
+    }
     const x = this.x, y = this.y;
     const r = this.r;
     const OUT = '#0a0908';
@@ -546,6 +604,18 @@ export class Enemy {
   // Yeux lumineux, dessinés par-dessus l'obscurité.
   drawEyes(ctx) {
     if (this.dead || this.type === 'rat' || this.spawnT > 0) return;
+    if (hasSprite(SPRITE_OF[this.type])) {
+      const dir = dirFromAngle(this.angle);
+      if (dir === 0) return; // de dos
+      const sc = this.boss ? 1.7 : this.elite ? 1.14 : 1;
+      const hy = this.y + this.r * 0.55 - (this.type === 'acolyte' ? 41 : 40) * sc;
+      const col = this.type === 'acolyte' ? 'rgba(190,140,240,0.9)' : this.boss ? 'rgba(255,70,40,0.95)' : 'rgba(240,90,50,0.85)';
+      ctx.fillStyle = col;
+      const s2 = this.boss ? 1.6 : 1.1;
+      if (dir === 2) { ctx.fillRect(this.x - 3 * sc - s2 / 2, hy, s2, s2); ctx.fillRect(this.x + 3 * sc - s2 / 2, hy, s2, s2); }
+      else ctx.fillRect(this.x + (dir === 3 ? 4 : -4) * sc - s2 / 2, hy, s2, s2);
+      return;
+    }
     const r = this.r;
     const c = Math.cos(this.angle), s = Math.sin(this.angle);
     const ex = this.x + c * r * (this.boss ? 0.7 : 0.6);

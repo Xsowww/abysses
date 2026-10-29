@@ -53,13 +53,13 @@ export const QUESTS = [
   },
   {
     id: 'q_rats', giver: 'aldric', main: true, name: 'Vermine', req: 'm_arrivee',
-    desc: 'Les rats de la Crypte remontent jusqu’aux réserves. En abattre 10.',
+    desc: 'Des goules remontent de la Crypte et rôdent près des réserves. En abattre 10.',
     intro: [
       'Maëlis t’envoie ? Alors tu as le droit de mourir pour Cendrebourg. Félicitations.',
-      'Les rats d’abord. Ils remontent par les fissures et dévorent nos réserves. Ils sont gros comme des chiens, là-dessous.',
-      'Tues-en dix. Et regarde bien comment ils bondissent : ils prennent leur élan avant de sauter.',
+      'Les goules d’abord. Des morts affamés qui remontent par les fissures et rôdent autour des réserves.',
+      'Tues-en dix. Et regarde bien comment elles bondissent : elles se ramassent avant de sauter.',
     ],
-    outro: ['Dix. Bien. Les réserves tiendront une semaine de plus.', 'Ne prends pas la grosse tête. Les rats, c’était l’entraînement.'],
+    outro: ['Dix. Bien. Les réserves tiendront une semaine de plus.', 'Ne prends pas la grosse tête. Les goules, c’était l’entraînement.'],
     obj: { type: 'kill', target: 'rat', count: 10 },
     reward: { xp: 120, gold: 40 },
   },

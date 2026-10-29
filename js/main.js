@@ -3,6 +3,7 @@ import { input } from './core/input.js';
 import { unlockAudio } from './core/audio.js';
 import { UI } from './ui/ui.js';
 import { Game } from './game/game.js';
+import { loadSprites } from './game/sprites.js';
 
 const canvas = document.getElementById('game');
 input.attach(canvas);
@@ -42,5 +43,4 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-ui.showTitle();
-requestAnimationFrame(frame);
+loadSprites().finally(() => { ui.showTitle(); requestAnimationFrame(frame); });

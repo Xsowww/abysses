@@ -7,6 +7,7 @@ import { PROLOGUE, LORE, LORE_BY_ID, npcTalk } from '../data/story.js';
 import { icon, itemIconName } from './icons.js';
 import { startTitleBg, stopTitleBg } from './titlebg.js';
 import { drawHero } from '../game/hero.js';
+import { hasSprite, drawSprite, walkFrame } from '../game/sprites.js';
 import {
   RARITIES, SLOTS, EQUIP_ORDER, WEAPONS, CONSUMABLES, affixText, itemName, itemColor, itemRarity, itemLore, itemClass,
   buyPrice, sellValue, isTwoHanded, makeConsumable, slotLabel, starterKit,
@@ -540,7 +541,7 @@ export class UI {
   questObjText(q, st) {
     const o = q.obj;
     const n = st ? st.progress : 0;
-    const names = { rat: 'Rats des cryptes', squelette: 'Squelettes', archer: 'Archers squelettes', acolyte: 'Acolytes des Abysses' };
+    const names = { rat: 'Goules', squelette: 'Squelettes', archer: 'Archers squelettes', acolyte: 'Acolytes des Abysses' };
     switch (o.type) {
       case 'kill': return `${names[o.target]} abattus : ${n} / ${o.count}`;
       case 'elite': return `Élites abattues : ${n} / ${o.count}`;
@@ -840,6 +841,12 @@ export class UI {
           g.font = "120px 'IM Fell English SC', Georgia";
           g.textAlign = 'center'; g.textBaseline = 'middle';
           g.fillText('?', 180, 180);
+          continue;
+        }
+        if (hasSprite(id)) {
+          g.imageSmoothingEnabled = false;
+          const sel = id === this.screenCls;
+          drawSprite(g, id, 180, 275, sel ? { anim: 'walk', frame: walkFrame(id, 'walk', t * 9), dir: 2, scale: 4 } : { anim: 'walk', frame: 0, dir: 2, scale: 4, squashY: 1 + 0.01 * Math.sin(t * 2) });
           continue;
         }
         const kit = this._kits || (this._kits = { guerrier: starterKit('guerrier'), rodeur: starterKit('rodeur') });

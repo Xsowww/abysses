@@ -3,7 +3,7 @@
 
 export const ENEMIES = {
   rat: {
-    name: 'Rat des cryptes', r: 10, hp: 14, dmg: 5, speed: 135, xp: 4, gold: [0, 2],
+    name: 'Goule', r: 12, hp: 14, dmg: 5, speed: 135, xp: 4, gold: [0, 2],
     color: '#7a5a3a', ai: 'lunge', atkRange: 70, windup: 0.4, cd: 1.3, aggro: 280, weight: 1,
   },
   squelette: {

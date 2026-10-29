@@ -4,7 +4,8 @@ import { CLASSES, SKILLS } from '../data/classes.js';
 import { WEAPONS, FISTS } from '../data/items.js';
 import { rand, clamp, TAU, dist, angleDiff } from '../core/util.js';
 import { sfx } from '../core/audio.js';
-import { drawHero, drawWarriorWeapon } from './hero.js';
+import { drawHero } from './hero.js';
+import { hasSprite, drawSprite, dirFromAngle, walkFrame, animFrames } from './sprites.js';
 
 const ROLL_COST = 22;
 const ATTACK_COST = 6;
@@ -55,6 +56,8 @@ export class Player {
     this.vx = 0;
     this.vy = 0;
     this.stepT = 0;
+    this.atk = null; // animation d'attaque en cours { anim, from, to, t, dur }
+    this.deathT = 0;
     this.ghosts = [];
     this.ghostT = 0;
   }
@@ -150,7 +153,8 @@ export class Player {
   update(dt) {
     const g = this.game;
     for (let i = this.ghosts.length - 1; i >= 0; i--) { this.ghosts[i].t -= dt; if (this.ghosts[i].t <= 0) this.ghosts.splice(i, 1); }
-    if (this.dead) return;
+    if (this.atk) { this.atk.t += dt; if (this.atk.t >= this.atk.dur) this.atk = null; }
+    if (this.dead) { this.deathT += dt; return; }
     this.invuln = Math.max(0, this.invuln - dt);
     this.attackCd -= dt;
     this.specialCd -= dt;
@@ -280,6 +284,7 @@ export class Player {
 
   shoot(ang, mult, o = {}) {
     const g = this.game;
+    this.atk = { anim: 'attack', from: 8, to: 12.99, t: 0, dur: o.heavy ? 0.4 : 0.24 };
     const w = this.weapon();
     const sp = (w.projSpeed || 700) * (o.speed || 1);
     g.spawnProjectile({
@@ -296,6 +301,8 @@ export class Player {
   doSwing(ang, range, arc, mult, kb, heavy) {
     const g = this.game;
     this.swing = { t: 0, dur: heavy ? 0.22 : 0.15, ang, arc, range, heavy };
+    // Animation : on part juste avant l'impact pour que le coup « parte » tout de suite
+    this.atk = { anim: heavy ? 'heavy' : 'attack', from: 1, to: 5.99, t: 0, dur: heavy ? 0.42 : Math.max(0.26, this.weapon().cd * 0.8) };
     sfx(heavy ? 'heavy' : 'swing');
     const hits = g.meleeFromPlayer(this.x, this.y, ang, range, arc, mult, kb, heavy ? 0.25 : 0);
     if (heavy) { g.fx.shake(hits ? 6 : 2); if (hits) g.hitstop(0.06); }
@@ -424,6 +431,32 @@ export class Player {
     }
   }
 
+  // État d'animation du sprite (direction, animation, frame, déformation)
+  spriteState(time) {
+    const name = this.pd.cls;
+    const sp = Math.hypot(this.vx || 0, this.vy || 0);
+    let dir = dirFromAngle(this.aim);
+    if (this.dead) return { anim: 'hurt', frame: Math.min(5, this.deathT * 9), dir: 0 };
+    if (this.whirl) return { anim: 'attack', frame: 2 + ((this.whirl.t * 14) % 3), dir: Math.floor(this.whirl.t * 12) % 4 };
+    if (this.roll) {
+      const k = this.roll.t / this.roll.dur;
+      dir = dirFromAngle(Math.atan2(this.roll.dy, this.roll.dx));
+      return { anim: 'run', frame: walkFrame(name, 'run', k * 8), dir, squashY: 1 - 0.18 * Math.sin(k * Math.PI), squashX: 1 + 0.08 * Math.sin(k * Math.PI) };
+    }
+    if (this.dash) return { anim: 'run', frame: walkFrame(name, 'run', this.dash.t * 40), dir };
+    if (this.atk && animFrames(name, this.atk.anim)) {
+      const a = this.atk;
+      return { anim: a.anim, frame: a.from + (a.to - a.from) * Math.min(1, a.t / a.dur), dir };
+    }
+    if (this.channel) return { anim: 'walk', frame: 0, dir: 2, squashY: 1 + 0.015 * Math.sin(time * 3) };
+    if (this.moving) {
+      const run = sp > 150;
+      return { anim: run ? 'run' : 'walk', frame: walkFrame(name, run ? 'run' : 'walk', this.walkT * (run ? 0.95 : 1.1)), dir };
+    }
+    // Au repos : respiration légère
+    return { anim: 'walk', frame: 0, dir, squashY: 1 + 0.012 * Math.sin(time * 2.4) };
+  }
+
   draw(ctx, time) {
     const eq = this.pd.equipment;
     const blink = this.invuln > 0 && !this.roll && !this.dash && Math.floor(time * 20) % 2 === 0;
@@ -436,15 +469,20 @@ export class Player {
       ctx.arc(this.x, this.y, this.r + 7, 0, TAU);
       ctx.stroke();
     }
-    // Images rémanentes (roulade, charge)
-    for (const gh of this.ghosts) {
-      drawHero(ctx, gh.x, gh.y, { cls: this.pd.cls, angle: gh.a, time, eq, alpha: (gh.t / 0.22) * 0.25, flash: 0 });
+    const name = this.pd.cls;
+    if (hasSprite(name)) {
+      const st = this.spriteState(time);
+      for (const gh of this.ghosts) drawSprite(ctx, name, gh.x, gh.y, { ...st, alpha: (gh.t / 0.22) * 0.3, flash: 0.6, shadow: false });
+      drawSprite(ctx, name, this.x, this.y, { ...st, alpha: this.stealth ? 0.3 : blink ? 0.6 : 1, flash: this.flash });
+    } else {
+      for (const gh of this.ghosts) drawHero(ctx, gh.x, gh.y, { cls: name, angle: gh.a, time, eq, alpha: (gh.t / 0.22) * 0.25, flash: 0 });
+      drawHero(ctx, this.x, this.y, {
+        cls: name, angle: this.angle, time, moving: this.moving, walkT: this.walkT, flash: this.flash, eq,
+        roll: this.roll ? this.roll.t / this.roll.dur : 0, whirlT: this.whirl ? this.whirl.t : null, swing: this.swing,
+        alpha: this.stealth ? 0.35 : blink ? 0.55 : 1, bowDraw: this.bowDraw,
+      });
     }
-    drawHero(ctx, this.x, this.y, {
-      cls: this.pd.cls, angle: this.angle, time, moving: this.moving, walkT: this.walkT, flash: this.flash, eq,
-      roll: this.roll ? this.roll.t / this.roll.dur : 0, whirlT: this.whirl ? this.whirl.t : null, swing: this.swing,
-      alpha: this.stealth ? 0.35 : blink ? 0.55 : 1, bowDraw: this.bowDraw,
-    });
+    if (this.dead) return;
 
     // Arc de frappe (corps à corps)
     if (this.swing) {
@@ -469,8 +507,6 @@ export class Player {
       ctx.closePath();
       ctx.fill();
       ctx.globalAlpha = 1;
-      ctx.rotate(cur);
-      drawWarriorWeapon(ctx, eq.weapon, 0, s.range / 62);
       ctx.restore();
     }
 
