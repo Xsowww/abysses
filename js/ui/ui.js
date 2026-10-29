@@ -1077,16 +1077,19 @@ export class UI {
     const p = g.player;
     const pd = this.pd;
     const h = this.hud;
-    const hpPct = (100 * Math.max(0, p.hp) / p.maxHp) + '%';
-    h.hpFill.style.width = hpPct;
-    h.hpTrail.style.width = hpPct;
-    h.hpText.textContent = `${Math.ceil(Math.max(0, p.hp))} / ${p.maxHp}`;
-    const staPct = (100 * p.stamina / p.maxStamina) + '%';
-    h.staFill.style.width = staPct;
-    h.staTrail.style.width = staPct;
+    // n'écrire dans la page que ce qui a changé (évite les recalculs de mise en page à chaque image)
+    const W = (el, v) => { if (el._w !== v) { el._w = v; el.style.width = v; } };
+    const T = (el, v) => { if (el._t !== v) { el._t = v; el.textContent = v; } };
+    const hpPct = (100 * Math.max(0, p.hp) / p.maxHp).toFixed(1) + '%';
+    W(h.hpFill, hpPct);
+    W(h.hpTrail, hpPct);
+    T(h.hpText, `${Math.ceil(Math.max(0, p.hp))} / ${p.maxHp}`);
+    const staPct = (100 * p.stamina / p.maxStamina).toFixed(1) + '%';
+    W(h.staFill, staPct);
+    W(h.staTrail, staPct);
     const need = xpForLevel(pd.level);
-    h.lvlNum.textContent = pd.level;
-    h.lvlRing.style.setProperty('--xp', (100 * pd.xp / need).toFixed(1) + '%');
+    T(h.lvlNum, String(pd.level));
+    { const xv = (100 * pd.xp / need).toFixed(1) + '%'; if (h.lvlRing._x !== xv) { h.lvlRing._x = xv; h.lvlRing.style.setProperty('--xp', xv); } }
     const goldTxt = fmt(pd.gold);
     if (h.gold.textContent !== goldTxt) h.gold.textContent = goldTxt;
     const runTxt = pd.inRun && pd.runGold ? `+ ${fmt(pd.runGold)} ramassé (non sécurisé)` : '';
@@ -1099,7 +1102,9 @@ export class UI {
         if (id === 'special') k = Math.max(0, p.specialCd) / (CLASSES[pd.cls].special.cd * p.cdMult());
         else if (id === 'potion') k = Math.max(0, p.potionCd) / 2.5;
         else if (SKILLS[id]) k = Math.max(0, p.skillCd[id] || 0) / (SKILLS[id].cd * p.cdMult());
-        el.querySelector('.cd').style.height = (Math.min(1, k) * 100) + '%';
+        const cd = el._cd || (el._cd = el.querySelector('.cd'));
+        const hv = (Math.min(1, k) * 100).toFixed(1) + '%';
+        if (cd._h !== hv) { cd._h = hv; cd.style.height = hv; }
       }
     }
 
@@ -1112,15 +1117,15 @@ export class UI {
       h.boss.classList.remove('hidden');
       const nm = (boss.guardian ? boss.guardian.name : boss.def.name) + (boss.phase === 2 ? ' — fureur' : '');
       if (h.bossName.textContent !== nm) h.bossName.textContent = nm;
-      const w = (100 * Math.max(0, boss.hp) / boss.maxHp) + '%';
-      h.bossFill.style.width = w;
-      h.bossTrail.style.width = w;
+      const w = (100 * Math.max(0, boss.hp) / boss.maxHp).toFixed(1) + '%';
+      W(h.bossFill, w);
+      W(h.bossTrail, w);
     } else h.boss.classList.add('hidden');
 
     if (p.channel) {
       h.channel.classList.remove('hidden');
-      h.chLabel.textContent = `${p.channel.label}`;
-      h.chFill.style.width = (100 * p.channel.t / p.channel.dur) + '%';
+      T(h.chLabel, `${p.channel.label}`);
+      W(h.chFill, (100 * p.channel.t / p.channel.dur).toFixed(1) + '%');
     } else h.channel.classList.add('hidden');
 
     const o = g.hover;

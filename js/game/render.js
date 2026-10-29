@@ -24,7 +24,11 @@ function makeLightSprite(color) {
 export class Renderer {
   constructor(canvas) {
     this.canvas = canvas;
-    this.ctx = canvas.getContext('2d');
+    this.ctx = canvas.getContext('2d', { alpha: false });
+    // Calque haute résolution pour les textes (le monde est rendu en basse résolution, pixel art)
+    this.overlay = document.getElementById('overlay');
+    this.octx = this.overlay ? this.overlay.getContext('2d') : null;
+    this.overlayDirty = true;
     this.light = document.createElement('canvas');
     this.lctx = this.light.getContext('2d');
     this.sprites = {
@@ -43,15 +47,23 @@ export class Renderer {
   }
 
   resize() {
-    this.dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+    this.dpr = Math.min(window.devicePixelRatio || 1, 2);
     this.w = window.innerWidth;
     this.h = window.innerHeight;
-    this.canvas.width = Math.floor(this.w * this.dpr);
-    this.canvas.height = Math.floor(this.h * this.dpr);
-    this.light.width = Math.ceil(this.w * LIGHT_SCALE);
-    this.light.height = Math.ceil(this.h * LIGHT_SCALE);
     this.baseZoom = clamp(Math.min(this.w / 1280, this.h / 760), 0.7, 1.6);
     this.zoom = this.baseZoom;
+    // Le monde est dessiné à sa résolution native (1 pixel du jeu ≈ 1 pixel du canvas), puis agrandi
+    // sans lissage par le navigateur : beaucoup moins de pixels à remplir, et un pixel art net.
+    this.k = Math.min(1, 1 / this.baseZoom);
+    this.canvas.width = Math.round(this.w * this.k);
+    this.canvas.height = Math.round(this.h * this.k);
+    if (this.overlay) {
+      this.overlay.width = Math.round(this.w * this.dpr);
+      this.overlay.height = Math.round(this.h * this.dpr);
+      this.overlayDirty = true;
+    }
+    this.light.width = Math.ceil(this.w * LIGHT_SCALE);
+    this.light.height = Math.ceil(this.h * LIGHT_SCALE);
     // Vignette pré-calculée à la résolution du calque de lumière
     const v = document.createElement('canvas');
     v.width = this.light.width;
@@ -407,7 +419,7 @@ export class Renderer {
     const ctx = this.ctx;
     const s = game.scene;
     const z = this.zoom;
-    const dpr = this.dpr;
+    const k = this.k * z; // échelle monde -> canvas
     const fx = game.fx;
     const cx = game.cam.x + fx.shakeX / z, cy = game.cam.y + fx.shakeY / z;
     const time = game.time;
@@ -416,7 +428,7 @@ export class Renderer {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
     ctx.fillStyle = '#000';
     ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-    ctx.setTransform(dpr * z, 0, 0, dpr * z, -cx * dpr * z, -cy * dpr * z);
+    ctx.setTransform(k, 0, 0, k, -cx * k, -cy * k);
     ctx.imageSmoothingEnabled = false;
 
     // Carte
@@ -473,7 +485,7 @@ export class Renderer {
     this.drawLighting(game, cx, cy);
 
     // ----- Par-dessus l'obscurité -----
-    ctx.setTransform(dpr * z, 0, 0, dpr * z, -cx * dpr * z, -cy * dpr * z);
+    ctx.setTransform(k, 0, 0, k, -cx * k, -cy * k);
     for (const t of s.telegraphs) this.drawTelegraph(ctx, t, time);
     for (const e of s.enemies) if (!e.dead && inView(e.x, e.y)) e.drawEyes(ctx);
     // Barres de vie des ennemis blessés et proches
@@ -487,6 +499,27 @@ export class Renderer {
       ctx.fillStyle = e.elite ? '#e8b030' : '#c0352b';
       ctx.fillRect(e.x - w / 2, e.y - e.r - 11, w * Math.max(0, e.hp / e.maxHp), 3);
     }
+    ctx.globalCompositeOperation = 'lighter';
+    fx.drawPillars(ctx);
+    ctx.globalCompositeOperation = 'source-over';
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    // Flash rouge quand le joueur a peu de vie
+    if (!p.dead && p.hp / p.maxHp < 0.3) {
+      ctx.fillStyle = `rgba(160,0,0,${0.12 + 0.08 * Math.sin(time * 6)})`;
+      ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
+    }
+    this.renderOverlay(game, cx, cy, inView);
+  }
+
+  // Textes nets (calque haute résolution) : noms, marques de quête, butin, inscriptions, dégâts.
+  renderOverlay(game, cx, cy, inView) {
+    const ctx = this.octx;
+    if (!ctx) return;
+    const s = game.scene, p = game.player, fx = game.fx, time = game.time;
+    const kk = this.dpr * this.zoom;
+    ctx.setTransform(1, 0, 0, 1, 0, 0);
+    ctx.clearRect(0, 0, this.overlay.width, this.overlay.height);
+    ctx.setTransform(kk, 0, 0, kk, -cx * kk, -cy * kk);
     // Noms / étiquettes
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
@@ -523,17 +556,8 @@ export class Renderer {
     }
     // Inscriptions au sol (lisibles même dans le noir)
     for (const o of s.interactables) if (o.type === 'inscription' && inView(o.x, o.y)) this.drawInscription(ctx, o, time);
-    ctx.globalCompositeOperation = 'lighter';
-    fx.drawPillars(ctx);
-    ctx.globalCompositeOperation = 'source-over';
     fx.drawTexts(ctx);
-
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    // Flash rouge quand le joueur a peu de vie
-    if (!p.dead && p.hp / p.maxHp < 0.3) {
-      ctx.fillStyle = `rgba(160,0,0,${0.12 + 0.08 * Math.sin(time * 6)})`;
-      ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
-    }
   }
 
   questMark(game, npcId) {
@@ -564,17 +588,29 @@ export class Renderer {
   drawAtmosphere(ctx, game, cx, cy, vw, vh, time) {
     const s = game.scene;
     if (!this.fog) this.fog = this.makeFog();
-    // Brouillard qui dérive lentement (2 couches)
+    // Brouillard qui dérive lentement (2 couches), composé en très basse résolution puis étiré d'un seul coup
+    const FS = 0.125;
+    const fw = Math.ceil(vw * FS) + 2, fh = Math.ceil(vh * FS) + 2;
+    if (!this.fogC || this.fogC.width !== fw || this.fogC.height !== fh) {
+      this.fogC = document.createElement('canvas'); this.fogC.width = fw; this.fogC.height = fh;
+      this.fogX = this.fogC.getContext('2d');
+    }
+    const fg = this.fogX;
+    fg.setTransform(1, 0, 0, 1, 0, 0);
+    fg.clearRect(0, 0, fw, fh);
+    fg.setTransform(FS, 0, 0, FS, -cx * FS, -cy * FS);
+    const layers = s.type === 'dungeon' ? [[14, 6, 0.6, 2.0], [-9, 4, 0.4, 3.0]] : [[10, 3, 0.3, 2.4]];
+    for (const [fvx, fvy, a, sc] of layers) {
+      const size = 512 * sc;
+      const ox = ((time * fvx) % size + size) % size, oy = ((time * fvy) % size + size) % size;
+      const x0 = Math.floor((cx - ox) / size) * size + ox, y0 = Math.floor((cy - oy) / size) * size + oy;
+      fg.globalAlpha = a;
+      for (let x = x0; x < cx + vw; x += size) for (let y = y0; y < cy + vh; y += size) fg.drawImage(this.fog, x, y, size, size);
+    }
+    fg.globalAlpha = 1;
     ctx.save();
     ctx.imageSmoothingEnabled = true;
-    const layers = s.type === 'dungeon' ? [[14, 6, 0.6, 2.0], [-9, 4, 0.4, 3.0]] : [[10, 3, 0.3, 2.4]];
-    for (const [vx, vy, a, sc] of layers) {
-      const size = 512 * sc;
-      const ox = ((time * vx) % size + size) % size, oy = ((time * vy) % size + size) % size;
-      const x0 = Math.floor((cx - ox) / size) * size + ox, y0 = Math.floor((cy - oy) / size) * size + oy;
-      ctx.globalAlpha = a;
-      for (let x = x0; x < cx + vw; x += size) for (let y = y0; y < cy + vh; y += size) ctx.drawImage(this.fog, x, y, size, size);
-    }
+    ctx.drawImage(this.fogC, cx, cy, fw / FS, fh / FS);
     ctx.restore();
     // Braises qui s'échappent des torches et braseros
     if (!this.embers) this.embers = [];
@@ -780,7 +816,7 @@ export class Renderer {
 
     // Halo coloré additif
     ctx.globalCompositeOperation = 'lighter';
-    const zz = this.zoom * this.dpr;
+    const zz = this.zoom * this.k;
     for (const l of lights) {
       if (!l.g || !vis(l)) continue;
       const sx = (l.x - cx) * zz, sy = (l.y - cy) * zz, r = l.r * zz * 0.7;
