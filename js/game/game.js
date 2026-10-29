@@ -605,8 +605,8 @@ export class Game {
       this.dropItem(x, y, generateSetItem(id, null, s.level + randInt(0, 2)));
     }
     // Matériaux de forge
-    if (chance(0.5 * k + 0.04)) this.dropItem(x, y, makeConsumable('fer', kind === 'boss' ? randInt(4, 7) : randInt(1, 2)));
-    if (depth >= 2 && chance(0.3 * k + 0.012)) this.dropItem(x, y, makeConsumable('bronze', kind === 'boss' ? randInt(2, 4) : 1));
+    if (chance(0.5 * k + 0.11)) this.dropItem(x, y, makeConsumable('fer', kind === 'boss' ? randInt(5, 8) : randInt(1, 3)));
+    if (depth >= 2 && chance(0.3 * k + 0.035)) this.dropItem(x, y, makeConsumable('bronze', kind === 'boss' ? randInt(2, 4) : 1));
     if (depth >= 3 && chance(0.18 * k + 0.006)) this.dropItem(x, y, makeConsumable('braise', kind === 'boss' ? randInt(1, 3) : 1));
     if (depth >= 4 && chance(kind === 'boss' ? 0.8 : 0.06 * k)) this.dropItem(x, y, makeConsumable('larme', 1));
     // Reliques de quête (seulement si une quête active les demande)
