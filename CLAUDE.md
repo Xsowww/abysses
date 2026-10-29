@@ -16,7 +16,9 @@ Jeu web 2D vue du dessus (action-RPG / roguelite à extraction). JavaScript pur 
 - `js/game/render.js` : la carte est pré-rendue dans un canvas (`map.cache`), éclairage = calque d’obscurité percé par des sprites de lumière.
 - `js/game/inventory.js` : sac (30), poche sécurisée (max 4), coffre (60), équipement.
 - `js/ui/ui.js` : HUD + panneaux en DOM (innerHTML + délégation d’événements via `data-action` / `data-ref`).
-- `js/data/*` : tout l’équilibrage (objets, talents, monstres, quêtes) est ici.
+- `js/data/*` : tout l’équilibrage (objets, talents, monstres, quêtes) est ici. `story.js` : prologue, Gardiens, fragments de lore, inscriptions, répliques des PNJ. Les quêtes ont des répliques `intro` / `outro`.
+- `js/core/audio.js` : bruitages synthétisés + réverbération + son spatial (`sfx(nom, {x, y})`). Échantillons optionnels via `assets/sfx/manifest.json`.
+- `js/core/music.js` : musique et ambiances procédurales (`playMusic('village' | 'dungeon' | 'boss' | 'title')`, `playAmbience`).
 
 ## Direction artistique
 Sobre et sombre (Souls-like) : polices *IM Fell English SC* (titres) et *EB Garamond* (texte), palette os / encre / braise (variables CSS dans `css/style.css`), pas d’arrondis ni de dégradés vifs. Cadres à coins ornés (`.frame`), séparateurs `.rule`, grain de film (`#grain`). Éviter tout retour à un style « interface générique ».
@@ -27,6 +29,10 @@ Sobre et sombre (Souls-like) : polices *IM Fell English SC* (titres) et *EB Gara
 - Fermer le jeu pendant une expédition (`pd.inRun`) = mort au prochain chargement.
 - Les piles de consommables `found` ne fusionnent pas avec les piles du village.
 - Armes et mains gauches sont réservées à une classe (`itemClass`) ; le butin est à 85 % adapté à la classe du joueur (`game.loot`).
+
+## Ton et histoire
+Ambiance Souls : récit fragmentaire et mélancolique, protagoniste sans mémoire, PNJ ambigus (Maëlis cache que sa lignée doit sonner le 13ᵉ coup). Acte I terminé (épilogue après le Roi sans cloche, profondeur 5) ; l’Acte II doit révéler qui a pris le battant de la Cloche Noire (indice : « au-delà des eaux » → les îles).
+Progression volontairement lente (`xpForLevel` = 100 × niveau^1,85).
 
 ## Pistes prévues
 Classe Mage, îles / nouveaux biomes et boss, plus de quêtes, amélioration d’objets chez le forgeron, support manette (Gamepad API), sprites (packs libres type Kenney).

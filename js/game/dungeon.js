@@ -2,6 +2,7 @@
 import { TileMap, T, TILE } from './world.js';
 import { randInt, rand, pick, shuffle, weightedPick, chance } from '../core/util.js';
 import { enemyPool } from '../data/enemies.js';
+import { INSCRIPTIONS } from '../data/story.js';
 
 function overlaps(a, b, m) {
   return a.x - m < b.x + b.w && a.x + a.w + m > b.x && a.y - m < b.y + b.h && a.y + a.h + m > b.y;
@@ -104,6 +105,12 @@ export function generateDungeon(depth) {
   const chestRooms = shuffle([...others]).slice(0, randInt(2, 3 + Math.floor(depth / 2)));
   for (const idx of chestRooms) chests.push({ ...randomFloorIn(rooms[idx], 1), rich: chance(0.15 + depth * 0.03) });
 
+  // Inscriptions laissées par d'anciens aventuriers.
+  const inscriptions = [];
+  const insRooms = shuffle([...others]).slice(0, randInt(2, 3));
+  const texts = shuffle([...INSCRIPTIONS]);
+  insRooms.forEach((idx, i) => inscriptions.push({ ...randomFloorIn(rooms[idx], 2), text: texts[i] }));
+
   // Monstres.
   const spawns = [];
   const pool = enemyPool(depth);
@@ -149,6 +156,7 @@ export function generateDungeon(depth) {
     bossPos: toPx(centers[bossIdx]),
     extractions,
     chests,
+    inscriptions,
     spawns,
     torches,
     decor,

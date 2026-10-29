@@ -48,7 +48,8 @@ export class Renderer {
     this.canvas.height = Math.floor(this.h * this.dpr);
     this.light.width = Math.ceil(this.w * LIGHT_SCALE);
     this.light.height = Math.ceil(this.h * LIGHT_SCALE);
-    this.zoom = clamp(Math.min(this.w / 1280, this.h / 760), 0.7, 1.6);
+    this.baseZoom = clamp(Math.min(this.w / 1280, this.h / 760), 0.7, 1.6);
+    this.zoom = this.baseZoom;
     // Vignette pré-calculée à la résolution du calque de lumière
     const v = document.createElement('canvas');
     v.width = this.light.width;
@@ -301,7 +302,7 @@ export class Renderer {
 
     // Entités triées par y
     const ents = [];
-    for (const e of s.enemies) if (!e.dead && inView(e.x, e.y)) ents.push(e);
+    for (const e of s.enemies) if ((!e.dead || e.deadT > 0) && inView(e.x, e.y)) ents.push(e);
     if (!game.player.dead) ents.push(game.player);
     ents.sort((a, b) => a.y - b.y);
     for (const e of ents) e.draw(ctx, time);
@@ -368,6 +369,11 @@ export class Renderer {
       ctx.fillStyle = itemColor(d.item);
       ctx.fillText(name, d.x, d.y - 19);
     }
+    // Inscriptions au sol (lisibles même dans le noir)
+    for (const o of s.interactables) if (o.type === 'inscription' && inView(o.x, o.y)) this.drawInscription(ctx, o, time);
+    ctx.globalCompositeOperation = 'lighter';
+    fx.drawPillars(ctx);
+    ctx.globalCompositeOperation = 'source-over';
     fx.drawTexts(ctx);
 
     ctx.setTransform(1, 0, 0, 1, 0, 0);
@@ -409,7 +415,7 @@ export class Renderer {
     // Brouillard qui dérive lentement (2 couches)
     ctx.save();
     ctx.imageSmoothingEnabled = true;
-    const layers = s.type === 'dungeon' ? [[14, 6, 0.6, 1.0], [-9, 4, 0.4, 1.6]] : [[10, 3, 0.3, 1.2]];
+    const layers = s.type === 'dungeon' ? [[14, 6, 0.6, 2.0], [-9, 4, 0.4, 3.0]] : [[10, 3, 0.3, 2.4]];
     for (const [vx, vy, a, sc] of layers) {
       const size = 512 * sc;
       const ox = ((time * vx) % size + size) % size, oy = ((time * vy) % size + size) % size;
@@ -418,6 +424,23 @@ export class Renderer {
       for (let x = x0; x < cx + vw; x += size) for (let y = y0; y < cy + vh; y += size) ctx.drawImage(this.fog, x, y, size, size);
     }
     ctx.restore();
+    // Braises qui s'échappent des torches et braseros
+    if (!this.embers) this.embers = [];
+    const em = this.embers;
+    const sources = [...s.torches, ...s.braziers];
+    for (const t of sources) {
+      if (t.x < cx - 50 || t.x > cx + vw + 50 || t.y < cy - 50 || t.y > cy + vh + 50) continue;
+      if (Math.random() < 0.06) em.push({ x: t.x + (Math.random() - 0.5) * 6, y: t.y - 10, vx: (Math.random() - 0.5) * 10, vy: -20 - Math.random() * 25, life: 1 + Math.random() * 1.2 });
+    }
+    for (let i = em.length - 1; i >= 0; i--) {
+      const e = em[i];
+      e.life -= 1 / 60; e.x += (e.vx + Math.sin(time * 3 + i) * 6) / 60; e.y += e.vy / 60;
+      if (e.life <= 0) { em.splice(i, 1); continue; }
+      ctx.globalAlpha = Math.min(1, e.life);
+      ctx.fillStyle = e.life > 0.8 ? '#ffb060' : '#c86a2a';
+      ctx.fillRect(e.x, e.y, 1.6, 1.6);
+    }
+    ctx.globalAlpha = 1;
     // Poussière / cendres (visibles seulement dans la lumière)
     if (!this.motes) this.motes = [];
     const m = this.motes;
@@ -580,6 +603,8 @@ export class Renderer {
       else if (o.type === 'npc') lights.push({ x: o.x, y: o.y, r: 110, a: 0.5, c: 'warm', g: 0 });
     }
     for (const pr of s.projectiles) lights.push({ x: pr.x, y: pr.y, r: 60, a: 0.5, c: 'white', g: 0.15 });
+    for (const d of s.drops) if (d.item && d.item.kind === 'lore') lights.push({ x: d.x, y: d.y, r: 80, a: 0.6, c: 'warm', g: 0.25 });
+    for (const o of s.interactables) if (o.type === 'inscription') lights.push({ x: o.x, y: o.y, r: 50, a: 0.35, c: 'warm', g: 0.15 });
     for (const d of s.drops) if (d.item && d.item.kind === 'equip' && d.item.rarity >= 2) lights.push({ x: d.x, y: d.y, r: 70, a: 0.5, c: 'white', g: 0 });
     for (const e of s.enemies) if (!e.dead && e.boss && e.engaged) lights.push({ x: e.x, y: e.y, r: 160, a: 0.6, c: 'red', g: 0.12 });
 
@@ -615,6 +640,27 @@ export class Renderer {
     ctx.imageSmoothingEnabled = false;
   }
 
+  drawInscription(ctx, o, time) {
+    const a = o.read ? 0.25 : 0.45 + 0.25 * Math.sin(time * 2 + o.x);
+    ctx.save();
+    ctx.translate(o.x, o.y);
+    ctx.strokeStyle = `rgba(214,150,80,${a})`;
+    ctx.lineWidth = 1.4;
+    // glyphes runiques griffonnés
+    let h = 0;
+    for (const c of o.text) h = (h * 31 + c.charCodeAt(0)) | 0;
+    for (let i = 0; i < 5; i++) {
+      const sx = -16 + i * 8, r1 = ((h >> (i * 3)) & 7) / 7;
+      ctx.beginPath();
+      ctx.moveTo(sx, -4 + r1 * 3);
+      ctx.lineTo(sx + 3, 4 - r1 * 2);
+      ctx.lineTo(sx + 6, -3 + r1 * 4);
+      ctx.stroke();
+    }
+    ctx.beginPath(); ctx.ellipse(0, 0, 22, 9, 0, 0, TAU); ctx.stroke();
+    ctx.restore();
+  }
+
   drawTelegraph(ctx, t, time) {
     const k = clamp(t.t / t.dur, 0, 1);
     const purple = t.color === 'purple';
@@ -626,8 +672,8 @@ export class Renderer {
       ctx.beginPath(); ctx.arc(0, 0, t.r, 0, TAU); ctx.fill();
       ctx.fillStyle = `rgba(${base},0.28)`;
       ctx.beginPath(); ctx.arc(0, 0, t.r * k, 0, TAU); ctx.fill();
-      ctx.strokeStyle = `rgba(${base},0.75)`;
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = k > 0.85 ? `rgba(255,190,150,0.9)` : `rgba(${base},0.75)`;
+      ctx.lineWidth = k > 0.85 ? 3 : 2;
       ctx.beginPath(); ctx.arc(0, 0, t.r, 0, TAU); ctx.stroke();
     } else if (t.shape === 'cone') {
       const half = (t.arc * Math.PI) / 360;
@@ -636,8 +682,8 @@ export class Renderer {
       ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, t.r, -half, half); ctx.closePath(); ctx.fill();
       ctx.fillStyle = `rgba(${base},0.3)`;
       ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, t.r * k, -half, half); ctx.closePath(); ctx.fill();
-      ctx.strokeStyle = `rgba(${base},0.7)`;
-      ctx.lineWidth = 2;
+      ctx.strokeStyle = k > 0.85 ? 'rgba(255,190,150,0.9)' : `rgba(${base},0.7)`;
+      ctx.lineWidth = k > 0.85 ? 3 : 2;
       ctx.beginPath(); ctx.moveTo(0, 0); ctx.arc(0, 0, t.r, -half, half); ctx.closePath(); ctx.stroke();
     } else if (t.shape === 'rect') {
       ctx.rotate(t.ang);
@@ -723,7 +769,8 @@ export class Renderer {
     } else if (o.type === 'stash') {
       this.drawChestShape(ctx, x, y, false, '#2e2218', '#6e5a3c');
     } else if (o.type === 'chest') {
-      this.drawChestShape(ctx, x, y, o.opened, o.rich ? '#241c22' : '#2e2218', o.rich ? '#a8884a' : '#5e4c34');
+      if (o.openT !== undefined) o.openT = Math.min(1, o.openT + 1 / 30);
+      this.drawChestShape(ctx, x, y, o.opened, o.rich ? '#241c22' : '#2e2218', o.rich ? '#a8884a' : '#5e4c34', o.openT);
     } else if (o.type === 'portal' || o.type === 'exitPortal') {
       const abyss = o.type === 'portal';
       ctx.save();
@@ -772,7 +819,7 @@ export class Renderer {
     }
   }
 
-  drawChestShape(ctx, x, y, opened, body, trim) {
+  drawChestShape(ctx, x, y, opened, body, trim, openT = 1) {
     ctx.fillStyle = 'rgba(0,0,0,0.4)';
     ctx.fillRect(x - 13, y + 4, 28, 8);
     ctx.fillStyle = body;
@@ -781,8 +828,16 @@ export class Renderer {
     ctx.fillRect(x - 13, y - 8, 26, 2);
     ctx.fillRect(x - 2, y - 4, 4, 5);
     if (opened) {
-      ctx.fillStyle = '#1a0f08';
-      ctx.fillRect(x - 11, y - 12, 22, 6);
+      // Couvercle qui bascule + lueur qui s'échappe
+      const k = openT === undefined ? 1 : openT;
+      ctx.fillStyle = '#0d0805';
+      ctx.fillRect(x - 11, y - 8, 22, 4);
+      ctx.fillStyle = `rgba(220,170,90,${0.5 * (1 - k)})`;
+      ctx.fillRect(x - 11, y - 8 - 14 * (1 - k), 22, 14 * (1 - k) + 2);
+      ctx.fillStyle = body;
+      ctx.fillRect(x - 13, y - 8 - 10 * k, 26, 3 + 7 * k);
+      ctx.fillStyle = trim;
+      ctx.fillRect(x - 13, y - 8 - 10 * k, 26, 2);
     } else {
       ctx.fillStyle = trim;
       ctx.fillRect(x - 13, y - 1, 26, 1);
@@ -791,6 +846,25 @@ export class Renderer {
 
   drawDrop(ctx, d, time) {
     const y = d.y - d.z;
+    if (d.item && d.item.kind === 'lore') {
+      // Parchemin roulé
+      const bob = Math.sin(time * 2.5 + d.x) * 1.5;
+      ctx.fillStyle = 'rgba(0,0,0,0.4)';
+      ctx.beginPath(); ctx.ellipse(d.x, d.y + 5, 8, 3, 0, 0, TAU); ctx.fill();
+      ctx.save();
+      ctx.translate(d.x, y - 3 + bob);
+      ctx.rotate(-0.4);
+      ctx.fillStyle = '#c9b48a';
+      ctx.strokeStyle = '#3a2a1a';
+      ctx.lineWidth = 1;
+      ctx.fillRect(-7, -3, 14, 6); ctx.strokeRect(-7, -3, 14, 6);
+      ctx.fillStyle = '#a8905e';
+      ctx.beginPath(); ctx.arc(-7, 0, 3.2, 0, TAU); ctx.arc(7, 0, 3.2, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#7a1f17';
+      ctx.fillRect(-1.5, -3, 3, 6);
+      ctx.restore();
+      return;
+    }
     if (d.gold) {
       ctx.fillStyle = '#b08a20';
       ctx.beginPath(); ctx.arc(d.x, y, 5, 0, TAU); ctx.fill();

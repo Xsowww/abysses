@@ -45,7 +45,12 @@ Dans l’inventaire : **clic** pour sélectionner, **clic droit** pour l’actio
 - Le **butin trouvé** dans le sac (marqué d’un **!** orange) et l’**or ramassé** pendant l’expédition sont **perdus** si vous mourez.
 - Pour rentrer avec votre butin : **point d’extraction** (pilier vert, 4 s d’incantation), **portail** qui apparaît après le boss, ou **pierre de retour** (5 s). Une incantation est interrompue si vous êtes touché ou si vous bougez.
 
-## Contenu (v0.2)
+## Contenu (v0.3)
+
+- **Histoire** (Acte I, « La Cloche Noire ») : prologue, trame principale en 9 quêtes, dialogues, 5 Gardiens nommés, 12 fragments de lore à collectionner, inscriptions au sol.
+- **Son** : bruitages synthétisés (métal, os, cordes d’arc, pas), réverbération de crypte, sons spatialisés, musique et ambiances générées en direct (village, crypte, boss). De vrais fichiers audio peuvent être ajoutés dans `assets/sfx/` (voir `LISEZMOI.md`).
+- **Mise en scène** : ralentis, caméra sur les boss, morts animées, colonnes de lumière, images rémanentes, braises, flash de dégâts.
+- **Progression lente** : plusieurs heures pour atteindre le niveau 10, butin et or plus rares.
 
 - Direction artistique sombre façon Souls : menus gothiques, HUD épuré, brouillard, grain, traces de combat persistantes.
 - Village : forgeron, marchande, capitaine (quêtes), gardienne du portail, coffre de stockage.

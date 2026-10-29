@@ -1,7 +1,9 @@
 // Interface : HUD, panneaux (inventaire, talents, journal, marchands…), écrans et menus.
 import { input, ACTIONS, codeLabel } from '../core/input.js';
 import { settings, saveSettings, hasSave, loadGame, deleteSave } from '../core/save.js';
-import { sfx, unlockAudio } from '../core/audio.js';
+import { sfx, unlockAudio, applyVolumes } from '../core/audio.js';
+import { playMusic, playAmbience } from '../core/music.js';
+import { PROLOGUE, LORE, LORE_BY_ID, npcTalk } from '../data/story.js';
 import { icon, itemIconName } from './icons.js';
 import { startTitleBg, stopTitleBg } from './titlebg.js';
 import { drawHero } from '../game/hero.js';
@@ -43,6 +45,11 @@ export class UI {
       fade: $('#fade'),
       area: $('#area'),
       banner: $('#banner'),
+      subtitle: $('#subtitle'),
+      message: $('#message'),
+      flash: $('#flash'),
+      hurt: $('#hurt'),
+      canvas: $('#game'),
     };
     this.bindEvents();
   }
@@ -95,7 +102,7 @@ export class UI {
     });
     root.addEventListener('input', (e) => {
       const t = e.target;
-      if (t.dataset.setting === 'volume') { settings.volume = +t.value / 100; saveSettings(); }
+      if (t.dataset.setting && t.type === 'range') { settings[t.dataset.setting] = +t.value / 100; saveSettings(); applyVolumes(); }
     });
     root.addEventListener('change', (e) => {
       const t = e.target;
@@ -144,7 +151,7 @@ export class UI {
     input.clear();
     this.hideTip();
     this.renderPanel(true);
-    sfx('ui');
+    sfx(MENU_TABS.includes(name) || name === 'dialog' ? 'page' : 'ui');
   }
 
   close() {
@@ -164,7 +171,15 @@ export class UI {
     else if (!this.panel || !BLOCKING.has(this.panel) || name === 'inventory') this.open(name);
   }
 
+  // Touches pendant les dialogues / récits.
+  onKey(code) {
+    if (this.storyState && (code === 'Space' || code === 'Enter' || code === 'KeyE')) { this.storyNext(); return true; }
+    if (this.panel === 'dialog' && this.opts.seq && (code === 'Space' || code === 'Enter' || code === input.bindings.interact)) { this.seqNext(); return true; }
+    return false;
+  }
+
   escape() {
+    if (this.storyState) { this.storyEnd(); return; }
     if (input.rebinding) return;
     if (this.screenOpen || this.summaryOpen) return;
     if (this.panel === 'options' && this.opts.from === 'pause') { this.open('pause'); return; }
@@ -353,7 +368,24 @@ export class UI {
       case 'learn': g.learnTalent(arg); break;
       case 'spec': g.chooseSpec(arg); break;
       case 'respec': g.respec(); break;
-      case 'quest-view': this.opts.view = arg; sfx('ui'); this.refresh(); break;
+      case 'quest-view': {
+        const q = QUEST_BY_ID[arg];
+        if (!this.pd.quests[arg] && q.intro) this.startSeq(q.intro, () => { this.opts.view = arg; });
+        else { this.opts.view = arg; sfx('ui'); this.refresh(); }
+        break;
+      }
+      case 'quest-turnin-talk': {
+        const q = QUEST_BY_ID[arg];
+        if (!g.canTurnIn(arg)) { this.toast('Libérez de la place dans votre inventaire.', 'bad', 2); sfx('error'); break; }
+        if (q.outro) this.startSeq(q.outro, () => g.turnInQuest(arg));
+        else g.turnInQuest(arg);
+        break;
+      }
+      case 'talk': this.startSeq(npcTalk(this.opts.npc, this.pd)); break;
+      case 'seq-next': this.seqNext(); break;
+      case 'lore-read': this.opts.lore = arg; sfx('page'); this.refresh(); break;
+      case 'lore-back': this.opts.lore = null; sfx('page'); this.refresh(); break;
+      case 'story-next': this.storyNext(); break;
       case 'quest-accept': g.acceptQuest(arg); this.opts.view = null; this.refresh(); break;
       case 'quest-turnin': g.turnInQuest(arg); this.refresh(); break;
       case 'dialog-back': this.opts.view = null; this.refresh(); break;
@@ -381,8 +413,10 @@ export class UI {
         if (hasSave() && !this.confirmNew) { this.confirmNew = true; this.renderClassSelect(); return; }
         deleteSave();
         this.hideScreen();
-        g.newGame(name.slice(0, 18), cls);
-        setTimeout(() => this.toast(`Parlez aux habitants avec ${input.label('interact')}. Le portail des Abysses est au nord.`, 'good', 7), 3500);
+        this.showStory(PROLOGUE, () => {
+          g.newGame(name.slice(0, 18), cls);
+          setTimeout(() => this.toast(`Maëlis vous attend près du portail, au nord. Parlez avec ${input.label('interact')}.`, 'good', 7), 4000);
+        });
         break;
       }
       case 'summary-ok': {
@@ -527,18 +561,45 @@ export class UI {
     return parts.join(' · ');
   }
 
+  startSeq(lines, done = null) {
+    if (!lines || !lines.length) { if (done) done(); this.refresh(); return; }
+    this.opts.seq = { lines, i: 0, done };
+    this.opts.view = null;
+    sfx('page');
+    this.refresh();
+  }
+
+  seqNext() {
+    const sq = this.opts.seq;
+    if (!sq) return;
+    sq.i++;
+    sfx('ui');
+    if (sq.i >= sq.lines.length) {
+      this.opts.seq = null;
+      if (sq.done) sq.done();
+    }
+    if (this.panel === 'dialog') this.refresh();
+  }
+
   panel_dialog() {
     const g = this.game;
     const id = this.opts.npc;
     const N = NPCS[id];
     const view = this.opts.view;
+    if (this.opts.seq) {
+      const sq = this.opts.seq;
+      const last = sq.i >= sq.lines.length - 1;
+      const html = `<div class="dialog seq"><div class="npc-line">« ${sq.lines[sq.i]} »</div>
+        <div class="seq-foot"><span class="dim">${sq.i + 1} / ${sq.lines.length}</span><button class="btn main" data-action="seq-next">${last ? 'Terminer' : 'Continuer'}</button></div></div>`;
+      return { title: N.name, sub: N.title, html, cls: 'narrow', footer: `<span><kbd>Espace</kbd>Continuer</span><span><kbd>Échap</kbd>Fermer</span>` };
+    }
     if (view) {
       const q = QUEST_BY_ID[view];
       const st = this.pd.quests[view];
       const html = `<div class="dialog"><div class="npc-line">« ${q.desc} »</div>
         <div class="quest-box"><div><span class="dim">Objectif —</span> ${this.questObjText(q, st)}</div><div><span class="dim">Récompense —</span> ${this.rewardText(q)}</div></div>
         <div class="actions" style="justify-content:center;margin-top:18px">${!st ? `<button class="btn main" data-action="quest-accept" data-arg="${q.id}">Accepter</button>` : ''}
-        ${st && st.status === 'ready' ? `<button class="btn main" data-action="quest-turnin" data-arg="${q.id}">Rendre la quête</button>` : ''}
+        ${st && st.status === 'ready' ? `<button class="btn main" data-action="quest-turnin-talk" data-arg="${q.id}">Rendre la quête</button>` : ''}
         <button class="btn" data-action="dialog-back">Retour</button></div></div>`;
       return { title: q.name, sub: N.name, html };
     }
@@ -546,9 +607,10 @@ export class UI {
     const avail = g.questsAvailable(id);
     const active = g.questsOf(id, 'active');
     let opts = '';
-    for (const q of ready) opts += `<button class="opt ready" data-action="quest-turnin" data-arg="${q.id}">Rendre — ${q.name}</button>`;
-    for (const q of avail) opts += `<button class="opt new" data-action="quest-view" data-arg="${q.id}">Nouvelle quête — ${q.name}</button>`;
+    for (const q of ready) opts += `<button class="opt ready" data-action="quest-turnin-talk" data-arg="${q.id}">Rendre — ${q.name}</button>`;
+    for (const q of avail) opts += `<button class="opt new" data-action="quest-view" data-arg="${q.id}">${q.main ? 'Histoire' : 'Nouvelle quête'} — ${q.name}</button>`;
     for (const q of active) opts += `<button class="opt" data-action="quest-view" data-arg="${q.id}">${q.name} <span class="dim">(${this.pd.quests[q.id].progress} / ${q.obj.count})</span></button>`;
+    if (npcTalk(id, this.pd).length) opts += '<button class="opt" data-action="talk">Parler</button>';
     if (N.shop) opts += `<button class="opt shop" data-action="open-shop" data-arg="${N.shop}">Commercer</button>`;
     if (N.portal) opts += '<button class="opt portal" data-action="open-portal">Ouvrir le portail des Abysses</button>';
     opts += '<button class="opt" data-action="close">Prendre congé</button>';
@@ -558,6 +620,12 @@ export class UI {
 
   panel_journal() {
     const pd = this.pd;
+    const known = (pd.story && pd.story.lore) || [];
+    if (this.opts.lore) {
+      const L = LORE_BY_ID[this.opts.lore];
+      const html = `<div class="lore-read"><h3>${L.title}</h3><div class="lore-text">${escapeHtml(L.text).replace(/\n/g, '<br>')}</div><div class="actions" style="justify-content:center"><button class="btn" data-action="lore-back">Retour</button></div></div>`;
+      return { sub: 'Fragment', html, cls: 'wide' };
+    }
     const rows = (status) => QUESTS.filter((q) => pd.quests[q.id] && pd.quests[q.id].status === status);
     const qHTML = (q) => {
       const st = pd.quests[q.id];
@@ -575,6 +643,8 @@ export class UI {
       <h3>En cours</h3>${active.map(qHTML).join('') || '<p class="hint">Aucune quête en cours. Les habitants qui ont besoin de vous portent un signe au-dessus de la tête.</p>'}
       <h3>Accomplies <span class="dim">${done.length} / ${QUESTS.length}</span></h3>
       <div class="done-list">${done.map((q) => `<span>${q.name}</span>`).join('') || '<span>—</span>'}</div>
+      <h3>Fragments <span class="dim">${known.length} / ${LORE.length}</span></h3>
+      <div class="lore-list">${LORE.map((l) => known.includes(l.id) ? `<button class="opt" data-action="lore-read" data-arg="${l.id}">${l.title}</button>` : '<div class="opt locked-lore">— fragment non découvert —</div>').join('')}</div>
       <h3>Chroniques</h3>
       <div class="stats" style="margin-top:0"><div><span>Créatures abattues</span><b>${fmt(S.kills)}</b></div><div><span>Descentes</span><b>${S.runs}</b></div><div><span>Retours réussis</span><b>${S.extractions}</b></div><div><span>Morts</span><b>${S.deaths}</b></div><div><span>Profondeur atteinte</span><b>${pd.maxDepth}</b></div><div><span>Temps passé</span><b>${Math.floor(pd.playTime / 60)} min</b></div></div>`;
     return { sub: 'Ce que l’on attend de vous, et ce que vous avez accompli', html, cls: 'wide' };
@@ -680,7 +750,9 @@ export class UI {
       <div class="kb">${rows}<div class="kb-row"><span>Menu / fermer</span><button class="btn key" disabled>Échap</button></div></div>
       <button class="btn small" data-action="reset-keys">Rétablir les touches par défaut</button></div>
       <div class="col"><h3>Réglages</h3>
-      <label class="opt-row">Volume <input type="range" min="0" max="100" value="${Math.round(settings.volume * 100)}" data-setting="volume"></label>
+      <label class="opt-row">Volume général <input type="range" min="0" max="100" value="${Math.round(settings.volume * 100)}" data-setting="volume"></label>
+      <label class="opt-row">Musique et ambiance <input type="range" min="0" max="100" value="${Math.round((settings.musicVolume ?? 0.55) * 100)}" data-setting="musicVolume"></label>
+      <label class="opt-row">Effets sonores <input type="range" min="0" max="100" value="${Math.round((settings.sfxVolume ?? 0.85) * 100)}" data-setting="sfxVolume"></label>
       <label class="opt-row"><input type="checkbox" data-setting="pauseInMenus" ${settings.pauseInMenus ? 'checked' : ''}> Pause quand un menu est ouvert</label>
       <label class="opt-row"><input type="checkbox" data-setting="screenShake" ${settings.screenShake ? 'checked' : ''}> Tremblements de l’écran</label>
       <label class="opt-row"><input type="checkbox" data-setting="showDamage" ${settings.showDamage ? 'checked' : ''}> Afficher les dégâts</label>
@@ -711,11 +783,14 @@ export class UI {
 
   showTitle() {
     this.confirmNew = false;
+    playMusic('title');
+    playAmbience(null);
+    this.dying(false);
     const save = loadGame();
     const cont = save ? `<button class="mi main" data-action="continue">Continuer<span class="sub">${escapeHtml(save.name)} · ${CLASSES[save.cls] ? CLASSES[save.cls].name : ''} · niveau ${save.level}</span></button>` : '';
     this.showScreen(`<div class="screen title-screen"><div class="logo">Les Abysses</div><div class="logo-rule"></div><div class="tagline">Descendez. Survivez. Remontez.</div>
       <div class="menu">${cont}<button class="mi ${save ? '' : 'main'}" data-action="new-game">Nouvelle partie</button><button class="mi" data-action="title-options">Options</button></div>
-      <div class="version">PROTOTYPE · v0.2</div></div>`, { titleBg: true });
+      <div class="version">PROTOTYPE · v0.3</div></div>`, { titleBg: true });
   }
 
   showOptionsScreen() {
@@ -820,6 +895,81 @@ export class UI {
     void b.offsetWidth;
     b.classList.add('show');
   }
+
+  // ================= RÉCITS (prologue / épilogue) =================
+  showStory(slides, done, title = null) {
+    this.screenOpen = true;
+    this.screenRefresh = null;
+    stopTitleBg();
+    this.close();
+    this.el.hud.classList.add('hidden');
+    this.storyState = { slides, i: 0, done, title };
+    this.el.screen.classList.remove('overlay');
+    this.el.screen.classList.add('show');
+    this.el.screen.innerHTML = '<canvas id="title-bg"></canvas><div class="story-host"></div>';
+    startTitleBg($('#title-bg'));
+    this.renderStory();
+  }
+
+  renderStory() {
+    const st = this.storyState;
+    const txt = escapeHtml(st.slides[st.i]).replace(/\n/g, '<br>');
+    $('.story-host', this.el.screen).innerHTML = `<div class="screen story">${st.title && st.i === 0 ? `<div class="story-title">${st.title}</div>` : ''}<div class="story-text" key="${st.i}">${txt}</div>
+      <div class="story-foot"><span class="dim">${st.i + 1} / ${st.slides.length}</span><button class="btn" data-action="story-next">Continuer</button></div>
+      <div class="story-skip"><kbd>Espace</kbd> Continuer <kbd>Échap</kbd> Passer</div></div>`;
+    sfx('page');
+  }
+
+  storyNext() {
+    const st = this.storyState;
+    if (!st) return;
+    st.i++;
+    if (st.i >= st.slides.length) this.storyEnd();
+    else this.renderStory();
+  }
+
+  storyEnd() {
+    const st = this.storyState;
+    if (!st) return;
+    this.storyState = null;
+    this.hideScreen();
+    if (st.done) st.done();
+    else if (this.game && this.game.scene) { this.el.hud.classList.remove('hidden'); this.game.ui.onSceneChange(); }
+  }
+
+  // ================= MISE EN SCÈNE =================
+  subtitle(text, who) {
+    const el = this.el.subtitle;
+    el.innerHTML = `${who ? `<span class="who">${who}</span>` : ''}<span class="line">« ${escapeHtml(text)} »</span>`;
+    el.classList.remove('show');
+    void el.offsetWidth;
+    el.classList.add('show');
+  }
+
+  inscription(text) {
+    const el = this.el.message;
+    el.innerHTML = `<div class="msg-label">Une inscription est gravée dans la pierre</div><div class="msg-text">${escapeHtml(text)}</div>`;
+    el.classList.remove('show');
+    void el.offsetWidth;
+    el.classList.add('show');
+  }
+
+  flash() {
+    const el = this.el.flash;
+    el.classList.remove('show');
+    void el.offsetWidth;
+    el.classList.add('show');
+  }
+
+  hurtFlash(k = 0.1) {
+    const el = this.el.hurt;
+    el.style.setProperty('--hk', Math.min(1, 0.35 + k * 3).toFixed(2));
+    el.classList.remove('show');
+    void el.offsetWidth;
+    el.classList.add('show');
+  }
+
+  dying(on) { this.el.canvas.classList.toggle('dying', !!on); }
 
   // ================= TOASTS =================
   toast(msg, type = 'info', dur = 2.5) {
@@ -936,7 +1086,7 @@ export class UI {
     const boss = g.scene.boss;
     if (boss && g.scene.bossEngaged && !boss.dead) {
       h.boss.classList.remove('hidden');
-      const nm = boss.def.name + (boss.phase === 2 ? ' — fureur' : '');
+      const nm = (boss.guardian ? boss.guardian.name : boss.def.name) + (boss.phase === 2 ? ' — fureur' : '');
       if (h.bossName.textContent !== nm) h.bossName.textContent = nm;
       const w = (100 * Math.max(0, boss.hp) / boss.maxHp) + '%';
       h.bossFill.style.width = w;
@@ -951,8 +1101,8 @@ export class UI {
 
     const o = g.hover;
     if (o && !p.dead && !this.panel) {
-      const verb = o.type === 'npc' ? 'Parler à' : o.type === 'chest' || o.type === 'stash' ? 'Ouvrir' : o.type === 'extract' ? 'Remonter par le' : 'Franchir le';
-      const lbl = o.type === 'extract' ? 'cercle d’extraction' : o.type === 'portal' || o.type === 'exitPortal' ? 'portail' : o.type === 'npc' ? o.label : o.label.toLowerCase();
+      const verb = o.type === 'npc' ? 'Parler à' : o.type === 'chest' || o.type === 'stash' ? 'Ouvrir' : o.type === 'extract' ? 'Remonter par le' : o.type === 'inscription' ? 'Lire' : 'Franchir le';
+      const lbl = o.type === 'extract' ? 'cercle d’extraction' : o.type === 'portal' || o.type === 'exitPortal' ? 'portail' : o.type === 'npc' ? o.label : o.type === 'inscription' ? 'l’inscription' : o.label.toLowerCase();
       const txt = `<kbd>${input.label('interact')}</kbd> ${verb} ${lbl}`;
       if (h.prompt._last !== txt) { h.prompt.innerHTML = txt; h.prompt._last = txt; }
       h.prompt.classList.remove('hidden');

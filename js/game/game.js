@@ -1,6 +1,7 @@
 // Cœur du jeu : scènes (village / donjon), combat, loot, quêtes, mort et extraction.
 import { input } from '../core/input.js';
-import { sfx } from '../core/audio.js';
+import { sfx, setListener, setReverb, setSurface } from '../core/audio.js';
+import { playMusic, playAmbience } from '../core/music.js';
 import { saveGame } from '../core/save.js';
 import { rand, randInt, dist, angleDiff, TAU, chance, clamp, pick } from '../core/util.js';
 import { TILE } from './world.js';
@@ -15,6 +16,7 @@ import { CLASSES, SKILLS, SPEC_LEVEL, xpForLevel } from '../data/classes.js';
 import { ENEMIES, enemyLevel } from '../data/enemies.js';
 import { generateItem, makeConsumable, starterKit, itemClass, itemName, itemColor, RARITIES, CONSUMABLES, POCKETS, buyPrice, sellValue } from '../data/items.js';
 import { QUESTS, QUEST_BY_ID, NPCS } from '../data/quests.js';
+import { LORE, LORE_BY_ID, guardianFor, EPILOGUE_ACT1 } from '../data/story.js';
 
 export const DUNGEON_NAME = 'La Crypte Oubliée';
 
@@ -33,6 +35,11 @@ export class Game {
     this.hover = null;
     this.invFullWarn = 0;
     this.saveTimer = 0;
+    this.slowT = 0;
+    this.slowScale = 1;
+    this.zoomMul = 1;
+    this.zoomTarget = 1;
+    this.camFocus = null;
   }
 
   // ---------------- PARTIE ----------------
@@ -61,6 +68,7 @@ export class Game {
       inRun: false,
       stats: { kills: 0, deaths: 0, extractions: 0, runs: 0 },
       playTime: 0,
+      story: { lore: [], epilogue: false },
     };
     Inv.addItem(this.pd, makeConsumable('potion', 3));
     Inv.addItem(this.pd, makeConsumable('pierre', 1));
@@ -75,6 +83,7 @@ export class Game {
     pd.stash = pd.stash || new Array(Inv.STASH_SIZE).fill(null);
     pd.bossKills = pd.bossKills || {};
     pd.stats = pd.stats || { kills: 0, deaths: 0, extractions: 0, runs: 0 };
+    pd.story = pd.story || { lore: [], epilogue: false };
     let penalty = null;
     if (pd.inRun) penalty = this.applyDeathPenalty();
     this.start();
@@ -124,6 +133,10 @@ export class Game {
     if (this.pd.shopDirty || !this.pd.shop) this.refreshShop();
     this.ui.onSceneChange();
     this.ui.areaTitle('Cendrebourg', 'Dernier refuge avant l’Abîme');
+    playMusic('village');
+    playAmbience('village');
+    setReverb('village');
+    setSurface('dirt');
     this.save();
   }
 
@@ -140,9 +153,11 @@ export class Game {
     s.level = lvl;
     for (const sp of d.spawns) s.enemies.push(new Enemy(sp.type, sp.x, sp.y, lvl, sp.elite));
     const boss = new Enemy('gardien', d.bossPos.x, d.bossPos.y, lvl + 1, false);
+    boss.guardian = guardianFor(depth);
     s.enemies.push(boss);
     s.boss = boss;
     for (const e of d.extractions) s.interactables.push({ type: 'extract', x: e.x, y: e.y, r: 22, label: 'Cercle d’extraction' });
+    for (const ins of d.inscriptions || []) s.interactables.push({ type: 'inscription', x: ins.x, y: ins.y, r: 14, label: 'Inscription', text: ins.text });
     for (const c of d.chests) s.interactables.push({ type: 'chest', x: c.x, y: c.y, r: 14, label: c.rich ? 'Coffre orné' : 'Coffre', rich: c.rich, opened: false });
     this.scene = s;
     this.fx.clear();
@@ -163,6 +178,11 @@ export class Game {
     this.ui.onSceneChange();
     this.ui.areaTitle(DUNGEON_NAME, `Profondeur ${depth}`);
     sfx('portal');
+    playMusic('dungeon', depth);
+    playAmbience('dungeon');
+    setReverb('dungeon');
+    setSurface('stone');
+    setTimeout(() => sfx('bell', { vol: 0.6 }), 1800);
   }
 
   // ---------------- BOUCLE ----------------
@@ -177,9 +197,16 @@ export class Game {
     this.cam.y = this.player.y - this.renderer.h / z / 2;
   }
 
+  // Ralenti (moments forts) : scale < 1 pendant `real` secondes réelles.
+  slowmo(real, scale) { this.slowT = Math.max(this.slowT, real); this.slowScale = scale; }
+
   update(dt) {
     if (!this.running || !this.scene) return;
     if (this.hitstopT > 0) { this.hitstopT -= dt; return; }
+    if (this.slowT > 0) { this.slowT -= dt; dt *= this.slowScale; }
+    // Zoom de mise en scène
+    this.zoomMul += (this.zoomTarget - this.zoomMul) * Math.min(1, dt * 3);
+    this.renderer.zoom = this.renderer.baseZoom * this.zoomMul;
     this.time += dt;
     this.pd.playTime += dt;
     const s = this.scene;
@@ -216,7 +243,10 @@ export class Game {
       this.updateProjectiles(dt);
       this.updateTraps(dt);
       this.updateZones(dt);
-      for (let i = s.enemies.length - 1; i >= 0; i--) if (s.enemies[i].dead && s.enemies[i].deadT !== undefined && (s.enemies[i].deadT -= dt) < 0) s.enemies.splice(i, 1);
+      for (let i = s.enemies.length - 1; i >= 0; i--) {
+        const e = s.enemies[i];
+        if (e.dead && (e.deadT -= dt) < 0) s.enemies.splice(i, 1);
+      }
     }
 
     this.updateDrops(dt);
@@ -225,10 +255,19 @@ export class Game {
 
     if (!p.dead && input.wasPressed('interact') && this.hover && !this.ui.blocksInput()) this.interact(this.hover);
 
-    // Caméra
+    setListener(p.x, p.y);
+    // Caméra (peut être attirée vers un point d'intérêt : boss, etc.)
     const z = this.renderer.zoom;
-    const tx = p.x - this.renderer.w / z / 2;
-    const ty = p.y - this.renderer.h / z / 2;
+    let fx0 = p.x, fy0 = p.y;
+    if (this.camFocus) {
+      this.camFocus.t -= dt;
+      const k2 = this.camFocus.w;
+      fx0 = p.x + (this.camFocus.x - p.x) * k2;
+      fy0 = p.y + (this.camFocus.y - p.y) * k2;
+      if (this.camFocus.t <= 0) { this.camFocus = null; this.zoomTarget = 1; }
+    }
+    const tx = fx0 - this.renderer.w / z / 2;
+    const ty = fy0 - this.renderer.h / z / 2;
     const k = Math.min(1, dt * 8);
     this.cam.x += (tx - this.cam.x) * k;
     this.cam.y += (ty - this.cam.y) * k;
@@ -338,6 +377,8 @@ export class Game {
     const e = new Enemy(type, x, y, level, elite);
     if (alerted) e.state = 'chase';
     e.summoned = true;
+    e.spawnT = 0.7;
+    this.fx.burst(x, y + 6, '#3a3430', 12, 80, 0.8, 5, { drag: 3 });
     this.scene.enemies.push(e);
     return e;
   }
@@ -447,13 +488,15 @@ export class Game {
     }
     if (p.stats.poison > 0) e.poison = { dps: (dm.amount * p.stats.poison / 100) / 3, t: 3, tick: 0.5 };
     e.flash = 1;
+    e.squash = 1;
     if (kbForce) { e.kbx += Math.cos(kbAng) * kbForce; e.kby += Math.sin(kbAng) * kbForce; }
     if (e.state === 'idle') e.alert(this);
     if (e.boss && !e.engaged) { e.engaged = true; e.state = 'chase'; this.onBossEngaged(e); }
     this.fx.text(e.x, e.y - e.r - 6, dm.amount + (dm.crit ? '!' : ''), dm.crit ? '#ffd24a' : '#ffffff', dm.crit ? 20 : 15, { damage: true, bold: dm.crit });
     this.fx.burst(e.x, e.y, e.type === 'acolyte' ? '#4a2a6a' : e.type === 'rat' ? '#5a1410' : '#b8b09a', dm.crit ? 9 : 5, 140, 0.4, 3, { ang: kbAng, spread: 0.9 });
     if (e.type === 'rat' || dm.crit) this.fx.burst(e.x, e.y, '#5a0f0b', 4, 100, 0.5, 3, { ang: kbAng, spread: 0.6 });
-    sfx(dm.crit ? 'crit' : 'hit');
+    sfx(dm.crit ? 'crit' : 'hit', { x: e.x, y: e.y });
+    if (dm.crit) this.hitstop(0.035);
     const ls = p.stats.lifesteal + p.mods().lifesteal;
     if (ls > 0) p.hp = Math.min(p.maxHp, p.hp + dm.amount * ls / 100);
     if (e.hp <= 0) this.killEnemy(e);
@@ -462,10 +505,13 @@ export class Game {
   killEnemy(e) {
     const s = this.scene;
     e.dead = true;
-    e.deadT = 0;
+    e.deadT = e.boss ? 1.6 : 0.7;
+    e.deathMax = e.deadT;
     this.renderer.addDecal(s, e);
-    this.fx.burst(e.x, e.y, e.type === 'acolyte' ? '#7b4fc0' : '#cfc8b5', e.boss ? 60 : 14, e.boss ? 300 : 160, 0.7, 4);
-    sfx(e.boss ? 'bossRoar' : 'enemyDie');
+    const debris = e.type === 'acolyte' ? '#3a2850' : e.type === 'rat' ? '#3e2f26' : '#b9b19c';
+    this.fx.burst(e.x, e.y, debris, e.boss ? 60 : 14, e.boss ? 300 : 170, e.boss ? 1.2 : 0.8, e.boss ? 5 : 4, { drag: 4 });
+    this.fx.burst(e.x, e.y, '#4a4440', 8, 60, 0.9, 6, { drag: 2, grav: -20 });
+    sfx(e.boss ? 'bossRoar' : e.type === 'rat' ? 'ratDie' : 'enemyDie', { x: e.x, y: e.y });
     this.addXp(e.xp, e.x, e.y);
     this.pd.stats.kills++;
     if (s.runStats) s.runStats.kills++;
@@ -475,22 +521,30 @@ export class Game {
     const D = e.def;
     const il = s.level + randInt(0, 2);
     // Or
-    const goldN = Math.round(randInt(D.gold[0], D.gold[1]) * (1 + (s.depth - 1) * 0.5) * (e.elite ? 3 : 1));
+    const goldN = chance(0.55) ? Math.round(randInt(D.gold[0], D.gold[1]) * 0.7 * (1 + (s.depth - 1) * 0.45) * (e.elite ? 3 : 1)) : 0;
     if (goldN > 0) this.dropGold(e.x, e.y, goldN);
     if (e.summoned) return;
     if (e.boss) { this.onBossKilled(e); return; }
     // Objets
-    const itemChance = e.elite ? 0.75 : 0.11;
+    const itemChance = e.elite ? 0.5 : 0.055;
     if (chance(itemChance)) this.dropItem(e.x, e.y, this.loot({ ilvl: il, rarityBonus: e.elite ? 1 : 0 }));
-    if (e.elite && chance(0.35)) this.dropItem(e.x, e.y, this.loot({ ilvl: il, rarityBonus: 1 }));
-    if (chance(e.elite ? 0.3 : 0.045)) this.dropItem(e.x, e.y, makeConsumable('potion', 1));
+    if (e.elite && chance(0.12)) this.dropItem(e.x, e.y, this.loot({ ilvl: il, rarityBonus: 1 }));
+    if (e.elite && chance(0.12)) this.dropLore(e.x, e.y);
+    if (chance(e.elite ? 0.2 : 0.025)) this.dropItem(e.x, e.y, makeConsumable('potion', 1));
   }
 
   onBossEngaged(b) {
     this.scene.bossEngaged = true;
     sfx('bossRoar');
     this.fx.shake(8);
-    this.ui.toast(b.def.name, 'boss', 2.5);
+    // Mise en scène : la caméra glisse vers le Gardien, léger ralenti.
+    this.camFocus = { x: b.x, y: b.y, t: 1.8, w: 0.55 };
+    this.zoomTarget = 1.18;
+    this.slowmo(1.2, 0.35);
+    const G = b.guardian || { name: b.def.name };
+    if (G.intro) this.ui.subtitle(G.intro, G.name);
+    playMusic('boss');
+    setReverb('boss');
   }
 
   onBossKilled(b) {
@@ -498,21 +552,31 @@ export class Game {
     const pd = this.pd;
     s.bossEngaged = false;
     this.fx.shake(14);
+    this.slowmo(1.8, 0.22);
+    this.camFocus = { x: b.x, y: b.y, t: 2.2, w: 0.5 };
+    this.zoomTarget = 1.25;
+    this.ui.flash();
+    this.fx.pillar(b.x, b.y, '#d8c79a');
+    const G = b.guardian;
+    if (G && G.death) setTimeout(() => this.ui.subtitle(G.death, G.name), 400);
+    setTimeout(() => { playMusic('dungeon', s.depth); setReverb('dungeon'); sfx('bell'); }, 2500);
+    this.dropLore(b.x, b.y, chance(0.6));
     const il = s.level + 2;
     this.dropItem(b.x, b.y, this.loot({ ilvl: il, rarityBonus: 2, minRarity: 2 }));
-    this.dropItem(b.x, b.y, this.loot({ ilvl: il, rarityBonus: 2 }));
-    this.dropItem(b.x, b.y, this.loot({ ilvl: il, rarityBonus: 2 }));
-    if (chance(0.25)) this.dropItem(b.x, b.y, this.loot({ ilvl: il, slot: 'pocket', rarity: Math.min(4, randInt(1, 3)) }));
-    this.dropItem(b.x, b.y, makeConsumable('potion', 2));
+    if (chance(0.5)) this.dropItem(b.x, b.y, this.loot({ ilvl: il, rarityBonus: 2 }));
+    if (chance(0.15)) this.dropItem(b.x, b.y, this.loot({ ilvl: il, slot: 'pocket', rarity: Math.min(4, randInt(1, 3)) }));
+    this.dropItem(b.x, b.y, makeConsumable('potion', 1));
     pd.bossKills[s.depth] = (pd.bossKills[s.depth] || 0) + 1;
     const unlocked = s.depth + 1 > pd.maxDepth;
     pd.maxDepth = Math.max(pd.maxDepth, s.depth + 1);
     this.questEvent('boss', { depth: s.depth });
     s.interactables.push({ type: 'exitPortal', x: b.x, y: b.y, r: 26, label: 'Portail de retour (village)' });
-    this.ui.banner('Gardien abattu', 'gold');
-    this.ui.toast('Un portail de retour s’est ouvert.', 'good', 5);
-    if (unlocked) this.ui.toast(`Profondeur ${s.depth + 1} débloquée au portail du village.`, 'good', 5);
-    sfx('portal');
+    setTimeout(() => {
+      this.ui.banner('Gardien abattu', 'gold');
+      this.ui.toast('Un portail de retour s’est ouvert.', 'good', 5);
+      if (unlocked) this.ui.toast(`Profondeur ${s.depth + 1} débloquée au portail du village.`, 'good', 5);
+      sfx('portal');
+    }, 1200);
   }
 
   hurtPlayer(amount, source) {
@@ -545,6 +609,7 @@ export class Game {
     this.fx.text(p.x, p.y - 26, '-' + dmg, '#ff5050', 17, { damage: true, bold: true });
     this.fx.burst(p.x, p.y, '#a01818', 8, 140, 0.4, 3);
     this.fx.shake(5);
+    this.ui.hurtFlash(dmg / p.maxHp);
     sfx('hurt');
     if (p.channel) this.cancelChannel('Touché');
     if (p.hp <= 0) this.playerDeath();
@@ -590,6 +655,7 @@ export class Game {
         continue;
       }
       const item = d.item;
+      if (item.kind === 'lore') { this.pickLore(item.id, d.x, d.y); s.drops.splice(i, 1); continue; }
       if (s.type === 'dungeon') item.found = true;
       const name = itemName(item);
       const qty = item.qty;
@@ -643,20 +709,57 @@ export class Game {
       case 'exitPortal':
         this.extract('Portail du boss');
         break;
+      case 'inscription':
+        o.read = true;
+        this.ui.inscription(o.text);
+        sfx('page');
+        break;
     }
   }
 
   openChest(o) {
     o.opened = true;
+    o.openT = 0;
+    // Le médaillon de Tomas apparaît dans le premier coffre ouvert à partir de la profondeur 2.
+    const tq = this.pd.quests.b_tomas;
+    if (tq && tq.status === 'active' && this.scene.depth >= 2 && !this.pd.story.lore.includes('l_tomas')) this.dropLore(o.x, o.y, true, 'l_tomas');
+    else if (chance(o.rich ? 0.45 : 0.2)) this.dropLore(o.x, o.y);
     const s = this.scene;
     const il = s.level + randInt(0, 2);
-    const n = o.rich ? randInt(2, 3) : randInt(1, 2);
+    const n = o.rich ? randInt(1, 2) : chance(0.6) ? 1 : 0;
     for (let i = 0; i < n; i++) this.dropItem(o.x, o.y, this.loot({ ilvl: il, rarityBonus: o.rich ? 2 : 1 }));
-    this.dropGold(o.x, o.y, Math.round(randInt(8, 20) * (1 + (s.depth - 1) * 0.6) * (o.rich ? 2.5 : 1)));
-    if (chance(0.4)) this.dropItem(o.x, o.y, makeConsumable('potion', 1));
+    this.dropGold(o.x, o.y, Math.round(randInt(5, 12) * (1 + (s.depth - 1) * 0.5) * (o.rich ? 2.5 : 1)));
+    if (chance(0.25)) this.dropItem(o.x, o.y, makeConsumable('potion', 1));
     if (chance(0.04 + (o.rich ? 0.08 : 0))) this.dropItem(o.x, o.y, this.loot({ slot: 'pocket', rarity: randInt(1, 3) }));
-    this.fx.burst(o.x, o.y, '#e8c547', 20, 160, 0.6, 3);
-    sfx('coin');
+    this.fx.burst(o.x, o.y - 6, '#c9a45a', 20, 140, 0.7, 2.5, { grav: -40 });
+    this.fx.ring(o.x, o.y, 'rgba(201,164,90,0.7)', 50, 0.5);
+    sfx('chest', { x: o.x, y: o.y });
+    setTimeout(() => sfx('coin'), 300);
+  }
+
+  // ---------------- LORE ----------------
+  dropLore(x, y, force = true, id = null) {
+    const pd = this.pd;
+    const s = this.scene;
+    if (!force) return;
+    let pickId = id;
+    if (!pickId) {
+      const pool = LORE.filter((l) => !l.quest && l.minDepth <= s.depth && !pd.story.lore.includes(l.id) && !s.drops.some((d) => d.item && d.item.id === l.id));
+      if (!pool.length) return;
+      pickId = pick(pool).id;
+    }
+    this.dropItem(x, y, { kind: 'lore', id: pickId });
+  }
+
+  pickLore(id, x, y) {
+    const pd = this.pd;
+    if (!pd.story.lore.includes(id)) pd.story.lore.push(id);
+    const L = LORE_BY_ID[id];
+    this.fx.text(x, y - 14, L.title, '#d8c79a', 13);
+    this.ui.toast(`Fragment découvert : « ${L.title} » — lisible dans le journal (${input.label('journal')})`, 'good', 5);
+    sfx('page');
+    this.questEvent('lore', { id });
+    this.save();
   }
 
   startChannel(dur, label, onDone) {
@@ -761,9 +864,13 @@ export class Game {
     p.dead = true;
     p.hp = 0;
     p.channel = null;
-    this.fx.burst(p.x, p.y, '#a01818', 40, 200, 1, 4);
+    this.fx.burst(p.x, p.y, '#5a0f0b', 40, 200, 1.2, 4);
     this.fx.shake(12);
+    this.slowmo(1.5, 0.3);
+    this.zoomTarget = 1.2;
+    this.ui.dying(true);
     sfx('death');
+    playMusic(null);
     const s = this.scene;
     const pen = this.applyDeathPenalty();
     setTimeout(() => {
@@ -778,8 +885,8 @@ export class Game {
         lostGold: pen.lostGold,
         kept: pen.kept,
         lost: pen.lost,
-      }, () => { this.running = true; this.enterVillage(); });
-    }, 1600);
+      }, () => { this.ui.dying(false); this.running = true; this.enterVillage(); });
+    }, 2200);
   }
 
   // ---------------- PROGRESSION ----------------
@@ -800,8 +907,9 @@ export class Game {
       p.recalc();
       p.hp = p.maxHp;
       p.stamina = p.maxStamina;
-      this.fx.burst(p.x, p.y, '#ffd24a', 40, 220, 0.9, 4, { glow: true });
-      this.fx.text(p.x, p.y - 40, `NIVEAU ${pd.level} !`, '#ffd24a', 24, { bold: true, life: 2 });
+      this.fx.burst(p.x, p.y, '#d8c79a', 30, 160, 1.2, 3, { grav: -80 });
+      this.fx.pillar(p.x, p.y, '#e7c98a');
+      this.ui.banner(`Niveau ${pd.level}`, 'gold');
       sfx('levelup');
       this.ui.toast(`Niveau ${pd.level} ! +1 point de talent (touche ${input.label('talents')})`, 'good', 4);
       if (pd.level === SPEC_LEVEL && !pd.spec) this.ui.toast('Vous pouvez choisir une spécialisation dans l’arbre de talents !', 'good', 6);
@@ -904,6 +1012,7 @@ export class Game {
       if (o.type !== type) continue;
       if (type === 'kill' && o.target !== data.type) continue;
       if ((type === 'boss' || type === 'depth') && data.depth < o.depth) continue;
+      if (type === 'lore' && o.id !== data.id) continue;
       st.progress++;
       if (st.progress >= o.count) {
         st.progress = o.count;
@@ -936,6 +1045,18 @@ export class Game {
     sfx('quest');
     this.save();
     this.ui.refresh();
+    if (q.epilogue && !pd.story.epilogue) {
+      pd.story.epilogue = true;
+      this.save();
+      setTimeout(() => { this.ui.close(); sfx('bell'); this.ui.showStory(EPILOGUE_ACT1, null, 'Acte I — La Cloche Noire'); }, 600);
+    }
+  }
+
+  // Une quête peut-elle être rendue (place dans le sac) ?
+  canTurnIn(id) {
+    const R = QUEST_BY_ID[id].reward;
+    const needSlots = (R.item ? 1 : 0) + (R.consumable ? 1 : 0);
+    return Inv.freeCount(this.pd.inventory) >= needSlots;
   }
 
   // ---------------- COMMERCE ----------------
@@ -949,8 +1070,8 @@ export class Game {
     }
     const pocket2 = generateItem({ slot: 'pocket', rarity: 1 });
     const pocket3 = generateItem({ slot: 'pocket', rarity: 3 });
-    pocket2.value = 75; // prix d'achat = valeur x 4
-    pocket3.value = 400;
+    pocket2.value = 100; // prix d'achat = valeur x 6
+    pocket3.value = 450;
     pd.shop = { forge, general: [pocket2, pocket3] };
     pd.shopDirty = false;
   }

@@ -45,6 +45,7 @@ export class Enemy {
   alert(g) {
     if (this.state !== 'idle') return;
     this.state = 'chase';
+    if (this.type !== 'rat') sfx('alert', { x: this.x, y: this.y, vol: 0.7 });
     for (const o of g.scene.enemies) {
       if (o !== this && !o.dead && o.state === 'idle' && !o.boss && dist(this.x, this.y, o.x, o.y) < 220) o.state = 'chase';
     }
@@ -80,6 +81,8 @@ export class Enemy {
 
   update(dt, g) {
     if (this.dead) return;
+    this.squash = Math.max(0, (this.squash || 0) - dt * 6);
+    if (this.spawnT > 0) { this.spawnT -= dt; return; }
     const p = g.player;
     const map = g.scene.map;
     this.flash = Math.max(0, this.flash - dt * 5);
@@ -178,6 +181,7 @@ export class Enemy {
     if (los && d < this.def.atkRange + p.r && this.cd <= 0) {
       this.angle = Math.atan2(p.y - this.y, p.x - this.x);
       this.state = 'windup';
+      sfx('windup', { x: this.x, y: this.y });
       this.tele = g.addTelegraph({ shape: 'cone', x: this.x, y: this.y, r: this.def.atkRange + 14, ang: this.angle, arc: this.def.arc, dur: this.def.windup * (this.elite ? 0.85 : 1), dmg: this.dmg, owner: this, follow: true });
       return;
     }
@@ -200,7 +204,7 @@ export class Enemy {
             const a = this.angle + (i - (n - 1) / 2) * 0.18;
             g.spawnProjectile({ x: this.x + Math.cos(a) * 14, y: this.y + Math.sin(a) * 14, vx: Math.cos(a) * D.projSpeed, vy: Math.sin(a) * D.projSpeed, r: 5, dmg: this.dmg, team: 'enemy', color: '#e8d9a8', life: 2.5, owner: this, kind: 'arrow' });
           }
-          sfx('arrow');
+          sfx('enemyArrow', { x: this.x, y: this.y });
           this.state = 'recover'; this.t = 0.4; this.cd = D.cd * rand(0.8, 1.2);
         }
       }
@@ -238,7 +242,7 @@ export class Enemy {
         const ox = i ? rand(-70, 70) : 0, oy = i ? rand(-70, 70) : 0;
         g.addTelegraph({ shape: 'circle', x: p.x + p.kbx * 0.1 + ox, y: p.y + oy, r: D.aoeR, dur: D.windup, dmg: this.dmg, owner: null, color: 'purple', onFire: (gg, t) => { gg.fx.burst(t.x, t.y, '#9b5cff', 18, 160, 0.5, 4, { glow: true }); sfx('boom'); } });
       }
-      sfx('cast');
+      sfx('cast', { x: this.x, y: this.y });
       return;
     }
     if (!los || d > 230) this.moveToward(g, p.x, p.y, sp, dt);
@@ -325,6 +329,7 @@ export class Enemy {
     ];
     if (this.phase === 2) opts.push({ w: d < 220 ? 3 : 0.5, v: 'nova' });
     const atk = weightedPick(opts);
+    sfx('bossWindup', { x: this.x, y: this.y });
     this.angle = Math.atan2(p.y - this.y, p.x - this.x);
     this.cd = (this.phase === 2 ? 0.9 : 1.4) * rand(0.85, 1.15);
 
@@ -351,12 +356,25 @@ export class Enemy {
 
   // ---------------- RENDU ----------------
   draw(ctx, time) {
-    if (this.dead) return;
     const x = this.x, y = this.y;
     const r = this.r;
     const OUT = '#0a0908';
     ctx.save();
     ctx.translate(x, y);
+    // Animation de mort : l'ennemi s'affaisse et se dissout
+    let dying = 0;
+    if (this.dead) {
+      dying = 1 - Math.max(0, this.deadT) / (this.deathMax || 0.7);
+      ctx.globalAlpha = Math.max(0, 1 - dying * 1.1);
+      ctx.scale(1 + dying * 0.25, 1 - dying * 0.55);
+      ctx.rotate(dying * 0.6 * (this.x % 2 ? 1 : -1));
+    } else if (this.spawnT > 0) {
+      // Invocation : surgit du sol
+      const k = 1 - this.spawnT / 0.7;
+      ctx.globalAlpha = k;
+      ctx.scale(0.4 + 0.6 * k, 0.4 + 0.6 * k);
+    }
+    if (this.squash > 0) ctx.scale(1 + this.squash * 0.18, 1 - this.squash * 0.14);
     ctx.fillStyle = 'rgba(0,0,0,0.45)';
     ctx.beginPath(); ctx.ellipse(2, r * 0.55, r * 1.1, r * 0.55, 0, 0, TAU); ctx.fill();
 
@@ -371,8 +389,8 @@ export class Enemy {
       ctx.fillStyle = 'rgba(110,150,60,0.25)';
       ctx.beginPath(); ctx.arc(0, 0, r + 3, 0, TAU); ctx.fill();
     }
-    ctx.rotate(this.angle);
-    const white = this.flash > 0;
+    ctx.rotate(this.angle + (this.state === 'chase' && !this.dead ? Math.sin(this.walkT) * 0.08 : 0));
+    const white = this.flash > 0 && !this.dead;
     const W = (c) => (white ? '#ffffff' : c);
     const step = Math.sin(this.walkT) * 2;
     ctx.lineWidth = 1.4;
@@ -513,7 +531,7 @@ export class Enemy {
 
   // Yeux lumineux, dessinés par-dessus l'obscurité.
   drawEyes(ctx) {
-    if (this.dead || this.type === 'rat') return;
+    if (this.dead || this.type === 'rat' || this.spawnT > 0) return;
     const r = this.r;
     const c = Math.cos(this.angle), s = Math.sin(this.angle);
     const ex = this.x + c * r * (this.boss ? 0.7 : 0.6);

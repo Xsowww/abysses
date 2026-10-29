@@ -7,12 +7,16 @@ export class Effects {
     this.particles = [];
     this.texts = [];
     this.rings = [];
+    this.pillars = [];
     this.shakeAmt = 0;
     this.shakeX = 0;
     this.shakeY = 0;
   }
 
-  clear() { this.particles.length = 0; this.texts.length = 0; this.rings.length = 0; this.shakeAmt = 0; }
+  clear() { this.particles.length = 0; this.texts.length = 0; this.rings.length = 0; this.pillars.length = 0; this.shakeAmt = 0; }
+
+  // Colonne de lumière (montée de niveau, Gardien abattu).
+  pillar(x, y, color, life = 1.6) { this.pillars.push({ x, y, color, life, max: life }); }
 
   ring(x, y, color, r, life = 0.45) { this.rings.push({ x, y, color, r, life, max: life }); }
 
@@ -51,6 +55,7 @@ export class Effects {
       p.vx *= d;
       p.vy = p.vy * d + p.grav * dt;
     }
+    for (let i = this.pillars.length - 1; i >= 0; i--) { this.pillars[i].life -= dt; if (this.pillars[i].life <= 0) this.pillars.splice(i, 1); }
     for (let i = this.rings.length - 1; i >= 0; i--) { this.rings[i].life -= dt; if (this.rings[i].life <= 0) this.rings.splice(i, 1); }
     for (let i = this.texts.length - 1; i >= 0; i--) {
       const t = this.texts[i];
@@ -64,6 +69,24 @@ export class Effects {
       this.shakeX = rand(-1, 1) * this.shakeAmt;
       this.shakeY = rand(-1, 1) * this.shakeAmt;
     } else { this.shakeX = this.shakeY = 0; }
+  }
+
+  drawPillars(ctx) {
+    for (const p of this.pillars) {
+      const k = p.life / p.max;
+      const w = 34 * Math.min(1, (1 - k) * 6) * (0.4 + 0.6 * k);
+      const g = ctx.createLinearGradient(0, p.y - 260, 0, p.y);
+      g.addColorStop(0, 'rgba(0,0,0,0)');
+      g.addColorStop(0.7, p.color);
+      g.addColorStop(1, p.color);
+      ctx.globalAlpha = 0.55 * k;
+      ctx.fillStyle = g;
+      ctx.fillRect(p.x - w / 2, p.y - 260, w, 262);
+      ctx.globalAlpha = 0.35 * k;
+      ctx.fillRect(p.x - w * 0.15, p.y - 260, w * 0.3, 262);
+      ctx.beginPath(); ctx.ellipse(p.x, p.y, w * 1.2, w * 0.45, 0, 0, Math.PI * 2); ctx.fill();
+    }
+    ctx.globalAlpha = 1;
   }
 
   drawParticles(ctx) {
@@ -81,7 +104,8 @@ export class Effects {
       ctx.globalAlpha = a;
       ctx.fillStyle = p.color;
       const s = p.size * (0.5 + a * 0.5);
-      ctx.fillRect(p.x - s / 2, p.y - s / 2, s, s);
+      if (p.glow) { ctx.beginPath(); ctx.arc(p.x, p.y, s * 0.6, 0, 6.283); ctx.fill(); }
+      else ctx.fillRect(p.x - s / 2, p.y - s / 2, s, s);
     }
     ctx.globalAlpha = 1;
   }

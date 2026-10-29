@@ -96,11 +96,11 @@ const SLOT_AFFIXES = {
 
 export const CONSUMABLES = {
   potion: {
-    name: 'Fiole de sang', desc: 'Rend 40 % des PV max.', stack: 20, price: 15, rarity: 0, color: '#b0362c',
+    name: 'Fiole de sang', desc: 'Rend 40 % des PV max.', stack: 20, price: 25, rarity: 0, color: '#b0362c',
     lore: 'Un liquide épais et tiède. Mieux vaut ne pas demander d’où il vient.',
   },
   pierre: {
-    name: 'Pierre de retour', desc: "Incantation de 5 s, puis retour au village avec votre butin. Interrompue si vous êtes touché.", stack: 5, price: 40, rarity: 2, color: '#79b8c4',
+    name: 'Pierre de retour', desc: "Incantation de 5 s, puis retour au village avec votre butin. Interrompue si vous êtes touché.", stack: 5, price: 60, rarity: 2, color: '#79b8c4',
     lore: 'Un galet froid qui se souvient du village. Il murmure le chemin à qui sait écouter.',
   },
 };
@@ -264,7 +264,7 @@ export function sellValue(item) {
 
 export function buyPrice(item) {
   if (item.kind === 'consumable') return CONSUMABLES[item.id].price;
-  return item.value * 4;
+  return item.value * 6;
 }
 
 export function affixText(a) {

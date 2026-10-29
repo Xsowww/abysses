@@ -49,6 +49,9 @@ export class Player {
     this.dead = false;
     this.lowStaWarn = 0;
     this.bowDraw = 0;
+    this.stepT = 0;
+    this.ghosts = [];
+    this.ghostT = 0;
   }
 
   weapon() {
@@ -141,6 +144,7 @@ export class Player {
 
   update(dt) {
     const g = this.game;
+    for (let i = this.ghosts.length - 1; i >= 0; i--) { this.ghosts[i].t -= dt; if (this.ghosts[i].t <= 0) this.ghosts.splice(i, 1); }
     if (this.dead) return;
     this.invuln = Math.max(0, this.invuln - dt);
     this.attackCd -= dt;
@@ -192,6 +196,13 @@ export class Player {
     if (this.moving) {
       g.scene.map.move(this, mx * speed * dt, my * speed * dt);
       this.walkT += dt * 10;
+      // Pas : son + petite poussière
+      this.stepT += dt * speed / 210;
+      if (this.stepT >= 0.34) {
+        this.stepT = 0;
+        sfx('step');
+        g.fx.burst(this.x - mx * 6, this.y + 8 - my * 6, g.scene.type === 'dungeon' ? '#4a4540' : '#3a3428', 2, 25, 0.5, 3, { drag: 4, grav: -6 });
+      }
       if (this.channel) g.cancelChannel('Déplacement');
     }
 
@@ -273,6 +284,8 @@ export class Player {
   updateRoll(dt) {
     const r = this.roll;
     r.t += dt;
+    this.ghostT -= dt;
+    if (this.ghostT <= 0) { this.ghostT = 0.045; this.ghosts.push({ x: this.x, y: this.y, a: this.angle, t: 0.22 }); }
     const k = 1 - r.t / r.dur;
     const sp = 600 * (0.35 + 0.65 * k);
     this.game.scene.map.move(this, r.dx * sp * dt, r.dy * sp * dt);
@@ -283,6 +296,8 @@ export class Player {
     const d = this.dash;
     const g = this.game;
     d.t += dt;
+    this.ghostT -= dt;
+    if (this.ghostT <= 0) { this.ghostT = 0.03; this.ghosts.push({ x: this.x, y: this.y, a: this.angle, t: 0.2 }); }
     const blocked = g.scene.map.move(this, d.dx * d.speed * dt, d.dy * d.speed * dt);
     g.fx.burst(this.x, this.y, d.color, 2, 30, 0.3, 4);
     if (d.hits) {
@@ -397,6 +412,10 @@ export class Player {
       ctx.beginPath();
       ctx.arc(this.x, this.y, this.r + 7, 0, TAU);
       ctx.stroke();
+    }
+    // Images rémanentes (roulade, charge)
+    for (const gh of this.ghosts) {
+      drawHero(ctx, gh.x, gh.y, { cls: this.pd.cls, angle: gh.a, time, eq, alpha: (gh.t / 0.22) * 0.25, flash: 0 });
     }
     drawHero(ctx, this.x, this.y, {
       cls: this.pd.cls, angle: this.angle, time, moving: this.moving, walkT: this.walkT, flash: this.flash, eq,

@@ -23,7 +23,9 @@ export function deleteSave() {
 }
 
 export const settings = {
-  volume: 0.5,
+  volume: 0.7,
+  musicVolume: 0.55,
+  sfxVolume: 0.85,
   pauseInMenus: true,
   screenShake: true,
   showDamage: true,

@@ -15,9 +15,11 @@ window.__game = game; // pratique pour déboguer depuis la console
 input.onRawKey((code) => {
   unlockAudio();
   if (code === 'Escape') ui.escape();
+  else ui.onKey(code);
 });
 
 function handleHotkeys() {
+  if (ui.storyState) return;
   if (!game.running || !game.pd || ui.screenOpen || ui.summaryOpen || input.rebinding) return;
   if (input.wasPressed('inventory')) ui.toggle('inventory');
   else if (input.wasPressed('talents')) ui.toggle('talents');

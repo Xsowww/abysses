@@ -161,5 +161,6 @@ export const CLASSES = {
 };
 
 export function xpForLevel(level) {
-  return Math.round(60 * Math.pow(level, 1.6));
+  // Progression lente : chaque niveau se mérite.
+  return Math.round(100 * Math.pow(level, 1.85));
 }
