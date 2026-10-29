@@ -1,5 +1,6 @@
 // Opérations d'inventaire : sac, poche sécurisée, coffre, équipement.
-import { CONSUMABLES, isTwoHanded, itemName } from '../data/items.js';
+import { CONSUMABLES, isTwoHanded, itemName, itemClass } from '../data/items.js';
+import { CLASSES } from '../data/classes.js';
 
 export const INV_SIZE = 30;
 export const STASH_SIZE = 60;
@@ -105,6 +106,8 @@ export function equip(pd, ref) {
   const item = getItem(pd, ref);
   if (!item || item.kind !== 'equip') return 'Cet objet ne s’équipe pas.';
   if (ref.c === 'equip') return null;
+  const ic = itemClass(item);
+  if (ic && ic !== pd.cls) return `Réservé à la classe ${CLASSES[ic].name}.`;
   const slot = item.slot;
   const old = pd.equipment[slot] || null;
   const extra = []; // objets supplémentaires à ranger dans le sac

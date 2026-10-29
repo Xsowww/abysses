@@ -24,6 +24,16 @@ const P = {
   shout: '<path d="M3 9h4l6-5v16l-6-5H3z"/><path d="M16 7a6 6 0 0 1 0 10l-1.2-1.6a4 4 0 0 0 0-6.8zM18.5 4a10 10 0 0 1 0 16l-1.2-1.6a8 8 0 0 0 0-12.8z"/>',
   rage: '<path d="M12 1c1 4 6 6 6 12a6 6 0 0 1-12 0c0-3 1.5-5 3-6 0 2 1 3 2 3 0-3-1-6 1-9z"/>',
   wall: '<path d="M2 4h20v16H2z" opacity=".35"/><path d="M2 4h9v4H2zM13 4h9v4h-9zM2 10h4v4H2zM8 10h8v4H8zM18 10h4v4h-4zM2 16h9v4H2zM13 16h9v4h-9z"/>',
+  arccourt: '<path d="M6 2c9 3 13 10 12 20" fill="none" stroke="currentColor" stroke-width="2.4"/><path d="M6 2L18 22" stroke="currentColor" stroke-width=".8" fill="none"/><path d="M3 13l12-2.5-1 2z"/><path d="M15 9.5l3 1.5-3 1.5z"/>',
+  arc: '<path d="M4 1c11 3 16 12 14 22" fill="none" stroke="currentColor" stroke-width="2.6"/><path d="M4 1L18 23" stroke="currentColor" stroke-width=".8" fill="none"/><path d="M2 14l14-3-1 2z"/><path d="M16 9.5l3.5 1.8-3.5 1.6z"/>',
+  arbalete: '<rect x="10.5" y="3" width="3" height="19" rx="1"/><path d="M2 8c5-3 15-3 20 0l-1 2c-5-2.5-13-2.5-18 0z"/><path d="M3 9.5l9 4 9-4" fill="none" stroke="currentColor" stroke-width=".8"/>',
+  quiver: '<path d="M7 7h8l2 15H9z"/><path d="M8 2l1 5M11 1.5v5.5M14 2l-1 5" stroke="currentColor" stroke-width="1.5" fill="none"/><path d="M6.5 1l3 1.5-1 1.2zM10 0.5l2.5 1.8L11 3zM15.5 1l-3 1.5 1 1.2z"/>',
+  pierce: '<path d="M1 12h17" stroke="currentColor" stroke-width="2"/><path d="M23 12l-6-4v8z"/><path d="M1 12l3-3v6z"/><circle cx="8" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.2"/><circle cx="14" cy="12" r="3" fill="none" stroke="currentColor" stroke-width="1.2"/>',
+  salve: '<path d="M2 12h14M3 6l12 4M3 18l12-4" stroke="currentColor" stroke-width="1.6" fill="none"/><path d="M22 12l-6-3v6zM21 8.5l-6.5-.5 2.8 4.6zM21 15.5l-6.5.5 2.8-4.6z"/>',
+  trap: '<path d="M2 15h20v3H2z"/><path d="M3 15l2-7 2 7 2-7 2 7 2-7 2 7 2-7 2 7 2-7 1 7z"/><circle cx="12" cy="20" r="1.5"/>',
+  rain: '<path d="M5 2l-2 9M10 1l-2 9M15 2l-2 9M20 1l-2 9" stroke="currentColor" stroke-width="1.6" fill="none"/><path d="M2 13l2 3 2-3zM7 12l2 3 2-3zM12 13l2 3 2-3zM17 12l2 3 2-3z"/><ellipse cx="12" cy="21" rx="10" ry="2" opacity=".5"/>',
+  eye: '<path fill-rule="evenodd" d="M12 5c5 0 9 4 11 7-2 3-6 7-11 7S3 15 1 12c2-3 6-7 11-7zm0 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/><circle cx="12" cy="12" r="1.8"/>',
+  veil: '<path d="M12 2c5 0 8 4 8 9v11l-2.5-2-2.5 2-3-2-3 2-2.5-2L4 22V11c0-5 3-9 8-9z"/><ellipse cx="9" cy="11" rx="1.6" ry="2.2" fill="#000"/><ellipse cx="15" cy="11" rx="1.6" ry="2.2" fill="#000"/>',
   lock: '<path d="M7 10V7a5 5 0 0 1 10 0v3h2v12H5V10zm2 0h6V7a3 3 0 0 0-6 0z"/>',
   gold: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="6" fill="#000" opacity=".25"/>',
 };
@@ -36,5 +46,6 @@ export function icon(name, cls = '') {
 export function itemIconName(item) {
   if (item.kind === 'consumable') return item.id;
   if (item.slot === 'weapon') return item.base;
+  if (item.slot === 'offhand') return item.offType === 'quiver' ? 'quiver' : 'offhand';
   return item.slot;
 }

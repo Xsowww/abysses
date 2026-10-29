@@ -1,11 +1,11 @@
-// Le joueur : statistiques, déplacements, attaques et compétences.
+// Le joueur : statistiques, déplacements, attaques (corps à corps ou à distance) et compétences.
 import { input } from '../core/input.js';
 import { CLASSES, SKILLS } from '../data/classes.js';
 import { WEAPONS, FISTS } from '../data/items.js';
-import { rand, clamp, angleDiff, TAU, dist } from '../core/util.js';
+import { rand, clamp, TAU, dist } from '../core/util.js';
 import { sfx } from '../core/audio.js';
+import { drawHero, drawWarriorWeapon } from './hero.js';
 
-const BASE_SPEED = 210;
 const ROLL_COST = 22;
 const ATTACK_COST = 6;
 
@@ -48,22 +48,26 @@ export class Player {
     this.walkT = 0;
     this.dead = false;
     this.lowStaWarn = 0;
+    this.bowDraw = 0;
   }
 
   weapon() {
     const w = this.pd.equipment.weapon;
-    if (!w) return { ...FISTS, dmg: 3 };
+    if (!w || !WEAPONS[w.base]) return { ...FISTS, dmg: 3 };
     return { ...WEAPONS[w.base], dmg: w.dmg };
   }
 
+  get stealth() { return this.hasBuff('voile'); }
+
   recalc() {
     const pd = this.pd;
-    const s = { hp: 0, hpPct: 0, armor: 0, armorPct: 0, dmgPct: 0, crit: 5, critDmg: 50, atkSpd: 0, moveSpd: 0, stamina: 0, staRegen: 0, lifesteal: 0, cdr: 0, hpRegen: 0, block: 0, thorns: 0, execute: 0 };
+    const s = { hp: 0, hpPct: 0, armor: 0, armorPct: 0, dmgPct: 0, crit: 5, critDmg: 50, atkSpd: 0, moveSpd: 0, stamina: 0, staRegen: 0, lifesteal: 0, cdr: 0, hpRegen: 0, block: 0, thorns: 0, execute: 0, pierce: 0, poison: 0, rollCost: 0 };
     for (const slot in pd.equipment) {
       const it = pd.equipment[slot];
       if (!it) continue;
       if (it.armor) s.armor += it.armor;
       if (it.block) s.block += it.block;
+      if (it.dmgBonus) s.dmgPct += it.dmgBonus;
       for (const a of it.affixes || []) s[a.k] = (s[a.k] || 0) + a.v;
     }
     const addTalents = (list) => {
@@ -81,13 +85,14 @@ export class Player {
 
     const lvl = pd.level;
     const oldMax = this.maxHp;
-    this.maxHp = Math.round((100 + 14 * (lvl - 1) + s.hp) * (1 + s.hpPct / 100));
+    this.maxHp = Math.round((C.hpBase + C.hpPerLvl * (lvl - 1) + s.hp) * (1 + s.hpPct / 100));
     this.armor = Math.round((s.armor + (lvl - 1) * 0.5) * (1 + s.armorPct / 100));
     this.maxStamina = 100 + s.stamina;
     s.crit = Math.min(s.crit, 75);
     s.cdr = Math.min(s.cdr, 40);
     s.block = Math.min(s.block, 60);
     s.moveSpd = Math.min(s.moveSpd, 50);
+    s.rollCost = Math.min(s.rollCost, 60);
     this.stats = s;
     if (this.maxHp > oldMax && oldMax > 0) this.hp += this.maxHp - oldMax;
     this.hp = Math.min(this.hp, this.maxHp);
@@ -96,11 +101,13 @@ export class Player {
 
   // Bonus temporaires des compétences.
   mods() {
-    const m = { dmgPct: 0, atkSpd: 0, lifesteal: 0, dmgTaken: 0, dr: 0, thorns: 0, staMult: 1 };
+    const m = { dmgPct: 0, atkSpd: 0, lifesteal: 0, dmgTaken: 0, dr: 0, thorns: 0, staMult: 1, crit: 0 };
     for (const b of this.buffs) {
       if (b.id === 'cri') { m.dmgPct += 30; m.atkSpd += 20; }
       if (b.id === 'dechainement') { m.atkSpd += 40; m.lifesteal += 8; m.dmgTaken += 15; }
       if (b.id === 'murdefer') { m.dr += 60; m.thorns += 30; m.staMult *= 2; }
+      if (b.id === 'oeil') { m.crit = 100; m.atkSpd += 30; }
+      if (b.id === 'voile') { m.dmgPct += 50; }
     }
     return m;
   }
@@ -112,7 +119,7 @@ export class Player {
     const m = this.mods();
     let d = w.dmg * mult * (1 + (this.stats.dmgPct + m.dmgPct) / 100) * rand(0.9, 1.1);
     if (target && target.hp / target.maxHp < 0.3 && this.stats.execute) d *= 1 + this.stats.execute / 100;
-    const crit = Math.random() * 100 < this.stats.crit;
+    const crit = Math.random() * 100 < Math.max(this.stats.crit, m.crit);
     if (crit) d *= 1 + this.stats.critDmg / 100;
     return { amount: Math.max(1, Math.round(d)), crit };
   }
@@ -122,7 +129,7 @@ export class Player {
 
   useStamina(n) {
     if (this.stamina < n) {
-      if (this.lowStaWarn <= 0) { this.game.fx.text(this.x, this.y - 30, 'Endurance !', '#e8c547', 13); this.lowStaWarn = 0.8; }
+      if (this.lowStaWarn <= 0) { this.game.fx.text(this.x, this.y - 30, 'Endurance', '#b9a46a', 13); this.lowStaWarn = 0.8; }
       return false;
     }
     this.stamina -= n;
@@ -150,11 +157,9 @@ export class Player {
     const regen = this.stats.hpRegen + (g.scene.type === 'village' ? this.maxHp * 0.08 : 0);
     if (regen > 0) this.hp = Math.min(this.maxHp, this.hp + regen * dt);
 
-    // Orientation vers la souris
     const mw = g.mouseWorld();
     this.angle = Math.atan2(mw.y - this.y, mw.x - this.x);
 
-    // Recul
     if (this.kbx || this.kby) {
       g.scene.map.move(this, this.kbx * dt, this.kby * dt);
       this.kbx *= 1 - Math.min(1, 10 * dt);
@@ -164,7 +169,6 @@ export class Player {
 
     if (this.swing) { this.swing.t += dt; if (this.swing.t >= this.swing.dur) this.swing = null; }
 
-    // Direction de déplacement
     let mx = 0, my = 0;
     if (input.isDown('up')) my -= 1;
     if (input.isDown('down')) my += 1;
@@ -178,9 +182,9 @@ export class Player {
     if (this.roll) { this.updateRoll(dt); return; }
     if (this.dash) { this.updateDash(dt); return; }
 
-    let speed = BASE_SPEED * (1 + this.stats.moveSpd / 100);
+    let speed = this.cls.speed * (1 + this.stats.moveSpd / 100);
     if (this.whirl) { speed *= 0.7; this.updateWhirl(dt); }
-    if (this.attackCd > 0 && !this.whirl) speed *= 0.82;
+    if (this.attackCd > 0 && !this.whirl) speed *= this.weapon().ranged ? 0.75 : 0.82;
     if (this.channel) speed = 0;
     if (inMenu) { mx = my = 0; }
 
@@ -191,28 +195,34 @@ export class Player {
       if (this.channel) g.cancelChannel('Déplacement');
     }
 
+    // Tension de l'arc (visuel)
+    const attacking = !inMenu && input.isDown('attack') && g.scene.type === 'dungeon';
+    this.bowDraw += ((attacking ? 1 : 0) - this.bowDraw) * Math.min(1, dt * 10);
+
     if (inMenu) return;
 
     // Roulade
-    if (input.wasPressed('roll') && this.useStamina(ROLL_COST)) {
+    const rollCost = ROLL_COST * (1 - this.stats.rollCost / 100);
+    if (input.wasPressed('roll') && this.useStamina(rollCost)) {
       const a = ml ? Math.atan2(my, mx) : this.angle;
       this.roll = { t: 0, dur: 0.32, dx: Math.cos(a), dy: Math.sin(a) };
       this.invuln = Math.max(this.invuln, 0.28);
       this.swing = null;
       if (this.channel) g.cancelChannel('Roulade');
       sfx('roll');
-      g.fx.burst(this.x, this.y + 6, '#6b5d4f', 6, 60, 0.4, 4);
+      g.fx.burst(this.x, this.y + 6, '#4a443c', 6, 60, 0.4, 4);
       return;
     }
 
     if (this.whirl) return;
 
+    const w = this.weapon();
     // Attaque de base
     if (input.isDown('attack') && this.attackCd <= 0 && g.scene.type === 'dungeon') {
-      if (this.useStamina(ATTACK_COST)) {
-        const w = this.weapon();
+      if (this.useStamina(w.ranged ? ATTACK_COST * 0.6 : ATTACK_COST)) {
         this.attackCd = w.cd / this.attackSpeedMult();
-        this.doSwing(this.angle, w.range, w.arc, 1, w.kb, false);
+        if (w.ranged) this.shoot(this.angle, 1, { pierce: (w.pierce || 0) + this.stats.pierce });
+        else this.doSwing(this.angle, w.range, w.arc, 1, w.kb, false);
         if (this.channel) g.cancelChannel('Attaque');
       } else this.attackCd = 0.15;
     }
@@ -221,18 +231,34 @@ export class Player {
     if (input.wasPressed('special') && this.specialCd <= 0 && g.scene.type === 'dungeon') {
       const sp = this.cls.special;
       if (this.useStamina(sp.stamina)) {
-        const w = this.weapon();
         this.specialCd = sp.cd * this.cdMult();
         this.attackCd = Math.max(this.attackCd, 0.45);
-        this.doSwing(this.angle, w.range * 1.25, Math.min(200, w.arc + 50), 2.2, w.kb * 2.2, true);
+        if (w.ranged) {
+          this.shoot(this.angle, 2.2, { pierce: 99, heavy: true, speed: 1.3 });
+          g.fx.shake(3);
+        } else this.doSwing(this.angle, w.range * 1.25, Math.min(200, w.arc + 50), 2.2, w.kb * 2.2, true);
         if (this.channel) g.cancelChannel('Attaque');
       }
     }
 
-    // Compétences 1 à 4
     for (let i = 0; i < 4; i++) {
       if (input.wasPressed('skill' + (i + 1))) this.castSkill(this.pd.skillBar[i]);
     }
+  }
+
+  shoot(ang, mult, o = {}) {
+    const g = this.game;
+    const w = this.weapon();
+    const sp = (w.projSpeed || 700) * (o.speed || 1);
+    g.spawnProjectile({
+      x: this.x + Math.cos(ang) * 16, y: this.y + Math.sin(ang) * 16,
+      vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp,
+      r: o.heavy ? 6 : 4, team: 'player', mult, kb: w.kb * (o.heavy ? 2 : 1),
+      pierce: o.pierce || 0, hit: new Set(), life: (w.range || 500) / sp * (o.heavy ? 1.3 : 1),
+      color: o.heavy ? '#e0c890' : '#d6cdb8', kind: o.heavy ? 'heavyArrow' : 'arrow', heavy: !!o.heavy,
+    });
+    this.bowDraw = 0;
+    sfx(o.heavy ? 'heavy' : 'arrow');
   }
 
   doSwing(ang, range, arc, mult, kb, heavy) {
@@ -240,7 +266,7 @@ export class Player {
     this.swing = { t: 0, dur: heavy ? 0.22 : 0.15, ang, arc, range, heavy };
     sfx(heavy ? 'heavy' : 'swing');
     const hits = g.meleeFromPlayer(this.x, this.y, ang, range, arc, mult, kb, heavy ? 0.25 : 0);
-    if (heavy) g.fx.shake(hits ? 6 : 2);
+    if (heavy) { g.fx.shake(hits ? 6 : 2); if (hits) g.hitstop(0.06); }
     else if (hits) g.fx.shake(2);
   }
 
@@ -257,17 +283,19 @@ export class Player {
     const d = this.dash;
     const g = this.game;
     d.t += dt;
-    const blocked = g.scene.map.move(this, d.dx * 950 * dt, d.dy * 950 * dt);
-    g.fx.burst(this.x, this.y, '#c9473b', 2, 30, 0.3, 4);
-    for (const e of g.scene.enemies) {
-      if (e.dead || d.hit.has(e)) continue;
-      if (dist(this.x, this.y, e.x, e.y) < this.r + e.r + 10) {
-        d.hit.add(e);
-        g.damageEnemy(e, this.rollDamage(1.5, e), Math.atan2(d.dy, d.dx), 260);
-        e.stun = Math.max(e.stun, 1.0);
+    const blocked = g.scene.map.move(this, d.dx * d.speed * dt, d.dy * d.speed * dt);
+    g.fx.burst(this.x, this.y, d.color, 2, 30, 0.3, 4);
+    if (d.hits) {
+      for (const e of g.scene.enemies) {
+        if (e.dead || d.hit.has(e)) continue;
+        if (dist(this.x, this.y, e.x, e.y) < this.r + e.r + 10) {
+          d.hit.add(e);
+          g.damageEnemy(e, this.rollDamage(1.5, e), Math.atan2(d.dy, d.dx), 260);
+          e.stun = Math.max(e.stun, 1.0);
+        }
       }
     }
-    if (d.t >= d.dur || blocked) { this.dash = null; g.fx.shake(4); }
+    if (d.t >= d.dur || blocked) { this.dash = null; if (d.hits) g.fx.shake(4); }
   }
 
   updateWhirl(dt) {
@@ -297,9 +325,10 @@ export class Player {
     if (!this.useStamina(S.stamina)) return;
     this.skillCd[id] = S.cd * this.cdMult();
     if (this.channel) g.cancelChannel('Compétence');
+    const w = this.weapon();
     switch (id) {
       case 'charge':
-        this.dash = { t: 0, dur: 0.26, dx: Math.cos(this.angle), dy: Math.sin(this.angle), hit: new Set() };
+        this.dash = { t: 0, dur: 0.26, dx: Math.cos(this.angle), dy: Math.sin(this.angle), hit: new Set(), speed: 950, hits: true, color: '#7a2a1e' };
         this.invuln = Math.max(this.invuln, 0.3);
         sfx('heavy');
         break;
@@ -308,106 +337,90 @@ export class Player {
         break;
       case 'cri':
         this.buffs.push({ id: 'cri', t: 8, max: 8 });
-        for (const e of g.scene.enemies) {
-          if (!e.dead && dist(this.x, this.y, e.x, e.y) < 230) e.slow = { t: 3, amt: 0.4 };
-        }
-        g.fx.burst(this.x, this.y, '#e8c547', 30, 260, 0.5, 4);
+        for (const e of g.scene.enemies) if (!e.dead && dist(this.x, this.y, e.x, e.y) < 230) e.slow = { t: 3, amt: 0.4 };
+        g.fx.ring(this.x, this.y, '#c9a45a', 230);
         g.fx.shake(5);
         sfx('bossRoar');
         break;
       case 'dechainement':
         this.buffs.push({ id: 'dechainement', t: 8, max: 8 });
-        g.fx.burst(this.x, this.y, '#ff3a2a', 30, 200, 0.6, 4);
+        g.fx.burst(this.x, this.y, '#a8402c', 30, 200, 0.6, 4);
         sfx('bossRoar');
         break;
       case 'murdefer':
         this.buffs.push({ id: 'murdefer', t: 5, max: 5 });
-        g.fx.burst(this.x, this.y, '#7fb0ff', 30, 200, 0.6, 4);
+        g.fx.ring(this.x, this.y, '#7f9ab8', 80);
         sfx('block');
+        break;
+      case 'salve':
+        for (let i = -2; i <= 2; i++) this.shoot(this.angle + i * 0.14, 0.75, { pierce: this.stats.pierce + (w.pierce || 0) });
+        this.attackCd = Math.max(this.attackCd, 0.3);
+        break;
+      case 'piege': {
+        const traps = g.scene.traps;
+        const mine = traps.filter((t) => !t.sprung);
+        if (mine.length >= 2) traps.splice(traps.indexOf(mine[0]), 1);
+        traps.push({ x: this.x, y: this.y, r: 20, sprung: false, t: 0, armT: 0.4 });
+        sfx('block');
+        break;
+      }
+      case 'pluie': {
+        const mw = g.mouseWorld();
+        const d = Math.min(dist(this.x, this.y, mw.x, mw.y), 420);
+        const tx = this.x + Math.cos(this.angle) * d, ty = this.y + Math.sin(this.angle) * d;
+        g.scene.zones.push({ kind: 'rain', x: tx, y: ty, r: 95, t: -0.35, dur: 1.5, tick: 0, interval: 0.25, mult: 0.45 });
+        sfx('arrow');
+        break;
+      }
+      case 'oeil':
+        this.buffs.push({ id: 'oeil', t: 6, max: 6 });
+        g.fx.ring(this.x, this.y, '#b8964a', 70);
+        sfx('cast');
+        break;
+      case 'voile':
+        this.buffs.push({ id: 'voile', t: 4, max: 4 });
+        for (const e of g.scene.enemies) if (!e.dead && !e.boss) e.cancelAttack();
+        g.fx.burst(this.x, this.y, '#2a2e36', 30, 140, 0.8, 6);
+        sfx('cast');
         break;
     }
   }
 
   draw(ctx, time) {
-    const x = this.x, y = this.y;
-    const C = this.cls;
-    const roll = this.roll;
-    ctx.save();
-    ctx.translate(x, y);
-
-    // Ombre
-    ctx.fillStyle = 'rgba(0,0,0,0.35)';
-    ctx.beginPath();
-    ctx.ellipse(0, 9, 14, 6, 0, 0, TAU);
-    ctx.fill();
-
-    // Auras de buffs
-    for (const b of this.buffs) {
-      const col = b.id === 'cri' ? '232,197,71' : b.id === 'dechainement' ? '255,58,42' : '127,176,255';
-      ctx.strokeStyle = `rgba(${col},${0.35 + 0.2 * Math.sin(time * 8)})`;
-      ctx.lineWidth = 3;
-      ctx.beginPath();
-      ctx.arc(0, 0, this.r + 6, 0, TAU);
-      ctx.stroke();
-    }
-
-    if (this.whirl) ctx.rotate(this.whirl.t * 18);
-    else ctx.rotate(this.angle);
-
-    if (roll) {
-      const k = Math.sin((roll.t / roll.dur) * Math.PI);
-      ctx.scale(1 - 0.25 * k, 1 + 0.15 * k);
-    }
-
-    const bob = this.moving ? Math.sin(this.walkT) * 1.5 : 0;
-    const invulnBlink = this.invuln > 0 && !roll && !this.dash && Math.floor(time * 20) % 2 === 0;
-    ctx.globalAlpha = invulnBlink ? 0.55 : 1;
-
-    // Bouclier (côté gauche)
     const eq = this.pd.equipment;
-    if (eq.offhand) {
-      ctx.fillStyle = '#6b4a2b';
-      ctx.strokeStyle = '#c8a46a';
+    const blink = this.invuln > 0 && !this.roll && !this.dash && Math.floor(time * 20) % 2 === 0;
+    // Auras de buffs (sobres)
+    for (const b of this.buffs) {
+      const col = { cri: '201,164,90', dechainement: '168,64,44', murdefer: '127,154,184', oeil: '184,150,74', voile: '90,106,122' }[b.id] || '200,200,200';
+      ctx.strokeStyle = `rgba(${col},${0.25 + 0.15 * Math.sin(time * 6)})`;
       ctx.lineWidth = 2;
       ctx.beginPath();
-      ctx.ellipse(4, -this.r - 1, 9, 4.5, 0, 0, TAU);
-      ctx.fill();
+      ctx.arc(this.x, this.y, this.r + 7, 0, TAU);
       ctx.stroke();
     }
+    drawHero(ctx, this.x, this.y, {
+      cls: this.pd.cls, angle: this.angle, time, moving: this.moving, walkT: this.walkT, flash: this.flash, eq,
+      roll: this.roll ? this.roll.t / this.roll.dur : 0, whirlT: this.whirl ? this.whirl.t : null, swing: this.swing,
+      alpha: this.stealth ? 0.35 : blink ? 0.55 : 1, bowDraw: this.bowDraw,
+    });
 
-    // Corps
-    ctx.fillStyle = this.flash > 0 ? '#fff' : C.color;
-    ctx.strokeStyle = '#2a1414';
-    ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(0, bob * 0.3, this.r, 0, TAU);
-    ctx.fill();
-    ctx.stroke();
-    // Épaulières
-    ctx.fillStyle = this.flash > 0 ? '#fff' : '#8d8a86';
-    ctx.beginPath(); ctx.arc(1, -9, 5, 0, TAU); ctx.fill();
-    ctx.beginPath(); ctx.arc(1, 9, 5, 0, TAU); ctx.fill();
-    // Tête / casque
-    ctx.fillStyle = this.flash > 0 ? '#fff' : (eq.head ? '#9a9792' : '#d9b48f');
-    ctx.beginPath(); ctx.arc(3, 0, 6.5, 0, TAU); ctx.fill();
-    ctx.fillStyle = '#1a1010';
-    ctx.fillRect(7, -3, 2, 6);
-
-    // Arme (si pas en train de frapper)
-    if (!this.swing && !this.whirl) this.drawWeapon(ctx, 0.9);
-    else if (this.whirl) this.drawWeapon(ctx, 0);
-    ctx.restore();
-
-    // Arc de frappe
+    // Arc de frappe (corps à corps)
     if (this.swing) {
       const s = this.swing;
       const k = s.t / s.dur;
       const half = (s.arc * Math.PI) / 360;
       const cur = s.ang - half + half * 2 * k;
       ctx.save();
-      ctx.translate(x, y);
-      ctx.globalAlpha = 0.55 * (1 - k * 0.6);
-      ctx.fillStyle = s.heavy ? 'rgba(255,170,90,0.6)' : 'rgba(230,230,240,0.45)';
+      ctx.translate(this.x, this.y);
+      // traînée
+      ctx.globalAlpha = 0.5 * (1 - k * 0.5);
+      ctx.strokeStyle = s.heavy ? 'rgba(230,170,110,0.9)' : 'rgba(220,215,200,0.8)';
+      ctx.lineWidth = s.heavy ? 5 : 3;
+      ctx.beginPath();
+      ctx.arc(0, 0, s.range * 0.92, Math.max(s.ang - half, cur - 1.2), cur);
+      ctx.stroke();
+      ctx.globalAlpha = 0.18 * (1 - k);
+      ctx.fillStyle = s.heavy ? '#e6aa6e' : '#ddd8c8';
       ctx.beginPath();
       ctx.moveTo(0, 0);
       ctx.arc(0, 0, s.range, s.ang - half, cur);
@@ -415,55 +428,18 @@ export class Player {
       ctx.fill();
       ctx.globalAlpha = 1;
       ctx.rotate(cur);
-      this.drawWeapon(ctx, 0, s.range / 62);
+      drawWarriorWeapon(ctx, eq.weapon, 0, s.range / 62);
       ctx.restore();
     }
 
-    // Barre d'incantation (extraction / pierre)
     if (this.channel) {
       const c = this.channel;
       ctx.strokeStyle = 'rgba(0,0,0,0.6)';
-      ctx.lineWidth = 5;
-      ctx.beginPath(); ctx.arc(x, y, this.r + 10, 0, TAU); ctx.stroke();
-      ctx.strokeStyle = '#7ad0ff';
-      ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.arc(x, y, this.r + 10, -Math.PI / 2, -Math.PI / 2 + TAU * (c.t / c.dur)); ctx.stroke();
+      ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(this.x, this.y, this.r + 11, 0, TAU); ctx.stroke();
+      ctx.strokeStyle = '#8fc4c0';
+      ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(this.x, this.y, this.r + 11, -Math.PI / 2, -Math.PI / 2 + TAU * (c.t / c.dur)); ctx.stroke();
     }
-  }
-
-  drawWeapon(ctx, offsetAng, scale = 1) {
-    const w = this.pd.equipment.weapon;
-    ctx.save();
-    ctx.rotate(offsetAng);
-    const type = w ? w.base : null;
-    const len = (type === 'espadon' ? 40 : type === 'marteau' ? 34 : 28) * Math.min(1.4, scale);
-    ctx.strokeStyle = '#4a3020';
-    ctx.lineWidth = 3;
-    ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(14, 0); ctx.stroke();
-    if (!type) { ctx.restore(); return; }
-    if (type === 'masse' || type === 'marteau') {
-      ctx.strokeStyle = '#6b4a2b';
-      ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.moveTo(10, 0); ctx.lineTo(10 + len, 0); ctx.stroke();
-      ctx.fillStyle = '#9ea3a8';
-      if (type === 'marteau') ctx.fillRect(4 + len, -8, 10, 16);
-      else { ctx.beginPath(); ctx.arc(10 + len, 0, 6, 0, TAU); ctx.fill(); }
-    } else if (type === 'hache') {
-      ctx.strokeStyle = '#6b4a2b';
-      ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.moveTo(10, 0); ctx.lineTo(10 + len, 0); ctx.stroke();
-      ctx.fillStyle = '#b3b8bd';
-      ctx.beginPath();
-      ctx.moveTo(len + 2, -1); ctx.quadraticCurveTo(len + 10, -12, len + 16, -9); ctx.lineTo(len + 10, 0); ctx.closePath();
-      ctx.fill();
-    } else {
-      ctx.strokeStyle = '#d4d8dc';
-      ctx.lineWidth = type === 'espadon' ? 5 : 4;
-      ctx.beginPath(); ctx.moveTo(14, 0); ctx.lineTo(12 + len, 0); ctx.stroke();
-      ctx.strokeStyle = '#c8a46a';
-      ctx.lineWidth = 3;
-      ctx.beginPath(); ctx.moveTo(14, -6); ctx.lineTo(14, 6); ctx.stroke();
-    }
-    ctx.restore();
   }
 }

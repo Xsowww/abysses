@@ -34,10 +34,10 @@ export function buildVillage() {
 
   // Maisons : rectangle solide (toit) ; la porte est implicite devant le PNJ.
   const houses = [
-    { x: 6, y: 8, w: 8, h: 6, roof: '#5a2f2a', name: 'Forge' },
-    { x: 31, y: 8, w: 9, h: 6, roof: '#3a3f5a', name: 'Comptoir' },
-    { x: 6, y: 24, w: 8, h: 6, roof: '#3d4a2c', name: 'Caserne' },
-    { x: 32, y: 24, w: 8, h: 6, roof: '#4a3a2a', name: 'Maison' },
+    { x: 6, y: 8, w: 8, h: 6, roof: '#3a2420', name: 'Forge' },
+    { x: 31, y: 8, w: 9, h: 6, roof: '#262a33', name: 'Comptoir' },
+    { x: 6, y: 24, w: 8, h: 6, roof: '#2a3022', name: 'Caserne' },
+    { x: 32, y: 24, w: 8, h: 6, roof: '#33291f', name: 'Maison' },
   ];
   for (const h of houses) map.fillRect(h.x, h.y, h.w, h.h, T.HOUSE);
   // Petits chemins vers les maisons

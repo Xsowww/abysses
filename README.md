@@ -26,10 +26,10 @@ Toutes les touches se modifient dans **Échap → Touches et options**.
 |---|---|
 | Se déplacer | Z Q S D (W A S D en QWERTY) |
 | Attaque de base | Clic gauche (maintenir) |
-| Attaque spéciale (Frappe lourde) | Clic droit |
+| Attaque spéciale (Frappe lourde / Tir perçant) | Clic droit |
 | Roulade (invulnérable) | Espace |
 | Compétences | 1 2 3 4 |
-| Potion de soin | A (Q en QWERTY) |
+| Fiole de sang (soin) | A (Q en QWERTY) |
 | Interagir / parler / ouvrir | E |
 | Pierre de retour | R |
 | Inventaire / Talents / Journal | I / N / J |
@@ -45,10 +45,12 @@ Dans l’inventaire : **clic** pour sélectionner, **clic droit** pour l’actio
 - Le **butin trouvé** dans le sac (marqué d’un **!** orange) et l’**or ramassé** pendant l’expédition sont **perdus** si vous mourez.
 - Pour rentrer avec votre butin : **point d’extraction** (pilier vert, 4 s d’incantation), **portail** qui apparaît après le boss, ou **pierre de retour** (5 s). Une incantation est interrompue si vous êtes touché ou si vous bougez.
 
-## Contenu de la v0.1
+## Contenu (v0.2)
 
+- Direction artistique sombre façon Souls : menus gothiques, HUD épuré, brouillard, grain, traces de combat persistantes.
 - Village : forgeron, marchande, capitaine (quêtes), gardienne du portail, coffre de stockage.
-- Classe Guerrier, arbre de talents (4 rangs) et 2 spécialisations au niveau 10 : **Berserker** et **Gardien**.
+- **Guerrier** (corps à corps) : spécialisations **Berserker** ou **Gardien** au niveau 10.
+- **Rôdeur** (arcs, arbalète, pièges) : spécialisations **Tireur d’élite** ou **Ombrelame** (poison, invisibilité) au niveau 10.
 - Donjon généré aléatoirement à chaque descente, profondeurs débloquées en battant le boss.
 - 4 types de monstres + élites + boss en 2 phases (« Le Gardien d’Os »).
 - Butin aléatoire à 5 raretés, 10 emplacements d’équipement, armes à une ou deux mains.

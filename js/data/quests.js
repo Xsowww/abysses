@@ -3,28 +3,28 @@
 
 export const NPCS = {
   aldric: {
-    name: 'Capitaine Aldric', title: 'Garde du village', color: '#8a96a8',
+    name: 'Capitaine Aldric', title: 'Garde du village', color: '#3a3f48', hood: '#5c6068',
     greet: [
       'Les Abysses s’éveillent, recrue. Chaque nuit, de nouvelles créatures remontent de la Crypte.',
       'Tu tiens encore debout ? Bien. Le village a besoin de lames.',
     ],
   },
   brann: {
-    name: 'Brann', title: 'Forgeron', color: '#b5653a', shop: 'forge',
+    name: 'Brann', title: 'Forgeron', color: '#4a2c1c', hood: '#2a1d15', shop: 'forge',
     greet: [
       'De l’acier honnête, forgé ici. Paye et il est à toi.',
       'Ramène-moi de quoi battre le fer… ou de l’or, ça marche aussi.',
     ],
   },
   odile: {
-    name: 'Odile', title: 'Marchande', color: '#c9a640', shop: 'general',
+    name: 'Odile', title: 'Marchande', color: '#4a3f26', hood: '#3a2a1c', shop: 'general',
     greet: [
       'Potions, pierres de retour, poches bien cousues… tout ce qu’il faut pour revenir vivant.',
       'Je rachète aussi ce que tu trouves en bas. Sans poser de questions.',
     ],
   },
   maelis: {
-    name: 'Maëlis', title: 'Gardienne du portail', color: '#7d5cc9', portal: true,
+    name: 'Maëlis', title: 'Gardienne du portail', color: '#1d3436', hood: '#142426', portal: true,
     greet: [
       'Le portail mène aux Abysses. Plus tu descends, plus c’est riche… et mortel.',
       'Garde une pierre de retour sur toi. Et sécurise ce qui compte.',

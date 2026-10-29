@@ -6,12 +6,15 @@ export class Effects {
   constructor() {
     this.particles = [];
     this.texts = [];
+    this.rings = [];
     this.shakeAmt = 0;
     this.shakeX = 0;
     this.shakeY = 0;
   }
 
-  clear() { this.particles.length = 0; this.texts.length = 0; this.shakeAmt = 0; }
+  clear() { this.particles.length = 0; this.texts.length = 0; this.rings.length = 0; this.shakeAmt = 0; }
+
+  ring(x, y, color, r, life = 0.45) { this.rings.push({ x, y, color, r, life, max: life }); }
 
   burst(x, y, color, n = 8, speed = 120, life = 0.5, size = 3, opts = {}) {
     for (let i = 0; i < n; i++) {
@@ -48,6 +51,7 @@ export class Effects {
       p.vx *= d;
       p.vy = p.vy * d + p.grav * dt;
     }
+    for (let i = this.rings.length - 1; i >= 0; i--) { this.rings[i].life -= dt; if (this.rings[i].life <= 0) this.rings.splice(i, 1); }
     for (let i = this.texts.length - 1; i >= 0; i--) {
       const t = this.texts[i];
       t.life -= dt;
@@ -63,6 +67,15 @@ export class Effects {
   }
 
   drawParticles(ctx) {
+    for (const r of this.rings) {
+      const k = 1 - r.life / r.max;
+      ctx.globalAlpha = (1 - k) * 0.8;
+      ctx.strokeStyle = r.color;
+      ctx.lineWidth = 3 * (1 - k) + 1;
+      ctx.beginPath();
+      ctx.arc(r.x, r.y, r.r * (0.3 + 0.7 * k), 0, Math.PI * 2);
+      ctx.stroke();
+    }
     for (const p of this.particles) {
       const a = Math.max(0, p.life / p.max);
       ctx.globalAlpha = a;
@@ -79,9 +92,9 @@ export class Effects {
     for (const t of this.texts) {
       const a = Math.min(1, t.life / t.max * 2);
       ctx.globalAlpha = a;
-      ctx.font = `${t.bold ? 'bold ' : ''}${t.size}px Georgia, serif`;
+      ctx.font = `${t.bold ? '600 ' : ''}${t.size}px 'EB Garamond', Georgia, serif`;
       ctx.lineWidth = 3;
-      ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+      ctx.strokeStyle = 'rgba(0,0,0,0.85)';
       ctx.strokeText(t.str, t.x, t.y);
       ctx.fillStyle = t.color;
       ctx.fillText(t.str, t.x, t.y);

@@ -3,7 +3,12 @@ import { input, ACTIONS, codeLabel } from '../core/input.js';
 import { settings, saveSettings, hasSave, loadGame, deleteSave } from '../core/save.js';
 import { sfx, unlockAudio } from '../core/audio.js';
 import { icon, itemIconName } from './icons.js';
-import { RARITIES, SLOTS, EQUIP_ORDER, WEAPONS, CONSUMABLES, affixText, itemName, itemColor, buyPrice, sellValue, isTwoHanded, makeConsumable } from '../data/items.js';
+import { startTitleBg, stopTitleBg } from './titlebg.js';
+import { drawHero } from '../game/hero.js';
+import {
+  RARITIES, SLOTS, EQUIP_ORDER, WEAPONS, CONSUMABLES, affixText, itemName, itemColor, itemRarity, itemLore, itemClass,
+  buyPrice, sellValue, isTwoHanded, makeConsumable, slotLabel, starterKit,
+} from '../data/items.js';
 import { CLASSES, SKILLS, SPEC_LEVEL, xpForLevel } from '../data/classes.js';
 import { QUESTS, QUEST_BY_ID, NPCS } from '../data/quests.js';
 import { enemyLevel } from '../data/enemies.js';
@@ -12,6 +17,7 @@ import { escapeHtml, fmt, pick } from '../core/util.js';
 
 const $ = (sel, root = document) => root.querySelector(sel);
 const ROMAN = ['I', 'II', 'III', 'IV', 'V'];
+const MENU_TABS = ['inventory', 'talents', 'journal'];
 
 // Panneaux qui bloquent les actions du joueur (déplacement compris).
 const BLOCKING = new Set(['dialog', 'shop', 'portal', 'pause', 'options', 'stash']);
@@ -35,7 +41,8 @@ export class UI {
       toasts: $('#toasts'),
       tip: $('#tooltip'),
       fade: $('#fade'),
-      minimap: $('#minimap'),
+      area: $('#area'),
+      banner: $('#banner'),
     };
     this.bindEvents();
   }
@@ -57,7 +64,7 @@ export class UI {
     root.addEventListener('click', (e) => {
       unlockAudio();
       const a = e.target.closest('[data-action]');
-      if (a && !a.disabled) { e.preventDefault(); this.action(a.dataset.action, a.dataset.arg, e); return; }
+      if (a && !a.disabled) { e.preventDefault(); this.action(a.dataset.action, a.dataset.arg, e, a); return; }
       const r = e.target.closest('[data-ref]');
       if (r) {
         if (e.shiftKey) { this.quickPocket(r.dataset.ref); return; }
@@ -99,8 +106,8 @@ export class UI {
   placeTip(e) {
     const t = this.el.tip;
     const w = t.offsetWidth, h = t.offsetHeight;
-    let x = e.clientX + 18, y = e.clientY + 14;
-    if (x + w > window.innerWidth - 8) x = e.clientX - w - 18;
+    let x = e.clientX + 20, y = e.clientY + 16;
+    if (x + w > window.innerWidth - 8) x = e.clientX - w - 20;
     if (y + h > window.innerHeight - 8) y = window.innerHeight - h - 8;
     t.style.left = Math.max(8, x) + 'px';
     t.style.top = Math.max(8, y) + 'px';
@@ -115,14 +122,13 @@ export class UI {
       return it ? this.itemTip(it, { compare: !el.dataset.ref.startsWith('equip'), ref: el.dataset.ref }) : null;
     }
     if (el.dataset.talent) return this.talentTip(el.dataset.talent);
-    if (el.dataset.skill) {
+    if (el.dataset.skill !== undefined) {
       const id = el.dataset.skill;
       if (id === 'special') { const sp = CLASSES[this.pd.cls].special; return `<div class="tt-name">${sp.name}</div><div class="tt-sub">Attaque spéciale · ${sp.stamina} endurance · ${sp.cd} s</div><div class="tt-desc">${sp.desc}</div>`; }
-      if (id === 'potion') return `<div class="tt-name">${CONSUMABLES.potion.name}</div><div class="tt-desc">${CONSUMABLES.potion.desc}</div>`;
-      if (id === 'pierre') return `<div class="tt-name">${CONSUMABLES.pierre.name}</div><div class="tt-desc">${CONSUMABLES.pierre.desc}</div>`;
+      if (id === 'potion' || id === 'pierre') { const C = CONSUMABLES[id]; return `<div class="tt-name">${C.name}</div><div class="tt-sub">Consommable</div><div class="tt-desc">${C.desc}</div><div class="tt-lore">${C.lore}</div>`; }
       const S = SKILLS[id];
-      if (!S) return '<div class="tt-desc">Emplacement vide. Débloquez des compétences dans l’arbre de talents.</div>';
-      return `<div class="tt-name">${S.name}</div><div class="tt-sub">${S.stamina ? S.stamina + ' endurance · ' : ''}Recharge ${S.cd} s</div><div class="tt-desc">${S.desc}</div>`;
+      if (!S) return '<div class="tt-desc dim">Emplacement vide. Les compétences se débloquent dans l’arbre de talents.</div>';
+      return `<div class="tt-name">${S.name}</div><div class="tt-sub">${S.stamina ? S.stamina + ' endurance · ' : ''}recharge ${S.cd} s</div><div class="tt-desc">${S.desc}</div>`;
     }
     if (el.dataset.tip) return `<div class="tt-desc">${escapeHtml(el.dataset.tip)}</div>`;
     return null;
@@ -137,7 +143,8 @@ export class UI {
     if (name === 'dialog') this.opts.greet = pick(NPCS[opts.npc].greet);
     input.clear();
     this.hideTip();
-    this.renderPanel();
+    this.renderPanel(true);
+    sfx('ui');
   }
 
   close() {
@@ -153,6 +160,7 @@ export class UI {
 
   toggle(name) {
     if (this.panel === name) this.close();
+    else if (MENU_TABS.includes(this.panel) && MENU_TABS.includes(name)) { this.panel = name; this.selected = null; this.renderPanel(); sfx('ui'); }
     else if (!this.panel || !BLOCKING.has(this.panel) || name === 'inventory') this.open(name);
   }
 
@@ -171,14 +179,20 @@ export class UI {
     this.refreshHudStatic();
   }
 
-  renderPanel() {
+  renderPanel(fresh = false) {
     const root = this.el.panel;
     const body = root.querySelector('.panel-body');
-    const scroll = body ? body.scrollTop : 0;
+    const scroll = body && !fresh ? body.scrollTop : 0;
     const fn = this['panel_' + this.panel];
     if (!fn) { root.innerHTML = ''; return; }
-    const { title, html, cls } = fn.call(this);
-    root.innerHTML = `<div class="panel ${cls || ''}"><div class="panel-head"><h2>${title}</h2><button class="x" data-action="close" title="Fermer (Échap)">✕</button></div><div class="panel-body">${html}</div></div>`;
+    const { title, sub, html, cls, footer } = fn.call(this);
+    let head;
+    if (MENU_TABS.includes(this.panel)) {
+      const labels = { inventory: 'Équipement', talents: 'Talents', journal: 'Journal' };
+      head = `<div class="tabs">${MENU_TABS.map((t) => `<button class="tab ${t === this.panel ? 'on' : ''}" data-action="tab-menu" data-arg="${t}"><kbd>${input.label(t)}</kbd>${labels[t]}</button>`).join('')}</div>${sub ? `<div class="ph-sub">${sub}</div>` : ''}`;
+    } else head = `<div class="ph-title">${title}</div>${sub ? `<div class="ph-sub">${sub}</div>` : ''}`;
+    const foot = footer || '<span><kbd>Échap</kbd>Fermer</span>';
+    root.innerHTML = `<div class="panel frame ${cls || ''}" ${fresh ? '' : 'style="animation:none"'}><header class="ph">${head}<button class="x" data-action="close" title="Fermer">✕</button></header><div class="rule"></div><div class="panel-body">${html}</div><footer class="pf">${foot}</footer></div>`;
     root.classList.add('show');
     const nb = root.querySelector('.panel-body');
     if (nb) nb.scrollTop = scroll;
@@ -194,13 +208,14 @@ export class UI {
   }
 
   cell(item, ref, extra = '') {
-    if (!item) return `<div class="slot empty" ${ref ? `data-drop="${ref}"` : ''}>${extra}</div>`;
+    if (!item) return `<div class="slot empty">${extra}</div>`;
     const col = itemColor(item);
     const sel = this.selected === ref ? ' selected' : '';
-    const rar = item.kind === 'equip' ? item.rarity : CONSUMABLES[item.id].rarity;
     const unsafe = item.found && this.pd.inRun && ref && ref.startsWith('inv') ? '<span class="unsafe" title="Non sécurisé">!</span>' : '';
     const qty = item.kind === 'consumable' && item.qty > 1 ? `<span class="qty">${item.qty}</span>` : '';
-    return `<div class="slot r${rar}${sel}" data-ref="${ref}" style="--c:${col}">${icon(itemIconName(item))}${qty}${unsafe}${extra}</div>`;
+    const ic = itemClass(item);
+    const other = ic && ic !== this.pd.cls ? ' style="opacity:.45"' : '';
+    return `<div class="slot r${itemRarity(item)}${sel}" data-ref="${ref}" style="--c:${col}"><span${other}>${icon(itemIconName(item))}</span>${qty}${unsafe}${extra}</div>`;
   }
 
   itemTip(item, opts = {}) {
@@ -209,39 +224,43 @@ export class UI {
     let h = `<div class="tt-name" style="color:${col}">${escapeHtml(itemName(item))}</div>`;
     if (item.kind === 'consumable') {
       const C = CONSUMABLES[item.id];
-      h += `<div class="tt-sub">Consommable${item.qty > 1 ? ' · x' + item.qty : ''}</div><div class="tt-desc">${C.desc}</div>`;
-      h += `<div class="tt-val">${icon('gold', 'gold')} Prix d’achat ${C.price} · revente ${Math.max(1, Math.floor(C.price / 3))}</div>`;
+      h += `<div class="tt-sub">Consommable${item.qty > 1 ? ' · ' + item.qty + ' exemplaires' : ''}</div><div class="tt-desc">${C.desc}</div>`;
+      h += `<div class="tt-val">Prix ${C.price} · revente ${Math.max(1, Math.floor(C.price / 3))} ${icon('gold', 'gold')}</div><div class="tt-lore">${C.lore}</div>`;
       return h;
     }
     const R = RARITIES[item.rarity];
-    let sub = `${R.name} · ${SLOTS[item.slot].label}`;
-    if (item.slot === 'weapon') { const W = WEAPONS[item.base]; sub = `${R.name} · ${W.name} · ${W.hands === 2 ? 'Deux mains' : 'Une main'}`; }
-    if (item.slot !== 'pocket') sub += ` · Niv. ${item.ilvl}`;
+    let sub = `${R.name} · ${slotLabel(item)}`;
+    if (item.slot === 'weapon') sub += isTwoHanded(item) ? ' · deux mains' : WEAPONS[item.base].ranged ? ' · à distance' : ' · une main';
+    if (item.slot !== 'pocket') sub += ` · niveau ${item.ilvl}`;
     h += `<div class="tt-sub">${sub}</div><div class="tt-main">`;
     const eq = pd.equipment[item.slot];
     const cmp = opts.compare && eq && eq !== item ? eq : null;
-    const delta = (a, b) => { if (b === undefined) return ''; const d = a - b; return d === 0 ? '' : `<span class="${d > 0 ? 'up' : 'down'}">(${d > 0 ? '+' : ''}${d})</span>`; };
+    const delta = (a, b) => { if (b === undefined) return ''; const d = a - b; return d === 0 ? '' : ` <span class="${d > 0 ? 'up' : 'down'}">${d > 0 ? '+' : ''}${d}</span>`; };
     if (item.slot === 'weapon') {
       const W = WEAPONS[item.base];
-      h += `<div>Dégâts : <b>${item.dmg}</b> ${cmp ? delta(item.dmg, cmp.dmg) : ''}</div>`;
-      h += `<div class="dim">${(1 / W.cd).toFixed(1)} attaques/s · portée ${W.range}</div>`;
+      h += `<div><span>Dégâts</span><b>${item.dmg}${cmp ? delta(item.dmg, cmp.dmg) : ''}</b></div>`;
+      h += `<div><span class="dim">Cadence</span><span class="dim">${(1 / W.cd).toFixed(1)} / s</span></div>`;
+      if (W.pierce) h += '<div><span class="dim">Traverse</span><span class="dim">1 ennemi</span></div>';
     }
-    if (item.armor) h += `<div>Armure : <b>${item.armor}</b> ${cmp ? delta(item.armor, cmp.armor || 0) : ''}</div>`;
-    if (item.block) h += `<div>Blocage : <b>${item.block} %</b></div>`;
-    if (item.slot === 'pocket') h += `<div>Emplacements sécurisés : <b>${item.secureSlots}</b> ${cmp ? delta(item.secureSlots, cmp.secureSlots) : ''}</div><div class="dim">Les objets rangés dans la poche sont conservés si vous mourez.</div>`;
+    if (item.armor) h += `<div><span>Armure</span><b>${item.armor}${cmp ? delta(item.armor, cmp.armor || 0) : ''}</b></div>`;
+    if (item.block) h += `<div><span>Blocage</span><b>${item.block} %</b></div>`;
+    if (item.dmgBonus) h += `<div><span>Dégâts</span><b>+${item.dmgBonus} %</b></div>`;
+    if (item.slot === 'pocket') h += `<div><span>Emplacements sécurisés</span><b>${item.secureSlots}${cmp ? delta(item.secureSlots, cmp.secureSlots) : ''}</b></div>`;
     h += '</div>';
     if (item.affixes && item.affixes.length) h += `<div class="tt-aff">${item.affixes.map((a) => `<div>${affixText(a)}</div>`).join('')}</div>`;
-    if (isTwoHanded(item)) h += '<div class="dim">Empêche l’utilisation d’un bouclier.</div>';
-    if (opts.ref && opts.ref.startsWith('inv') && item.found && pd.inRun) h += '<div class="tt-warn">⚠ Non sécurisé : perdu si vous mourez. Rangez-le dans votre poche ou équipez-le.</div>';
-    if (opts.ref && opts.ref.startsWith('pocket')) h += '<div class="tt-ok">✓ Sécurisé dans votre poche</div>';
-    if (opts.ref && opts.ref.startsWith('equip')) h += '<div class="tt-ok">✓ Équipé : jamais perdu</div>';
-    if (opts.ref && opts.ref.startsWith('shop')) h += `<div class="tt-val">${icon('gold', 'gold')} Prix : <b>${fmt(buyPrice(item))}</b> or</div>`;
-    else h += `<div class="tt-val">${icon('gold', 'gold')} Revente : ${fmt(sellValue(item))} or</div>`;
-    if (cmp) h += `<div class="tt-cmp">Équipé actuellement : <span style="color:${itemColor(cmp)}">${escapeHtml(cmp.name)}</span></div>`;
+    const ic = itemClass(item);
+    if (ic && ic !== pd.cls) h += `<div class="tt-warn">Réservé à la classe ${CLASSES[ic].name}. Peut être vendu.</div>`;
+    if (isTwoHanded(item)) h += '<div class="dim">Empêche l’usage de la main gauche.</div>';
+    if (opts.ref && opts.ref.startsWith('inv') && item.found && pd.inRun) h += '<div class="tt-warn">Non sécurisé : perdu si vous mourez. Rangez-le dans la poche ou équipez-le.</div>';
+    if (opts.ref && opts.ref.startsWith('pocket')) h += '<div class="tt-ok">Sécurisé dans votre poche.</div>';
+    if (opts.ref && opts.ref.startsWith('equip')) h += '<div class="tt-ok">Porté : jamais perdu.</div>';
+    if (opts.ref && opts.ref.startsWith('shop')) h += `<div class="tt-val">Prix : <b style="color:var(--bone)">${fmt(buyPrice(item))}</b> ${icon('gold', 'gold')}</div>`;
+    else h += `<div class="tt-val">Revente : ${fmt(sellValue(item))} ${icon('gold', 'gold')}</div>`;
+    if (cmp) h += `<div class="tt-cmp">Porté : <span style="color:${itemColor(cmp)}">${escapeHtml(cmp.name)}</span></div>`;
+    h += `<div class="tt-lore">${itemLore(item)}</div>`;
     return h;
   }
 
-  // Actions disponibles pour l'objet sélectionné selon le contexte.
   itemActions(ref) {
     const it = this.refItem(ref);
     if (!it) return [];
@@ -249,26 +268,26 @@ export class UI {
     const mode = this.panel;
     const A = [];
     if (c === 'cons') return A;
-    if (c === 'shop') { A.push({ l: `Acheter (${fmt(buyPrice(it))} or)`, a: 'buy', main: true }); return A; }
+    if (c === 'shop') { A.push({ l: `Acheter · ${fmt(buyPrice(it))} or`, a: 'buy', main: true }); return A; }
     if (c === 'equip') { A.push({ l: 'Retirer', a: 'unequip' }); return A; }
     if (it.kind === 'equip') A.push({ l: 'Équiper', a: 'equip', main: true });
     if (it.kind === 'consumable' && it.id === 'potion' && c !== 'stash') A.push({ l: 'Boire', a: 'drink' });
     if (c === 'inv') {
-      if (Inv.pocketSize(this.pd)) A.push({ l: 'Sécuriser (poche)', a: 'toPocket' });
-      if (mode === 'stash') A.push({ l: 'Déposer au coffre', a: 'toStash', main: true });
+      if (Inv.pocketSize(this.pd)) A.push({ l: 'Sécuriser', a: 'toPocket' });
+      if (mode === 'stash') A.push({ l: 'Déposer', a: 'toStash', main: true });
     }
     if (c === 'pocket') A.push({ l: 'Sortir de la poche', a: 'fromPocket' });
     if (c === 'stash') A.push({ l: 'Prendre', a: 'fromStash', main: true });
-    if (mode === 'shop' && c !== 'stash') A.push({ l: `Vendre (${fmt(sellValue(it))} or)`, a: 'sell', main: mode === 'shop' });
-    A.push({ l: this.confirmDestroy === ref ? 'Confirmer la destruction' : 'Détruire', a: 'destroy', danger: true });
+    if (mode === 'shop' && c !== 'stash') A.push({ l: `Vendre · ${fmt(sellValue(it))} or`, a: 'sell', main: true });
+    A.push({ l: this.confirmDestroy === ref ? 'Confirmer' : 'Détruire', a: 'destroy', danger: true });
     return A;
   }
 
   detailHTML() {
-    if (!this.selected) return '<div class="detail empty-detail">Cliquez sur un objet pour le sélectionner.<br><span class="dim">Clic droit : action rapide · Maj + clic : poche sécurisée</span></div>';
+    if (!this.selected) return '<div class="detail empty-detail">Sélectionnez un objet.<br>Clic droit : action rapide · Maj + clic : poche sécurisée</div>';
     const it = this.refItem(this.selected);
     if (!it) { this.selected = null; return this.detailHTML(); }
-    const acts = this.itemActions(this.selected).map((x) => `<button class="btn ${x.main ? 'main' : ''} ${x.danger ? 'danger' : ''}" data-action="item" data-arg="${x.a}">${x.l}</button>`).join('');
+    const acts = this.itemActions(this.selected).map((x) => `<button class="btn small ${x.main ? 'main' : ''} ${x.danger ? 'danger' : ''}" data-action="item" data-arg="${x.a}">${x.l}</button>`).join('');
     return `<div class="detail">${this.itemTip(it, { compare: !this.selected.startsWith('equip'), ref: this.selected })}<div class="actions">${acts}</div></div>`;
   }
 
@@ -324,52 +343,52 @@ export class UI {
   }
 
   // ---------- Actions génériques ----------
-  action(name, arg, e) {
+  action(name, arg, e, el) {
     const g = this.game;
     switch (name) {
       case 'close': sfx('ui'); if (this.panel === 'options' && this.opts.from === 'pause') this.open('pause'); else this.close(); break;
+      case 'tab-menu': this.toggle(arg); break;
       case 'item': this.doItemAction(arg); break;
       case 'sort': Inv.sortInventory(this.pd); sfx('ui'); this.refresh(); break;
       case 'learn': g.learnTalent(arg); break;
       case 'spec': g.chooseSpec(arg); break;
       case 'respec': g.respec(); break;
-      case 'tab': this.opts.tab = arg; sfx('ui'); this.refresh(); break;
       case 'quest-view': this.opts.view = arg; sfx('ui'); this.refresh(); break;
       case 'quest-accept': g.acceptQuest(arg); this.opts.view = null; this.refresh(); break;
       case 'quest-turnin': g.turnInQuest(arg); this.refresh(); break;
       case 'dialog-back': this.opts.view = null; this.refresh(); break;
-      case 'open-shop': this.open('shop', { shop: arg, npc: this.opts.npc }); sfx('ui'); break;
-      case 'open-portal': this.open('portal'); sfx('ui'); break;
-      case 'buy-cons': { const n = +(e && e.target.dataset.n) || 1; for (let i = 0; i < n; i++) g.buy('consumable', arg); break; }
+      case 'open-shop': this.open('shop', { shop: arg, npc: this.opts.npc }); break;
+      case 'open-portal': this.open('portal'); break;
+      case 'buy-cons': { const n = +(el && el.dataset.n) || 1; for (let i = 0; i < n; i++) g.buy('consumable', arg); break; }
       case 'descend': this.close(); g.enterDungeon(+arg); break;
       case 'resume': this.close(); break;
       case 'options': this.open('options', { from: this.panel === 'pause' ? 'pause' : null }); break;
       case 'quit': g.save(); g.running = false; this.close(); this.showTitle(); break;
       case 'rebind': this.startRebind(arg); break;
       case 'reset-keys': input.resetBindings(); sfx('ui'); this.refresh(); break;
-      case 'new-game': this.showClassSelect(); break;
+      case 'new-game': sfx('ui'); this.showClassSelect(); break;
       case 'continue': {
         const data = loadGame();
         if (data) { this.hideScreen(); g.load(data); }
         break;
       }
-      case 'title-options': this.showOptionsScreen(); break;
-      case 'back-title': this.showTitle(); break;
-      case 'pick-class': this.opts.cls = arg; this.renderClassSelect(); break;
+      case 'title-options': sfx('ui'); this.showOptionsScreen(); break;
+      case 'back-title': sfx('ui'); this.showTitle(); break;
+      case 'pick-class': if (!CLASSES[arg].locked) { this.screenCls = arg; this.confirmNew = false; sfx('ui'); this.renderClassSelect(); } break;
       case 'start-game': {
-        const name = ($('#char-name') && $('#char-name').value.trim()) || 'Aventurier';
+        const name = ($('#char-name') && $('#char-name').value.trim()) || 'Sans-nom';
         const cls = this.screenCls || 'guerrier';
         if (hasSave() && !this.confirmNew) { this.confirmNew = true; this.renderClassSelect(); return; }
         deleteSave();
         this.hideScreen();
         g.newGame(name.slice(0, 18), cls);
-        this.toast('Bienvenue au village. Parlez aux habitants (touche ' + input.label('interact') + ') !', 'good', 6);
+        setTimeout(() => this.toast(`Parlez aux habitants avec ${input.label('interact')}. Le portail des Abysses est au nord.`, 'good', 7), 3500);
         break;
       }
       case 'summary-ok': {
         this.summaryOpen = false;
         this.el.screen.innerHTML = '';
-        this.el.screen.classList.remove('show');
+        this.el.screen.classList.remove('show', 'overlay');
         const cb = this.summaryCb;
         this.summaryCb = null;
         if (cb) cb();
@@ -384,13 +403,15 @@ export class UI {
     input.startRebind(id, () => { this.rebindingId = null; this.refresh(); sfx('ui'); });
   }
 
-  // ================= INVENTAIRE =================
-  equipGridHTML() {
+  // ================= ÉQUIPEMENT =================
+  paperdollHTML() {
     const pd = this.pd;
-    return `<div class="equip-grid">${EQUIP_ORDER.map((s) => {
+    return `<div class="paperdoll">${EQUIP_ORDER.map((s) => {
       const it = pd.equipment[s];
       const blocked = s === 'offhand' && isTwoHanded(pd.equipment.weapon);
-      return `<div class="eq-cell" style="grid-area:${s}">${this.cell(it, 'equip:' + s, it ? '' : `<span class="ph">${icon(s === 'weapon' ? 'epee' : s)}</span>`)}<div class="eq-label">${blocked ? 'Deux mains' : SLOTS[s].label}</div></div>`;
+      const phIcon = s === 'weapon' ? (pd.cls === 'rodeur' ? 'arc' : 'epee') : s === 'offhand' ? (pd.cls === 'rodeur' ? 'quiver' : 'offhand') : s;
+      const label = s === 'offhand' ? (pd.cls === 'rodeur' ? 'Carquois' : 'Bouclier') : SLOTS[s].label;
+      return `<div class="eq-cell" style="grid-area:${s}">${this.cell(it, 'equip:' + s, it ? '' : `<span class="ph-icon">${icon(phIcon)}</span>`)}<div class="eq-label">${blocked ? 'deux mains' : label}</div></div>`;
     }).join('')}</div>`;
   }
 
@@ -400,17 +421,19 @@ export class UI {
     const w = p.weapon();
     const red = Math.round(Math.min(0.75, p.armor / (p.armor + 40 + 12 * this.pd.level)) * 100);
     const rows = [
-      ['PV max', fmt(p.maxHp)],
-      ['Armure', `${p.armor} <span class="dim">(-${red} %)</span>`],
-      ['Dégâts de l’arme', `${w.dmg} <span class="dim">(+${Math.round(s.dmgPct)} %)</span>`],
-      ['Attaques / s', (p.attackSpeedMult() / w.cd).toFixed(2)],
-      ['Critique', `${s.crit.toFixed(1)} % · x${(1 + s.critDmg / 100).toFixed(2)}`],
+      ['Vitalité', fmt(p.maxHp)],
+      ['Armure', `${p.armor} <span class="dim">· -${red} %</span>`],
+      ['Dégâts de l’arme', `${w.dmg} <span class="dim">· +${Math.round(s.dmgPct)} %</span>`],
+      ['Cadence', `${(p.attackSpeedMult() / w.cd).toFixed(2)} / s`],
+      ['Critique', `${s.crit.toFixed(1)} % · ×${(1 + s.critDmg / 100).toFixed(2)}`],
       ['Endurance', p.maxStamina],
       ['Vol de vie', `${s.lifesteal.toFixed(1)} %`],
-      ['Blocage', `${pd_block(this.pd, s)} %`],
+      ['Blocage', `${this.pd.equipment.offhand && this.pd.equipment.offhand.block ? Math.round(s.block) : 0} %`],
       ['Vitesse', `+${s.moveSpd} %`],
-      ['Réduction recharge', `${s.cdr} %`],
-      ['Régén. PV', `${s.hpRegen.toFixed(1)} /s`],
+      ['Recharge', `-${s.cdr} %`],
+      ['Régénération', `${s.hpRegen.toFixed(1)} /s`],
+      ...(s.poison ? [['Venin', `${s.poison} %`]] : []),
+      ...(s.pierce ? [['Traversée', `+${s.pierce}`]] : []),
     ];
     return `<div class="stats">${rows.map((r) => `<div><span>${r[0]}</span><b>${r[1]}</b></div>`).join('')}</div>`;
   }
@@ -425,21 +448,22 @@ export class UI {
       else pocket += `<div class="slot locked" data-tip="Équipez une meilleure poche sécurisée pour débloquer cet emplacement.">${icon('lock')}</div>`;
     }
     return `
-      <div class="bag-head"><h3>Sac <span class="dim">${used}/${Inv.INV_SIZE}</span></h3><button class="btn small" data-action="sort">Trier</button></div>
+      <div class="bag-head"><h3>Sac <span class="dim">${used} / ${Inv.INV_SIZE}</span></h3><button class="btn small" data-action="sort">Trier</button></div>
       <div class="grid bag">${pd.inventory.map((it, i) => this.cell(it, 'inv:' + i)).join('')}</div>
-      <div class="bag-head"><h3>${icon('pocket')} Poche sécurisée <span class="dim">${ps} emplacement${ps > 1 ? 's' : ''}</span></h3></div>
+      <div class="bag-head"><h3>Poche sécurisée <span class="dim">${ps} empl.</span></h3></div>
       <div class="grid pocket">${pocket}</div>
-      <div class="gold-line">${icon('gold', 'gold')} <b>${fmt(pd.gold)}</b> or${pd.inRun ? ` <span class="dim">· butin d’or non sécurisé : ${fmt(pd.runGold)}</span>` : ''}</div>`;
+      <div class="gold-line">${icon('gold', 'gold')} ${fmt(pd.gold)} or${pd.inRun ? ` <span class="dim">· ${fmt(pd.runGold)} or ramassé, non sécurisé</span>` : ''}</div>`;
   }
 
   panel_inventory() {
     const pd = this.pd;
+    const C = CLASSES[pd.cls];
     const html = `<div class="inv-layout">
-      <div class="col">${this.equipGridHTML()}${this.statsHTML()}</div>
+      <div class="col">${this.paperdollHTML()}${this.statsHTML()}</div>
       <div class="col">${this.bagHTML()}${this.detailHTML()}
-        <p class="hint">En expédition, le butin trouvé dans le sac (marqué <span class="unsafe inline">!</span>) est perdu si vous mourez. L’équipement porté et la poche sécurisée sont toujours conservés.</p>
+        <p class="hint">En expédition, le butin du sac marqué <span class="unsafe inline">!</span> est perdu à la mort. L’équipement porté et la poche sécurisée sont toujours conservés.</p>
       </div></div>`;
-    return { title: `Inventaire — ${escapeHtml(pd.name)}, ${CLASSES[pd.cls].name} niv. ${pd.level}`, html, cls: 'wide' };
+    return { sub: `${escapeHtml(pd.name)} · ${C.name}${pd.spec ? ' ' + C.specs[pd.spec].name : ''} · niveau ${pd.level}`, html, cls: 'wide', footer: '<span><kbd>Clic</kbd>Sélectionner</span><span><kbd>Clic D</kbd>Action rapide</span><span><kbd>Maj</kbd>+ clic : poche</span><span><kbd>Échap</kbd>Fermer</span>' };
   }
 
   // ================= COFFRE =================
@@ -447,11 +471,11 @@ export class UI {
     const pd = this.pd;
     const used = pd.stash.filter((x) => x).length;
     const html = `<div class="inv-layout">
-      <div class="col"><div class="bag-head"><h3>Coffre <span class="dim">${used}/${Inv.STASH_SIZE}</span></h3></div>
+      <div class="col"><div class="bag-head"><h3>Coffre <span class="dim">${used} / ${Inv.STASH_SIZE}</span></h3></div>
         <div class="grid stash">${pd.stash.map((it, i) => this.cell(it, 'stash:' + i)).join('')}</div>
-        <p class="hint">Le coffre reste au village : ce qui est dedans ne risque rien.</p></div>
+        <p class="hint">Ce qui dort ici ne craint rien des Abysses.</p></div>
       <div class="col">${this.bagHTML()}${this.detailHTML()}</div></div>`;
-    return { title: 'Coffre de stockage', html, cls: 'wide' };
+    return { title: 'Coffre', sub: 'Un vieux coffre cerclé de fer', html, cls: 'wide', footer: '<span><kbd>Clic D</kbd>Déposer / prendre</span><span><kbd>Échap</kbd>Fermer</span>' };
   }
 
   // ================= MARCHANDS =================
@@ -460,30 +484,35 @@ export class UI {
     const shop = this.opts.shop;
     let left = '';
     if (shop === 'forge') {
-      left = `<h3>Armes et armures de Brann</h3><p class="dim">Le stock change à chaque retour d’expédition.</p>
-        <div class="shop-list">${pd.shop.forge.map((it, i) => `<div class="shop-item">${this.cell(it, `shop:forge:${i}`)}<div class="si-info"><div style="color:${itemColor(it)}">${escapeHtml(it.name)}</div><div class="dim">${SLOTS[it.slot].label} · niv. ${it.ilvl}</div></div><div class="price ${pd.gold < buyPrice(it) ? 'poor' : ''}">${fmt(buyPrice(it))} ${icon('gold', 'gold')}</div></div>`).join('') || '<p class="dim">Plus rien en stock.</p>'}</div>`;
+      left = `<h3>Étal de la forge</h3><p class="hint" style="margin-top:-4px">Le stock change à chaque retour d’expédition.</p>
+        <div class="shop-list">${pd.shop.forge.map((it, i) => `<div class="shop-item">${this.cell(it, `shop:forge:${i}`)}<div class="si-info"><div style="color:${itemColor(it)}">${escapeHtml(it.name)}</div><div class="dim">${slotLabel(it)} · niveau ${it.ilvl}</div></div><div class="price ${pd.gold < buyPrice(it) ? 'poor' : ''}">${fmt(buyPrice(it))} ${icon('gold', 'gold')}</div></div>`).join('') || '<p class="dim">Plus rien en stock.</p>'}</div>`;
     } else {
       const cons = ['potion', 'pierre'].map((id) => {
         const C = CONSUMABLES[id];
-        return `<div class="shop-item">${this.cell(makeConsumable(id, 1), 'cons:' + id)}<div class="si-info"><div>${C.name}</div><div class="dim">${C.desc}</div></div><div class="buy-btns"><button class="btn small" data-action="buy-cons" data-arg="${id}" data-n="1">x1 · ${C.price}</button><button class="btn small" data-action="buy-cons" data-arg="${id}" data-n="5">x5 · ${C.price * 5}</button></div></div>`;
+        return `<div class="shop-item">${this.cell(makeConsumable(id, 1), 'cons:' + id)}<div class="si-info"><div>${C.name}</div><div class="dim">${C.desc}</div></div><div class="buy-btns"><button class="btn small" data-action="buy-cons" data-arg="${id}" data-n="1">×1 · ${C.price}</button><button class="btn small" data-action="buy-cons" data-arg="${id}" data-n="5">×5 · ${C.price * 5}</button></div></div>`;
       }).join('');
-      left = `<h3>Fournitures d’Odile</h3><div class="shop-list">${cons}
+      left = `<h3>Fournitures</h3><div class="shop-list">${cons}
         ${pd.shop.general.map((it, i) => `<div class="shop-item">${this.cell(it, `shop:general:${i}`)}<div class="si-info"><div style="color:${itemColor(it)}">${escapeHtml(it.name)}</div><div class="dim">Poche sécurisée · ${it.secureSlots} emplacements</div></div><div class="price ${pd.gold < buyPrice(it) ? 'poor' : ''}">${fmt(buyPrice(it))} ${icon('gold', 'gold')}</div></div>`).join('')}</div>`;
     }
-    const html = `<div class="inv-layout"><div class="col">${left}</div><div class="col">${this.bagHTML()}${this.detailHTML()}<p class="hint">Clic droit sur un objet du sac pour le vendre rapidement.</p></div></div>`;
-    return { title: shop === 'forge' ? 'Forge de Brann' : 'Comptoir d’Odile', html, cls: 'wide' };
+    const html = `<div class="inv-layout"><div class="col">${left}</div><div class="col">${this.bagHTML()}${this.detailHTML()}</div></div>`;
+    return {
+      title: shop === 'forge' ? 'La forge de Brann' : 'Le comptoir d’Odile',
+      sub: shop === 'forge' ? '« De l’acier honnête. Paye et il est à toi. »' : '« Je rachète tout. Sans poser de questions. »',
+      html, cls: 'wide', footer: '<span><kbd>Clic D</kbd>Acheter / vendre</span><span><kbd>Échap</kbd>Fermer</span>',
+    };
   }
 
   // ================= DIALOGUE / QUÊTES =================
   questObjText(q, st) {
     const o = q.obj;
     const n = st ? st.progress : 0;
+    const names = { rat: 'Rats des cryptes', squelette: 'Squelettes', archer: 'Archers squelettes', acolyte: 'Acolytes des Abysses' };
     switch (o.type) {
-      case 'kill': return `Tuer : ${q.obj.target === 'rat' ? 'Rats des cryptes' : q.obj.target === 'squelette' ? 'Squelettes' : q.obj.target === 'archer' ? 'Archers squelettes' : 'Acolytes des Abysses'} (${n}/${o.count})`;
-      case 'elite': return `Tuer des élites (${n}/${o.count})`;
-      case 'boss': return `Vaincre le Gardien d’Os, profondeur ${o.depth} ou plus (${n}/${o.count})`;
-      case 'extract': return `Réussir des extractions (${n}/${o.count})`;
-      case 'depth': return `Atteindre la profondeur ${o.depth} (${n}/${o.count})`;
+      case 'kill': return `${names[o.target]} abattus : ${n} / ${o.count}`;
+      case 'elite': return `Élites abattues : ${n} / ${o.count}`;
+      case 'boss': return `Gardien d’Os vaincu (profondeur ${o.depth}+) : ${n} / ${o.count}`;
+      case 'extract': return `Extractions réussies : ${n} / ${o.count}`;
+      case 'depth': return `Atteindre la profondeur ${o.depth} : ${n} / ${o.count}`;
     }
     return '';
   }
@@ -507,25 +536,24 @@ export class UI {
       const q = QUEST_BY_ID[view];
       const st = this.pd.quests[view];
       const html = `<div class="dialog"><div class="npc-line">« ${q.desc} »</div>
-        <div class="quest-box"><div><b>Objectif :</b> ${this.questObjText(q, st)}</div><div><b>Récompense :</b> ${this.rewardText(q)}</div></div>
-        <div class="actions">${!st ? `<button class="btn main" data-action="quest-accept" data-arg="${q.id}">Accepter</button>` : ''}
+        <div class="quest-box"><div><span class="dim">Objectif —</span> ${this.questObjText(q, st)}</div><div><span class="dim">Récompense —</span> ${this.rewardText(q)}</div></div>
+        <div class="actions" style="justify-content:center;margin-top:18px">${!st ? `<button class="btn main" data-action="quest-accept" data-arg="${q.id}">Accepter</button>` : ''}
         ${st && st.status === 'ready' ? `<button class="btn main" data-action="quest-turnin" data-arg="${q.id}">Rendre la quête</button>` : ''}
         <button class="btn" data-action="dialog-back">Retour</button></div></div>`;
-      return { title: `${N.name} — ${q.name}`, html };
+      return { title: q.name, sub: N.name, html };
     }
     const ready = g.questsOf(id, 'ready');
     const avail = g.questsAvailable(id);
     const active = g.questsOf(id, 'active');
     let opts = '';
-    for (const q of ready) opts += `<button class="opt ready" data-action="quest-turnin" data-arg="${q.id}">✔ Rendre : ${q.name}</button>`;
-    for (const q of avail) opts += `<button class="opt new" data-action="quest-view" data-arg="${q.id}">! Nouvelle quête : ${q.name}</button>`;
-    for (const q of active) opts += `<button class="opt" data-action="quest-view" data-arg="${q.id}">… ${q.name} <span class="dim">(${this.pd.quests[q.id].progress}/${q.obj.count})</span></button>`;
-    if (N.shop) opts += `<button class="opt shop" data-action="open-shop" data-arg="${N.shop}">${icon('gold', 'gold')} Commercer</button>`;
-    if (N.portal) opts += `<button class="opt portal" data-action="open-portal">✦ Ouvrir le portail des Abysses</button>`;
-    opts += '<button class="opt" data-action="close">Au revoir.</button>';
-    const html = `<div class="dialog"><div class="npc-head"><div class="npc-ava" style="background:${N.color}"></div><div><div class="npc-name">${N.name}</div><div class="dim">${N.title}</div></div></div>
-      <div class="npc-line">« ${this.opts.greet} »</div><div class="opts">${opts}</div></div>`;
-    return { title: N.name, html };
+    for (const q of ready) opts += `<button class="opt ready" data-action="quest-turnin" data-arg="${q.id}">Rendre — ${q.name}</button>`;
+    for (const q of avail) opts += `<button class="opt new" data-action="quest-view" data-arg="${q.id}">Nouvelle quête — ${q.name}</button>`;
+    for (const q of active) opts += `<button class="opt" data-action="quest-view" data-arg="${q.id}">${q.name} <span class="dim">(${this.pd.quests[q.id].progress} / ${q.obj.count})</span></button>`;
+    if (N.shop) opts += `<button class="opt shop" data-action="open-shop" data-arg="${N.shop}">Commercer</button>`;
+    if (N.portal) opts += '<button class="opt portal" data-action="open-portal">Ouvrir le portail des Abysses</button>';
+    opts += '<button class="opt" data-action="close">Prendre congé</button>';
+    const html = `<div class="dialog"><div class="npc-line">« ${this.opts.greet} »</div><div class="opts">${opts}</div></div>`;
+    return { title: N.name, sub: N.title, html, cls: 'narrow' };
   }
 
   panel_journal() {
@@ -535,21 +563,21 @@ export class UI {
       const st = pd.quests[q.id];
       const pct = Math.round((st.progress / q.obj.count) * 100);
       return `<div class="jq ${st.status}"><div class="jq-head"><b>${q.name}</b><span class="dim">${NPCS[q.giver].name}</span></div>
-        <div class="dim">${q.desc}</div><div>${this.questObjText(q, st)}</div>
+        <div class="dim" style="font-style:italic">${q.desc}</div><div>${this.questObjText(q, st)}</div>
         <div class="pbar"><div style="width:${pct}%"></div></div>
-        ${st.status === 'ready' ? `<div class="tt-ok">Terminée — retournez voir ${NPCS[q.giver].name}</div>` : ''}
+        ${st.status === 'ready' ? `<div class="warn">Terminée — retournez voir ${NPCS[q.giver].name}.</div>` : ''}
         <div class="dim">Récompense : ${this.rewardText(q)}</div></div>`;
     };
     const ready = rows('ready'), active = rows('active'), done = rows('done');
     const S = pd.stats;
     const html = `
       ${ready.length ? `<h3>À rendre</h3>${ready.map(qHTML).join('')}` : ''}
-      <h3>En cours</h3>${active.map(qHTML).join('') || '<p class="dim">Aucune quête en cours. Parlez aux habitants marqués d’un « ! ».</p>'}
-      <h3>Terminées <span class="dim">(${done.length}/${QUESTS.length})</span></h3>
-      <div class="done-list">${done.map((q) => `<span>✔ ${q.name}</span>`).join('') || '<span class="dim">—</span>'}</div>
-      <h3>Statistiques</h3>
-      <div class="stats small"><div><span>Monstres tués</span><b>${fmt(S.kills)}</b></div><div><span>Expéditions</span><b>${S.runs}</b></div><div><span>Extractions réussies</span><b>${S.extractions}</b></div><div><span>Morts</span><b>${S.deaths}</b></div><div><span>Profondeur max débloquée</span><b>${pd.maxDepth}</b></div><div><span>Temps de jeu</span><b>${Math.floor(pd.playTime / 60)} min</b></div></div>`;
-    return { title: 'Journal de quêtes', html };
+      <h3>En cours</h3>${active.map(qHTML).join('') || '<p class="hint">Aucune quête en cours. Les habitants qui ont besoin de vous portent un signe au-dessus de la tête.</p>'}
+      <h3>Accomplies <span class="dim">${done.length} / ${QUESTS.length}</span></h3>
+      <div class="done-list">${done.map((q) => `<span>${q.name}</span>`).join('') || '<span>—</span>'}</div>
+      <h3>Chroniques</h3>
+      <div class="stats" style="margin-top:0"><div><span>Créatures abattues</span><b>${fmt(S.kills)}</b></div><div><span>Descentes</span><b>${S.runs}</b></div><div><span>Retours réussis</span><b>${S.extractions}</b></div><div><span>Morts</span><b>${S.deaths}</b></div><div><span>Profondeur atteinte</span><b>${pd.maxDepth}</b></div><div><span>Temps passé</span><b>${Math.floor(pd.playTime / 60)} min</b></div></div>`;
+    return { sub: 'Ce que l’on attend de vous, et ce que vous avez accompli', html, cls: 'wide' };
   }
 
   // ================= TALENTS =================
@@ -560,7 +588,7 @@ export class UI {
     if (!t) for (const k in C.specs) { const f = C.specs[k].talents.find((x) => x.id === id); if (f) { t = f; tree = C.specs[k]; } }
     if (!t) return null;
     const r = pd.talents[id] || 0;
-    let h = `<div class="tt-name">${t.name}</div><div class="tt-sub">Rang ${r}/${t.max}</div>`;
+    let h = `<div class="tt-name">${t.name}</div><div class="tt-sub">Rang ${r} / ${t.max}${t.skill ? ' · compétence' : ''}</div>`;
     if (t.skill) h += `<div class="tt-desc">${SKILLS[t.skill].desc}</div><div class="dim">Recharge ${SKILLS[t.skill].cd} s${SKILLS[t.skill].stamina ? ' · ' + SKILLS[t.skill].stamina + ' endurance' : ''}</div>`;
     else {
       if (r > 0) h += `<div>Actuel : ${t.desc(r)}</div>`;
@@ -586,7 +614,7 @@ export class UI {
         const can = g.canLearn(t, tree);
         const cls = r >= t.max ? 'maxed' : can ? 'learnable' : open ? 'nopts' : 'locked';
         const ico = t.skill ? icon(SKILLS[t.skill].icon) : `<span class="t-letter">${t.name[0]}</span>`;
-        h += `<div class="talent ${cls} ${t.skill ? 'skill' : ''} ${r ? 'has' : ''}" data-action="learn" data-arg="${t.id}" data-talent="${t.id}"><div class="t-ico">${ico}</div><div class="t-name">${t.name}</div><div class="t-rank">${r}/${t.max}</div></div>`;
+        h += `<div class="talent ${cls} ${t.skill ? 'skill' : ''} ${r ? 'has' : ''}" data-action="learn" data-arg="${t.id}" data-talent="${t.id}"><div class="t-ico">${ico}</div><div class="t-name">${t.name}</div><div class="t-rank">${r} / ${t.max}</div></div>`;
       }
       h += '</div></div>';
     }
@@ -601,21 +629,21 @@ export class UI {
     let spec = '';
     if (pd.spec) {
       const S = C.specs[pd.spec];
-      spec = `<h3 style="color:${S.color}">Spécialisation : ${S.name}</h3><p class="dim">${S.desc}</p>${this.treeHTML(S)}`;
+      spec = `<h3>Voie du ${S.name}</h3><p class="hint" style="margin-top:-4px">${S.desc}</p>${this.treeHTML(S)}`;
     } else {
       const can = pd.level >= SPEC_LEVEL;
-      spec = `<h3>Spécialisation</h3><p class="dim">${can ? 'Choisissez votre voie. Ce choix oriente votre style de jeu (modifiable contre de l’or au village).' : `Disponible au niveau ${SPEC_LEVEL}.`}</p>
-        <div class="spec-cards">${Object.entries(C.specs).map(([id, S]) => `<div class="spec-card ${can ? '' : 'locked'}" style="--c:${S.color}"><div class="spec-name">${S.name}</div><div class="dim">${S.desc}</div>
-          <ul>${S.talents.map((t) => `<li>${t.skill ? '★ ' : ''}${t.name}</li>`).join('')}</ul>
-          ${can ? `<button class="btn main" data-action="spec" data-arg="${id}">Choisir ${S.name}</button>` : `<div class="dim">${icon('lock')} Niveau ${SPEC_LEVEL}</div>`}</div>`).join('')}</div>`;
+      spec = `<h3>Spécialisation</h3><p class="hint" style="margin-top:-4px">${can ? 'Choisissez votre voie. Ce choix pourra être défait contre de l’or, au village.' : `Une voie s’ouvrira au niveau ${SPEC_LEVEL}.`}</p>
+        <div class="spec-cards">${Object.entries(C.specs).map(([id, S]) => `<div class="spec-card ${can ? '' : 'locked'}" style="--c:${S.color}"><div class="spec-name">${S.name}</div><div class="dim" style="font-style:italic">${S.desc}</div>
+          <ul>${S.talents.map((t) => `<li>${t.name}${t.skill ? ' <span class="warn">(compétence)</span>' : ''}</li>`).join('')}</ul>
+          ${can ? `<button class="btn main small" data-action="spec" data-arg="${id}">Embrasser cette voie</button>` : `<div class="dim">${icon('lock')} Niveau ${SPEC_LEVEL}</div>`}</div>`).join('')}</div>`;
     }
     const bar = pd.skillBar.map((s, i) => `<div class="sb-slot" data-skill="${s || ''}"><span class="key">${input.label('skill' + (i + 1))}</span>${s ? icon(SKILLS[s].icon) : ''}<div class="sb-name">${s ? SKILLS[s].name : '—'}</div></div>`).join('');
     const inVillage = g.scene.type === 'village';
-    const html = `<div class="tal-head"><div class="pts ${pts > 0 ? 'has' : ''}">Points disponibles : <b>${pts}</b></div><div class="dim">1 point par niveau. Cliquez sur un talent pour l’apprendre.</div></div>
+    const html = `<div class="tal-head"><div class="pts ${pts > 0 ? 'has' : ''}">Points disponibles · <b>${pts}</b></div><div class="dim" style="font-style:italic">Un point par niveau. Cliquez sur un talent pour l’apprendre.</div></div>
       <div class="tal-layout"><div class="col"><h3>${C.name}</h3>${this.treeHTML(C)}</div><div class="col">${spec}
-      <h3>Barre de compétences</h3><div class="sb-row">${bar}</div>
-      <div class="respec">${inVillage ? `<button class="btn danger small" data-action="respec">Réinitialiser les talents (${fmt(g.respecCost())} or)</button>` : '<span class="dim">Réinitialisation possible au village.</span>'}</div></div></div>`;
-    return { title: 'Arbre de talents', html, cls: 'wide' };
+      <h3>Compétences</h3><div class="sb-row">${bar}</div>
+      <div class="respec">${inVillage ? `<button class="btn danger small" data-action="respec">Oublier tous les talents · ${fmt(g.respecCost())} or</button>` : '<span class="hint">Les talents ne peuvent être oubliés qu’au village.</span>'}</div></div></div>`;
+    return { sub: `${C.name}${pd.spec ? ' · ' + C.specs[pd.spec].name : ''}`, html, cls: 'wide' };
   }
 
   // ================= PORTAIL =================
@@ -626,34 +654,34 @@ export class UI {
       const L = enemyLevel(d);
       const kills = pd.bossKills[d] || 0;
       const diff = L - pd.level;
-      const warn = diff >= 3 ? '<span class="bad">Très dangereux</span>' : diff >= 1 ? '<span class="warn">Difficile</span>' : '<span class="ok">Adapté</span>';
-      rows += `<div class="depth-row"><div><div class="depth-name">Profondeur ${d}</div><div class="dim">Monstres niv. ${L} · Gardien niv. ${L + 1} · ${warn}${kills ? ` · Boss vaincu ×${kills}` : ''}</div></div><button class="btn main" data-action="descend" data-arg="${d}">Descendre</button></div>`;
+      const warn = diff >= 3 ? '<span class="bad">mortel</span>' : diff >= 1 ? '<span class="warn">périlleux</span>' : '<span class="ok">à votre mesure</span>';
+      rows += `<div class="depth-row"><div><div class="depth-name">Profondeur ${ROMAN[d - 1] || d}</div><div class="dim">Créatures niv. ${L} · Gardien niv. ${L + 1} · ${warn}${kills ? ` · Gardien vaincu ×${kills}` : ''}</div></div><button class="btn main" data-action="descend" data-arg="${d}">Descendre</button></div>`;
     }
     const ps = Inv.pocketSize(pd);
     const pots = Inv.countConsumable(pd, 'potion'), stones = Inv.countConsumable(pd, 'pierre');
-    const html = `<p>Le portail mène à <b>La Crypte Oubliée</b>. Chaque descente génère un nouveau donjon.</p>
-      <div class="rules"><div>✓ Équipement porté : <b>toujours conservé</b></div><div>✓ Poche sécurisée (${ps} empl.) : <b>conservée</b></div><div>✗ Butin trouvé dans le sac et or ramassé : <b>perdus si vous mourez</b></div>
-      <div class="dim">Pour rentrer : point d’extraction (vert), portail après le boss, ou pierre de retour (${input.label('stone')}).</div></div>
-      <div class="dim">Vous emportez : ${pots} potion(s), ${stones} pierre(s) de retour.</div>
+    const html = `<p class="npc-line" style="font-size:17px;margin-bottom:10px">« Chaque descente ouvre un chemin différent. Ce que tu y trouves, tu ne le gardes que si tu remontes. »</p>
+      <div class="rules"><div>Équipement porté — <b>toujours conservé</b></div><div>Poche sécurisée (${ps} empl.) — <b>conservée</b></div><div>Butin du sac et or ramassé — <span class="bad">perdus à la mort</span></div>
+      <div class="dim" style="font-style:italic">Pour remonter : cercle d’extraction, portail du Gardien, ou pierre de retour (${input.label('stone')}).</div></div>
+      <div class="dim">Vous emportez ${pots} fiole(s) de sang et ${stones} pierre(s) de retour.</div>
       <div class="depths">${rows}</div>`;
-    return { title: 'Portail des Abysses', html };
+    return { title: 'Portail des Abysses', sub: 'La Crypte Oubliée', html };
   }
 
   // ================= MENUS =================
   panel_pause() {
-    const html = `<div class="menu"><button class="btn main" data-action="resume">Reprendre</button><button class="btn" data-action="options">Touches et options</button><button class="btn" data-action="quit">Sauvegarder et quitter</button>
-      ${this.pd && this.pd.inRun ? '<p class="warn">Quitter pendant une expédition compte comme une mort : le butin non sécurisé sera perdu.</p>' : ''}</div>`;
-    return { title: 'Pause', html, cls: 'narrow' };
+    const html = `<div class="menu"><button class="mi main" data-action="resume">Reprendre</button><button class="mi" data-action="options">Touches et options</button><button class="mi" data-action="quit">Sauvegarder et quitter</button>
+      ${this.pd && this.pd.inRun ? '<p class="hint" style="text-align:center">Quitter pendant une descente compte comme une mort : le butin non sécurisé sera perdu.</p>' : ''}</div>`;
+    return { title: 'Pause', html, cls: 'narrow', footer: '<span><kbd>Échap</kbd>Reprendre</span>' };
   }
 
   optionsHTML() {
-    const rows = ACTIONS.map((a) => `<div class="kb-row"><span>${a.label}</span><button class="btn key ${this.rebindingId === a.id ? 'waiting' : ''}" data-action="rebind" data-arg="${a.id}">${this.rebindingId === a.id ? 'Appuyez sur une touche…' : codeLabel(input.bindings[a.id])}</button></div>`).join('');
-    return `<div class="opt-layout"><div class="col"><h3>Touches</h3><p class="dim">Cliquez puis appuyez sur la touche ou le bouton de souris voulu. Échap pour annuler. Une touche déjà utilisée est échangée.</p>
+    const rows = ACTIONS.map((a) => `<div class="kb-row"><span>${a.label}</span><button class="btn key ${this.rebindingId === a.id ? 'waiting' : ''}" data-action="rebind" data-arg="${a.id}">${this.rebindingId === a.id ? 'Appuyez…' : codeLabel(input.bindings[a.id])}</button></div>`).join('');
+    return `<div class="opt-layout"><div class="col"><h3>Touches</h3><p class="hint" style="margin-top:-4px">Cliquez puis appuyez sur une touche ou un bouton de souris. Échap annule. Une touche déjà prise est échangée.</p>
       <div class="kb">${rows}<div class="kb-row"><span>Menu / fermer</span><button class="btn key" disabled>Échap</button></div></div>
-      <button class="btn small" data-action="reset-keys">Touches par défaut</button></div>
-      <div class="col"><h3>Options</h3>
+      <button class="btn small" data-action="reset-keys">Rétablir les touches par défaut</button></div>
+      <div class="col"><h3>Réglages</h3>
       <label class="opt-row">Volume <input type="range" min="0" max="100" value="${Math.round(settings.volume * 100)}" data-setting="volume"></label>
-      <label class="opt-row"><input type="checkbox" data-setting="pauseInMenus" ${settings.pauseInMenus ? 'checked' : ''}> Mettre en pause quand un menu est ouvert</label>
+      <label class="opt-row"><input type="checkbox" data-setting="pauseInMenus" ${settings.pauseInMenus ? 'checked' : ''}> Pause quand un menu est ouvert</label>
       <label class="opt-row"><input type="checkbox" data-setting="screenShake" ${settings.screenShake ? 'checked' : ''}> Tremblements de l’écran</label>
       <label class="opt-row"><input type="checkbox" data-setting="showDamage" ${settings.showDamage ? 'checked' : ''}> Afficher les dégâts</label>
       </div></div>`;
@@ -662,16 +690,20 @@ export class UI {
   panel_options() { return { title: 'Touches et options', html: this.optionsHTML(), cls: 'wide' }; }
 
   // ================= ÉCRANS =================
-  showScreen(html) {
+  showScreen(html, { titleBg = false } = {}) {
     this.screenRefresh = null;
     this.screenOpen = true;
-    this.el.screen.innerHTML = html;
+    this.el.screen.classList.remove('overlay');
+    this.el.screen.innerHTML = (titleBg ? '<canvas id="title-bg"></canvas>' : '') + html;
     this.el.screen.classList.add('show');
     this.el.hud.classList.add('hidden');
     this.close();
+    if (titleBg) startTitleBg($('#title-bg'));
+    else stopTitleBg();
   }
 
   hideScreen() {
+    stopTitleBg();
     this.screenOpen = false;
     this.el.screen.innerHTML = '';
     this.el.screen.classList.remove('show');
@@ -680,14 +712,14 @@ export class UI {
   showTitle() {
     this.confirmNew = false;
     const save = loadGame();
-    const cont = save ? `<button class="btn main big" data-action="continue">Continuer<span class="sub">${escapeHtml(save.name)} · ${CLASSES[save.cls] ? CLASSES[save.cls].name : ''} niv. ${save.level}</span></button>` : '';
-    this.showScreen(`<div class="screen title-screen"><div class="logo">LES ABYSSES</div><div class="tagline">Descendez. Survivez. Revenez plus fort.</div>
-      <div class="menu">${cont}<button class="btn ${save ? '' : 'main'} big" data-action="new-game">Nouvelle partie</button><button class="btn" data-action="title-options">Touches et options</button></div>
-      <div class="version">v0.1 · prototype</div></div>`);
+    const cont = save ? `<button class="mi main" data-action="continue">Continuer<span class="sub">${escapeHtml(save.name)} · ${CLASSES[save.cls] ? CLASSES[save.cls].name : ''} · niveau ${save.level}</span></button>` : '';
+    this.showScreen(`<div class="screen title-screen"><div class="logo">Les Abysses</div><div class="logo-rule"></div><div class="tagline">Descendez. Survivez. Remontez.</div>
+      <div class="menu">${cont}<button class="mi ${save ? '' : 'main'}" data-action="new-game">Nouvelle partie</button><button class="mi" data-action="title-options">Options</button></div>
+      <div class="version">PROTOTYPE · v0.2</div></div>`, { titleBg: true });
   }
 
   showOptionsScreen() {
-    this.showScreen(`<div class="screen"><div class="panel wide"><div class="panel-head"><h2>Touches et options</h2></div><div class="panel-body">${this.optionsHTML()}<div class="actions"><button class="btn main" data-action="back-title">Retour</button></div></div></div></div>`);
+    this.showScreen(`<div class="screen"><div class="panel frame wide" style="margin:auto"><header class="ph"><div class="ph-title">Touches et options</div></header><div class="rule"></div><div class="panel-body">${this.optionsHTML()}</div><footer class="pf"><button class="btn" data-action="back-title">Retour</button></footer></div></div>`, { titleBg: true });
     this.screenRefresh = () => this.showOptionsScreen();
   }
 
@@ -699,32 +731,68 @@ export class UI {
 
   renderClassSelect() {
     const nameVal = $('#char-name') ? $('#char-name').value : '';
-    if (this.opts.cls && !CLASSES[this.opts.cls].locked) this.screenCls = this.opts.cls;
-    const cards = Object.entries(CLASSES).map(([id, C]) => `<div class="class-card ${C.locked ? 'locked' : ''} ${this.screenCls === id ? 'sel' : ''}" ${C.locked ? '' : `data-action="pick-class" data-arg="${id}"`} style="--c:${C.color}">
-      <div class="cc-ico" style="background:${C.color}"></div><div class="cc-name">${C.name}</div><div class="dim">${C.desc}</div>
-      ${C.locked ? `<div class="soon">${icon('lock')} Bientôt</div>` : `<div class="cc-specs">Spécialisations : ${Object.values(C.specs).map((s) => `<b style="color:${s.color}">${s.name}</b>`).join(' ou ')}</div>`}</div>`).join('');
-    this.showScreen(`<div class="screen class-screen"><h1>Choisissez votre classe</h1><div class="class-cards">${cards}</div>
-      <div class="name-row"><label>Nom du personnage <input id="char-name" maxlength="18" placeholder="Aventurier" value="${escapeHtml(nameVal)}"></label></div>
-      ${this.confirmNew ? '<p class="warn">Une sauvegarde existe déjà : elle sera effacée. Cliquez à nouveau pour confirmer.</p>' : ''}
-      <div class="menu row"><button class="btn" data-action="back-title">Retour</button><button class="btn main big" data-action="start-game">${this.confirmNew ? 'Confirmer et commencer' : 'Commencer l’aventure'}</button></div></div>`);
-    this.opts = {};
+    const cards = Object.entries(CLASSES).map(([id, C]) => `<div class="class-card ${C.locked ? 'locked' : ''} ${this.screenCls === id ? 'sel' : ''}" data-action="pick-class" data-arg="${id}">
+      <canvas data-portrait="${id}" width="360" height="360"></canvas>
+      <div class="cc-name">${C.name}</div><div class="cc-title">${C.title}</div><div class="cc-desc">${C.desc}</div>
+      ${C.locked ? '<div class="soon">— Bientôt —</div>' : `<div class="cc-specs">Voies : ${Object.values(C.specs).map((s) => `<b>${s.name}</b>`).join(' ou ')}</div>`}</div>`).join('');
+    this.showScreen(`<div class="screen class-screen"><h1>Qui descend ?</h1><div class="ph-sub">Choisissez votre classe</div><div class="class-cards">${cards}</div>
+      <div class="name-row">Nom <input id="char-name" maxlength="18" placeholder="Sans-nom" value="${escapeHtml(nameVal)}" autocomplete="off" spellcheck="false"></div>
+      ${this.confirmNew ? '<p class="warn">Une sauvegarde existe déjà : elle sera effacée. Validez à nouveau pour confirmer.</p>' : ''}
+      <div class="menu row"><button class="mi" data-action="back-title">Retour</button><button class="mi main" data-action="start-game">${this.confirmNew ? 'Confirmer' : 'Descendre'}</button></div></div>`, { titleBg: true });
+    this.drawPortraits();
+  }
+
+  drawPortraits() {
+    const canvases = document.querySelectorAll('canvas[data-portrait]');
+    const t0 = performance.now();
+    const draw = () => {
+      if (!this.screenOpen || !canvases.length || !canvases[0].isConnected) return;
+      const t = (performance.now() - t0) / 1000;
+      for (const c of canvases) {
+        const id = c.dataset.portrait;
+        const g = c.getContext('2d');
+        g.clearRect(0, 0, c.width, c.height);
+        // socle
+        const grd = g.createRadialGradient(180, 200, 10, 180, 200, 150);
+        grd.addColorStop(0, id === this.screenCls ? 'rgba(201,138,74,0.18)' : 'rgba(214,206,189,0.06)');
+        grd.addColorStop(1, 'rgba(0,0,0,0)');
+        g.fillStyle = grd;
+        g.fillRect(0, 0, 360, 360);
+        g.strokeStyle = 'rgba(214,206,189,0.12)';
+        g.beginPath(); g.ellipse(180, 205, 110, 40, 0, 0, Math.PI * 2); g.stroke();
+        if (CLASSES[id].locked) {
+          g.fillStyle = 'rgba(214,206,189,0.15)';
+          g.font = "120px 'IM Fell English SC', Georgia";
+          g.textAlign = 'center'; g.textBaseline = 'middle';
+          g.fillText('?', 180, 180);
+          continue;
+        }
+        const kit = this._kits || (this._kits = { guerrier: starterKit('guerrier'), rodeur: starterKit('rodeur') });
+        drawHero(g, 180, 185, { cls: id, angle: Math.PI / 2 + Math.sin(t * 0.6) * 0.25, time: t, eq: kit[id], scale: 4.2, bowDraw: id === 'rodeur' ? (Math.sin(t * 1.4) + 1) / 2 : 0 });
+      }
+      requestAnimationFrame(draw);
+    };
+    draw();
   }
 
   showSummary(d, cb) {
     this.close();
+    this.el.hud.classList.add('hidden');
     this.summaryOpen = true;
     this.summaryCb = cb;
     const list = (arr) => arr.map((x) => `<li style="color:${x.color}">${escapeHtml(x.name)}${x.qty > 1 ? ' ×' + x.qty : ''}</li>`).join('');
-    let body = `<div class="sum-stats"><div><b>${d.kills}</b><span>monstres tués</span></div><div><b>${d.xp}</b><span>XP gagnée (conservée)</span></div>`;
-    body += d.success ? `<div><b>${fmt(d.gold)}</b><span>or rapporté</span></div>` : `<div><b class="bad">-${fmt(d.lostGold || 0)}</b><span>or perdu</span></div>`;
+    let body = `<div class="sum-stats"><div><b>${d.kills}</b><span>créatures abattues</span></div><div><b>${d.xp}</b><span>expérience (conservée)</span></div>`;
+    body += d.success ? `<div><b>${fmt(d.gold)}</b><span>or rapporté</span></div>` : `<div><b class="bad">${fmt(d.lostGold || 0)}</b><span>or perdu</span></div>`;
     body += '</div>';
-    if (d.success) body += `<h3>Butin rapporté</h3>${d.kept.length ? `<ul class="loot">${list(d.kept)}</ul>` : '<p class="dim">Aucun objet.</p>'}`;
+    if (d.success) body += `<h3>Butin rapporté</h3>${d.kept.length ? `<ul class="loot">${list(d.kept)}</ul>` : '<p class="dim">Rien.</p>'}`;
     else {
-      body += `<h3>Sauvé par la poche sécurisée</h3>${d.kept.length ? `<ul class="loot">${list(d.kept)}</ul>` : '<p class="dim">Rien.</p>'}`;
-      body += `<h3>Butin perdu</h3>${d.lost.length ? `<ul class="loot lost">${list(d.lost)}</ul>` : '<p class="dim">Rien.</p>'}`;
-      body += '<p class="dim">Votre équipement porté est intact.</p>';
+      body += `<h3>Sauvé par la poche</h3>${d.kept.length ? `<ul class="loot">${list(d.kept)}</ul>` : '<p class="dim">Rien.</p>'}`;
+      body += `<h3>Abandonné aux Abysses</h3>${d.lost.length ? `<ul class="loot lost">${list(d.lost)}</ul>` : '<p class="dim">Rien.</p>'}`;
+      body += '<p class="hint" style="text-align:center">Votre équipement porté vous a suivi.</p>';
     }
-    this.el.screen.innerHTML = `<div class="screen summary ${d.success ? 'win' : 'lose'}"><h1>${d.title}</h1><div class="dim">${d.subtitle}</div>${body}<div class="menu"><button class="btn main big" data-action="summary-ok">Retour au village</button></div></div>`;
+    this.el.screen.classList.add('overlay');
+    this.el.screen.innerHTML = `<div class="screen summary ${d.success ? 'win' : 'lose'}"><div class="sum-band"><h1>${d.title}</h1><div class="sum-sub">${d.subtitle}</div></div>
+      <div class="sum-details">${body}<div class="menu"><button class="mi main" data-action="summary-ok">Retourner au village</button></div></div></div>`;
     this.el.screen.classList.add('show');
   }
 
@@ -737,42 +805,61 @@ export class UI {
     this.buildHud();
   }
 
+  areaTitle(name, sub) {
+    const a = this.el.area;
+    a.innerHTML = `<div class="a-name">${name}</div><div class="a-rule"></div><div class="a-sub">${sub || ''}</div>`;
+    a.classList.remove('show');
+    void a.offsetWidth;
+    a.classList.add('show');
+  }
+
+  banner(text, kind = 'gold') {
+    const b = this.el.banner;
+    b.className = kind === 'blood' ? 'blood' : '';
+    b.innerHTML = `<span>${text}</span>`;
+    void b.offsetWidth;
+    b.classList.add('show');
+  }
+
   // ================= TOASTS =================
   toast(msg, type = 'info', dur = 2.5) {
     const el = document.createElement('div');
     el.className = 'toast ' + type;
     el.textContent = msg;
     this.el.toasts.appendChild(el);
-    while (this.el.toasts.children.length > 5) this.el.toasts.firstChild.remove();
-    setTimeout(() => { el.classList.add('hide'); setTimeout(() => el.remove(), 400); }, dur * 1000);
+    while (this.el.toasts.children.length > 4) this.el.toasts.firstChild.remove();
+    setTimeout(() => { el.classList.add('hide'); setTimeout(() => el.remove(), 500); }, dur * 1000);
   }
 
   // ================= HUD =================
   buildHud() {
     const h = this.el.hud;
     h.innerHTML = `
-      <div id="hud-zone"><div class="zone-name"></div><div class="zone-sub"></div></div>
-      <div id="hud-map"><canvas id="minimap" width="200" height="200"></canvas><div class="map-hint"></div></div>
+      <div id="vitals">
+        <div class="lvl"><div class="ring"></div><div class="gem"></div><div class="num"></div></div>
+        <div class="bars">
+          <div class="vbar hp"><div class="trail"></div><div class="fill"></div><span class="val"></span></div>
+          <div class="vbar sta"><div class="trail"></div><div class="fill"></div></div>
+          <div id="buffs"></div>
+        </div>
+      </div>
+      <div id="hud-map"><div class="mm-frame frame"><canvas id="minimap" width="200" height="200"></canvas></div><div class="map-hint"></div></div>
       <div id="tracker"></div>
-      <div id="boss-bar" class="hidden"><div class="bb-name"></div><div class="bb-bar"><div class="bb-fill"></div><div class="bb-phase"></div></div></div>
+      <div id="boss-bar" class="hidden"><div class="bb-name"></div><div class="bb-bar"><div class="bb-trail"></div><div class="bb-fill"></div></div></div>
       <div id="channel" class="hidden"><div class="ch-label"></div><div class="ch-bar"><div class="ch-fill"></div></div></div>
       <div id="prompt" class="hidden"></div>
-      <div id="buffs"></div>
-      <div id="bottom">
-        <div class="orb-row">
-          <div class="bar hp"><div class="fill"></div><span></span></div>
-          <div class="bar sta"><div class="fill"></div><span></span></div>
-        </div>
-        <div id="skillbar"></div>
-        <div class="bar xp"><div class="fill"></div><span></span></div>
-      </div>
+      <div id="skills"><div class="cross"></div><div class="items"></div></div>
+      <div id="purse"><div class="purse-box">${icon('gold')}<span class="n"></span></div><div class="purse-run"></div></div>
       <div id="keys-hint"></div>`;
-    this.el.minimap = $('#minimap');
     this.hud = {
-      zone: $('.zone-name', h), zoneSub: $('.zone-sub', h), tracker: $('#tracker'), boss: $('#boss-bar'), bossName: $('.bb-name', h), bossFill: $('.bb-fill', h),
-      channel: $('#channel'), chLabel: $('.ch-label', h), chFill: $('.ch-fill', h), prompt: $('#prompt'), buffs: $('#buffs'),
-      hpFill: $('.bar.hp .fill', h), hpText: $('.bar.hp span', h), staFill: $('.bar.sta .fill', h), staText: $('.bar.sta span', h),
-      xpFill: $('.bar.xp .fill', h), xpText: $('.bar.xp span', h), skillbar: $('#skillbar'), mapHint: $('.map-hint', h), keys: $('#keys-hint'), mapBox: $('#hud-map'),
+      lvlNum: $('.lvl .num', h), lvlRing: $('.lvl .ring', h),
+      hpBar: $('.vbar.hp', h), hpFill: $('.vbar.hp .fill', h), hpTrail: $('.vbar.hp .trail', h), hpText: $('.vbar.hp .val', h),
+      staBar: $('.vbar.sta', h), staFill: $('.vbar.sta .fill', h), staTrail: $('.vbar.sta .trail', h),
+      buffs: $('#buffs'), tracker: $('#tracker'),
+      boss: $('#boss-bar'), bossName: $('.bb-name', h), bossFill: $('.bb-fill', h), bossTrail: $('.bb-trail', h),
+      channel: $('#channel'), chLabel: $('.ch-label', h), chFill: $('.ch-fill', h), prompt: $('#prompt'),
+      cross: $('#skills .cross', h), items: $('#skills .items', h), gold: $('#purse .n', h), run: $('#purse .purse-run', h),
+      mapHint: $('.map-hint', h), keys: $('#keys-hint'), mapBox: $('#hud-map'), minimap: $('#minimap'),
     };
     this.refreshHudStatic();
   }
@@ -781,28 +868,32 @@ export class UI {
     if (!this.hud || !this.pd) return;
     const pd = this.pd;
     const g = this.game;
-    const s = g.scene;
-    this.hud.zone.textContent = s.type === 'village' ? 'Village de Cendrebourg' : `La Crypte Oubliée — Profondeur ${s.depth}`;
-    // Barre de compétences
-    const slots = [{ id: 'special', key: 'special', ico: 'special' }];
-    for (let i = 0; i < 4; i++) slots.push({ id: pd.skillBar[i], key: 'skill' + (i + 1), ico: pd.skillBar[i] ? SKILLS[pd.skillBar[i]].icon : null, idx: i });
-    slots.push({ id: 'potion', key: 'potion', ico: 'potion', count: Inv.countConsumable(pd, 'potion') });
-    slots.push({ id: 'pierre', key: 'stone', ico: 'pierre', count: Inv.countConsumable(pd, 'pierre') });
-    this.hud.skillbar.innerHTML = slots.map((sl) => `<div class="sk ${sl.ico ? '' : 'empty'} sk-${sl.id || 'none'}" data-skill="${sl.id || ''}" data-key="${sl.key}">
-      ${sl.ico ? icon(sl.ico) : ''}<div class="cd"></div><span class="key">${input.label(sl.key)}</span>${sl.count !== undefined ? `<span class="count">${sl.count}</span>` : ''}</div>`).join('');
-    this.hud.skEls = [...this.hud.skillbar.querySelectorAll('.sk')];
-    this.hud.mapHint.textContent = `${input.label('map')} : agrandir`;
-    this.hud.keys.innerHTML = `<span>${input.label('inventory')}</span> Inventaire <span>${input.label('talents')}</span> Talents${g.talentPoints() > 0 ? ' <b class="glow">(' + g.talentPoints() + ')</b>' : ''} <span>${input.label('journal')}</span> Journal <span>Échap</span> Menu`;
+    const C = CLASSES[pd.cls];
+    const sk = (id, key, ico, cls, count) => `<div class="sk ${cls} ${ico ? '' : 'empty'} sk-${id || 'none'}" data-skill="${id || ''}">${ico ? icon(ico) : ''}<div class="cd"></div><span class="key">${input.label(key)}</span>${count !== undefined ? `<span class="count">${count}</span>` : ''}</div>`;
+    const b = pd.skillBar;
+    const ic = (i) => (b[i] ? SKILLS[b[i]].icon : null);
+    this.hud.cross.innerHTML =
+      sk(b[0], 'skill1', ic(0), 's-up') + sk(b[1], 'skill2', ic(1), 's-left') + sk(b[2], 'skill3', ic(2), 's-right') + sk(b[3], 'skill4', ic(3), 's-down') +
+      sk('special', 'special', C.special.icon || 'special', 's-mid');
+    this.hud.items.innerHTML = sk('potion', 'potion', 'potion', '', Inv.countConsumable(pd, 'potion')) + sk('pierre', 'stone', 'pierre', '', Inv.countConsumable(pd, 'pierre'));
+    this.hud.skEls = [...this.hud.cross.querySelectorAll('.sk'), ...this.hud.items.querySelectorAll('.sk')];
+    this.hud.mapHint.textContent = `${input.label('map')} · carte`;
+    const pts = g.talentPoints();
+    this.hud.keys.innerHTML = `<kbd>${input.label('inventory')}</kbd>Équipement <kbd>${input.label('talents')}</kbd>Talents${pts > 0 ? ` <span class="glow">(${pts})</span>` : ''} <kbd>${input.label('journal')}</kbd>Journal <kbd>Échap</kbd>Menu`;
+    // Longueur des barres proportionnelle aux maximums (façon Souls)
+    const p = g.player;
+    this.hud.hpBar.style.width = Math.max(180, Math.min(480, 90 + p.maxHp * 1.2)) + 'px';
+    this.hud.staBar.style.width = Math.max(140, Math.min(380, p.maxStamina * 2)) + 'px';
     this.refreshTracker();
   }
 
   refreshTracker() {
     if (!this.hud || !this.pd) return;
     const pd = this.pd;
-    const qs = QUESTS.filter((q) => pd.quests[q.id] && pd.quests[q.id].status !== 'done').slice(0, 5);
-    this.hud.tracker.innerHTML = qs.length ? `<div class="tr-title">Quêtes</div>` + qs.map((q) => {
+    const qs = QUESTS.filter((q) => pd.quests[q.id] && pd.quests[q.id].status !== 'done').slice(0, 4);
+    this.hud.tracker.innerHTML = qs.length ? '<div class="tr-title">Quêtes</div>' + qs.map((q) => {
       const st = pd.quests[q.id];
-      return `<div class="tr-q ${st.status}"><b>${q.name}</b><div>${st.status === 'ready' ? `✔ Retournez voir ${NPCS[q.giver].name}` : this.questObjText(q, st)}</div></div>`;
+      return `<div class="tr-q ${st.status}"><b>${q.name}</b><div>${st.status === 'ready' ? `Retournez voir ${NPCS[q.giver].name}` : this.questObjText(q, st)}</div></div>`;
     }).join('') : '';
   }
 
@@ -812,16 +903,21 @@ export class UI {
     const p = g.player;
     const pd = this.pd;
     const h = this.hud;
-    h.hpFill.style.width = (100 * Math.max(0, p.hp) / p.maxHp) + '%';
+    const hpPct = (100 * Math.max(0, p.hp) / p.maxHp) + '%';
+    h.hpFill.style.width = hpPct;
+    h.hpTrail.style.width = hpPct;
     h.hpText.textContent = `${Math.ceil(Math.max(0, p.hp))} / ${p.maxHp}`;
-    h.staFill.style.width = (100 * p.stamina / p.maxStamina) + '%';
-    h.staText.textContent = `${Math.floor(p.stamina)} / ${p.maxStamina}`;
+    const staPct = (100 * p.stamina / p.maxStamina) + '%';
+    h.staFill.style.width = staPct;
+    h.staTrail.style.width = staPct;
     const need = xpForLevel(pd.level);
-    h.xpFill.style.width = (100 * pd.xp / need) + '%';
-    h.xpText.textContent = `Niveau ${pd.level} — ${fmt(pd.xp)} / ${fmt(need)} XP`;
-    h.zoneSub.innerHTML = `${icon('gold', 'gold')} ${fmt(pd.gold)}${pd.inRun ? ` <span class="run-gold" title="Or non sécurisé">+${fmt(pd.runGold)}</span>` : ''}`;
+    h.lvlNum.textContent = pd.level;
+    h.lvlRing.style.setProperty('--xp', (100 * pd.xp / need).toFixed(1) + '%');
+    const goldTxt = fmt(pd.gold);
+    if (h.gold.textContent !== goldTxt) h.gold.textContent = goldTxt;
+    const runTxt = pd.inRun && pd.runGold ? `+ ${fmt(pd.runGold)} ramassé (non sécurisé)` : '';
+    if (h.run.textContent !== runTxt) h.run.textContent = runTxt;
 
-    // Recharges
     if (h.skEls) {
       for (const el of h.skEls) {
         const id = el.dataset.skill;
@@ -833,48 +929,44 @@ export class UI {
       }
     }
 
-    // Buffs
-    const bHtml = p.buffs.map((b) => `<div class="buff b-${b.id}">${icon(b.id === 'cri' ? 'shout' : b.id === 'dechainement' ? 'rage' : 'wall')}<span>${Math.ceil(b.t)}</span></div>`).join('');
+    const iconFor = { cri: 'shout', dechainement: 'rage', murdefer: 'wall', oeil: 'eye', voile: 'veil' };
+    const bHtml = p.buffs.map((b) => `<div class="buff b-${b.id}">${icon(iconFor[b.id] || 'special')}<span>${Math.ceil(b.t)}</span></div>`).join('');
     if (h.buffs._last !== bHtml) { h.buffs.innerHTML = bHtml; h.buffs._last = bHtml; }
 
-    // Boss
     const boss = g.scene.boss;
     if (boss && g.scene.bossEngaged && !boss.dead) {
       h.boss.classList.remove('hidden');
-      h.bossName.textContent = `${boss.def.name} — niv. ${boss.level}${boss.phase === 2 ? ' · FUREUR' : ''}`;
-      h.bossFill.style.width = (100 * Math.max(0, boss.hp) / boss.maxHp) + '%';
+      const nm = boss.def.name + (boss.phase === 2 ? ' — fureur' : '');
+      if (h.bossName.textContent !== nm) h.bossName.textContent = nm;
+      const w = (100 * Math.max(0, boss.hp) / boss.maxHp) + '%';
+      h.bossFill.style.width = w;
+      h.bossTrail.style.width = w;
     } else h.boss.classList.add('hidden');
 
-    // Canalisation
     if (p.channel) {
       h.channel.classList.remove('hidden');
-      h.chLabel.textContent = `${p.channel.label} ${(p.channel.dur - p.channel.t).toFixed(1)} s`;
+      h.chLabel.textContent = `${p.channel.label}`;
       h.chFill.style.width = (100 * p.channel.t / p.channel.dur) + '%';
     } else h.channel.classList.add('hidden');
 
-    // Invite d'interaction
     const o = g.hover;
     if (o && !p.dead && !this.panel) {
-      const verb = o.type === 'npc' ? 'Parler à' : o.type === 'chest' || o.type === 'stash' ? 'Ouvrir :' : o.type === 'extract' ? 'S’extraire :' : 'Entrer :';
-      const txt = `<span class="key">${input.label('interact')}</span> ${verb} ${o.label}`;
+      const verb = o.type === 'npc' ? 'Parler à' : o.type === 'chest' || o.type === 'stash' ? 'Ouvrir' : o.type === 'extract' ? 'Remonter par le' : 'Franchir le';
+      const lbl = o.type === 'extract' ? 'cercle d’extraction' : o.type === 'portal' || o.type === 'exitPortal' ? 'portail' : o.type === 'npc' ? o.label : o.label.toLowerCase();
+      const txt = `<kbd>${input.label('interact')}</kbd> ${verb} ${lbl}`;
       if (h.prompt._last !== txt) { h.prompt.innerHTML = txt; h.prompt._last = txt; }
       h.prompt.classList.remove('hidden');
     } else h.prompt.classList.add('hidden');
 
-    // Mini-carte (rafraîchie ~15 fois/s)
     this.hudTimer -= dt;
     if (this.hudTimer <= 0) {
       this.hudTimer = 1 / 15;
       const big = this.mapBig;
       h.mapBox.classList.toggle('big', big);
-      const cv = this.el.minimap;
-      const size = big ? Math.min(560, window.innerHeight - 160) : 200;
+      const cv = h.minimap;
+      const size = big ? Math.min(560, window.innerHeight - 160) : 190;
       if (cv.width !== size) { cv.width = size; cv.height = size; }
       g.renderer.drawMinimap(g, cv, big);
     }
   }
-}
-
-function pd_block(pd, s) {
-  return pd.equipment.offhand ? Math.round(s.block) : 0;
 }
