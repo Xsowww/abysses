@@ -441,9 +441,9 @@ export class Player {
     if (this.roll) {
       const k = this.roll.t / this.roll.dur;
       dir = dirFromAngle(Math.atan2(this.roll.dy, this.roll.dx));
-      return { anim: 'run', frame: walkFrame(name, 'run', k * 8), dir, squashY: 1 - 0.18 * Math.sin(k * Math.PI), squashX: 1 + 0.08 * Math.sin(k * Math.PI) };
+      return { anim: 'walk', frame: walkFrame(name, 'walk', k * 8), dir, squashY: 1 - 0.18 * Math.sin(k * Math.PI), squashX: 1 + 0.08 * Math.sin(k * Math.PI) };
     }
-    if (this.dash) return { anim: 'run', frame: walkFrame(name, 'run', this.dash.t * 40), dir };
+    if (this.dash) return { anim: 'walk', frame: walkFrame(name, 'walk', this.dash.t * 40), dir };
     if (this.atk && animFrames(name, this.atk.anim)) {
       const a = this.atk;
       return { anim: a.anim, frame: a.from + (a.to - a.from) * Math.min(1, a.t / a.dur), dir };
@@ -451,7 +451,7 @@ export class Player {
     if (this.channel) return { anim: 'walk', frame: 0, dir: 2, squashY: 1 + 0.015 * Math.sin(time * 3) };
     if (this.moving) {
       const run = sp > 150;
-      return { anim: run ? 'run' : 'walk', frame: walkFrame(name, run ? 'run' : 'walk', this.walkT * (run ? 0.95 : 1.1)), dir };
+      return { anim: 'walk', frame: walkFrame(name, 'walk', this.walkT * (run ? 1.3 : 1.1)), dir };
     }
     // Au repos : respiration légère
     return { anim: 'walk', frame: 0, dir, squashY: 1 + 0.012 * Math.sin(time * 2.4) };

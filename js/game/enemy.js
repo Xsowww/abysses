@@ -385,7 +385,7 @@ export class Enemy {
     if (this.stun > 0) return { anim: 'walk', frame: 0, dir, rot: Math.sin(time * 9) * 0.05 };
     const tp = this.tele ? Math.min(1, this.tele.t / this.tele.dur) : 0;
     const ranged = D.ai === 'ranged';
-    if (this.boss && this.dashing) return { anim: 'run', frame: walkFrame(name, 'run', time * 16), dir };
+    if (this.boss && this.dashing) return { anim: 'walk', frame: walkFrame(name, 'walk', time * 16), dir };
     if (this.lunge) return { anim: 'attack', frame: 3 + Math.min(2.99, this.lunge.t * 14), dir };
     if (this.state === 'windup') return { anim: 'attack', frame: ranged ? tp * 8.99 : tp * 2.6, dir };
     if (this.state === 'cast') return { anim: 'attack', frame: Math.min(6.99, (1 - this.t / 0.7) * 7), dir };
@@ -395,7 +395,7 @@ export class Enemy {
     }
     if (this.state === 'chase' || (this.mvx && Math.abs(this.mvx) + Math.abs(this.mvy) > 20)) {
       const fast = this.speed * this.speedMult() > 120;
-      return { anim: fast ? 'run' : 'walk', frame: walkFrame(name, fast ? 'run' : 'walk', this.walkT * (fast ? 0.9 : 1.2)), dir };
+      return { anim: 'walk', frame: walkFrame(name, 'walk', this.walkT * (fast ? 1.25 : 1.2)), dir };
     }
     return { anim: 'walk', frame: 0, dir, squashY: 1 + 0.012 * Math.sin(time * 2 + this.x) };
   }

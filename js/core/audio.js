@@ -30,7 +30,9 @@ function ensure() {
   B.comp.threshold.value = -16;
   B.comp.ratio.value = 4;
   B.master = ctx.createGain();
-  B.master.connect(B.comp).connect(ctx.destination);
+  B.trim = ctx.createGain();
+  B.trim.gain.value = MASTER_TRIM; // après le compresseur : baisse réelle du niveau de sortie
+  B.master.connect(B.comp).connect(B.trim).connect(ctx.destination);
   B.sfx = ctx.createGain();
   B.music = ctx.createGain();
   B.amb = ctx.createGain();
@@ -70,6 +72,9 @@ export function setReverb(kind) {
   else if (kind === 'boss') { B.verb.buffer = impulse(4.0, 2.2, 0.3); B.verbSend.gain.value = 0.6; B.verbOut.gain.value = 0.9; }
   else { B.verb.buffer = impulse(1.4, 3.5, 0.5); B.verbSend.gain.value = 0.25; B.verbOut.gain.value = 0.8; }
 }
+
+// Les échantillons enregistrés sont plus forts que l'ancienne synthèse : -28 % sur tout le son.
+const MASTER_TRIM = 0.72;
 
 export function applyVolumes() {
   if (!ctx) return;
