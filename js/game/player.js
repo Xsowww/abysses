@@ -472,8 +472,8 @@ export class Player {
     const name = this.pd.cls;
     if (hasSprite(name)) {
       const st = this.spriteState(time);
-      for (const gh of this.ghosts) drawSprite(ctx, name, gh.x, gh.y, { ...st, alpha: (gh.t / 0.22) * 0.3, flash: 0.6, shadow: false });
-      drawSprite(ctx, name, this.x, this.y, { ...st, alpha: this.stealth ? 0.3 : blink ? 0.6 : 1, flash: this.flash });
+      for (const gh of this.ghosts) drawSprite(ctx, name, gh.x, gh.y + this.r * 0.55, { ...st, alpha: (gh.t / 0.22) * 0.3, flash: 0.6, shadow: false });
+      drawSprite(ctx, name, this.x, this.y + this.r * 0.55, { ...st, alpha: this.stealth ? 0.3 : blink ? 0.6 : 1, flash: this.flash });
     } else {
       for (const gh of this.ghosts) drawHero(ctx, gh.x, gh.y, { cls: name, angle: gh.a, time, eq, alpha: (gh.t / 0.22) * 0.25, flash: 0 });
       drawHero(ctx, this.x, this.y, {

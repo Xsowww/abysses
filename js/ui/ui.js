@@ -407,6 +407,7 @@ export class UI {
       }
       case 'title-options': sfx('ui'); this.showOptionsScreen(); break;
       case 'back-title': sfx('ui'); this.showTitle(); break;
+      case 'credits': sfx('ui'); this.showCredits(); break;
       case 'pick-class': if (!CLASSES[arg].locked) { this.screenCls = arg; this.confirmNew = false; sfx('ui'); this.renderClassSelect(); } break;
       case 'start-game': {
         const name = ($('#char-name') && $('#char-name').value.trim()) || 'Sans-nom';
@@ -790,8 +791,18 @@ export class UI {
     const save = loadGame();
     const cont = save ? `<button class="mi main" data-action="continue">Continuer<span class="sub">${escapeHtml(save.name)} · ${CLASSES[save.cls] ? CLASSES[save.cls].name : ''} · niveau ${save.level}</span></button>` : '';
     this.showScreen(`<div class="screen title-screen"><div class="logo">Les Abysses</div><div class="logo-rule"></div><div class="tagline">Descendez. Survivez. Remontez.</div>
-      <div class="menu">${cont}<button class="mi ${save ? '' : 'main'}" data-action="new-game">Nouvelle partie</button><button class="mi" data-action="title-options">Options</button></div>
-      <div class="version">PROTOTYPE · v0.3</div></div>`, { titleBg: true });
+      <div class="menu">${cont}<button class="mi ${save ? '' : 'main'}" data-action="new-game">Nouvelle partie</button><button class="mi" data-action="title-options">Options</button><button class="mi" data-action="credits">Crédits</button></div>
+      <div class="version">PROTOTYPE · v0.4</div></div>`, { titleBg: true });
+  }
+
+  async showCredits() {
+    let data = null;
+    try { data = await (await fetch('assets/credits.json')).json(); } catch (e) { data = null; }
+    const sections = (data || []).map((sec) => `<h3 class="cr-h">${escapeHtml(sec.title)}</h3>${sec.note ? `<p class="cr-note">${escapeHtml(sec.note)}</p>` : ''}
+      <ul class="cr-list">${sec.items.map((it) => `<li><b>${escapeHtml(it.what)}</b> — ${escapeHtml(it.authors)}<span class="cr-lic">${escapeHtml(it.license || '')}</span>${it.url ? `<span class="cr-url">${escapeHtml(it.url)}</span>` : ''}</li>`).join('')}</ul>`).join('');
+    this.showScreen(`<div class="screen"><div class="panel frame wide credits" style="margin:auto"><header class="ph"><div class="ph-title">Crédits</div></header><div class="rule"></div>
+      <div class="panel-body"><p class="cr-note">Les Abysses — conception et code : le joueur et Claude. Graphismes, sons et musiques : artistes de la communauté libre, listés ci-dessous. Merci à eux.</p>${sections || '<p class="cr-note">Liste indisponible.</p>'}</div>
+      <footer class="pf"><button class="btn" data-action="back-title">Retour</button></footer></div></div>`, { titleBg: true });
   }
 
   showOptionsScreen() {
