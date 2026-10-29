@@ -49,6 +49,17 @@ export class Renderer {
     this.light.width = Math.ceil(this.w * LIGHT_SCALE);
     this.light.height = Math.ceil(this.h * LIGHT_SCALE);
     this.zoom = clamp(Math.min(this.w / 1280, this.h / 760), 0.7, 1.6);
+    // Vignette pré-calculée à la résolution du calque de lumière
+    const v = document.createElement('canvas');
+    v.width = this.light.width;
+    v.height = this.light.height;
+    const vg = v.getContext('2d');
+    const grd = vg.createRadialGradient(v.width / 2, v.height / 2, v.height * 0.35, v.width / 2, v.height / 2, v.height * 0.85);
+    grd.addColorStop(0, 'rgba(0,0,0,0)');
+    grd.addColorStop(1, 'rgba(0,0,0,0.55)');
+    vg.fillStyle = grd;
+    vg.fillRect(0, 0, v.width, v.height);
+    this.vignette = v;
   }
 
   // ---------- Carte pré-calculée ----------
@@ -361,16 +372,7 @@ export class Renderer {
     }
     fx.drawTexts(ctx);
 
-    // Vignette
     ctx.setTransform(1, 0, 0, 1, 0, 0);
-    if (!this.vignette || this.vignette.w !== this.canvas.width) {
-      const g = ctx.createRadialGradient(this.canvas.width / 2, this.canvas.height / 2, this.canvas.height * 0.35, this.canvas.width / 2, this.canvas.height / 2, this.canvas.height * 0.85);
-      g.addColorStop(0, 'rgba(0,0,0,0)');
-      g.addColorStop(1, 'rgba(0,0,0,0.55)');
-      this.vignette = { w: this.canvas.width, g };
-    }
-    ctx.fillStyle = this.vignette.g;
-    ctx.fillRect(0, 0, this.canvas.width, this.canvas.height);
     // Flash rouge quand le joueur a peu de vie
     if (!p.dead && p.hp / p.maxHp < 0.3) {
       ctx.fillStyle = `rgba(160,0,0,${0.12 + 0.08 * Math.sin(time * 6)})`;
@@ -423,6 +425,9 @@ export class Renderer {
       lc.drawImage(this.sprites.mask, sx - r, sy - r, r * 2, r * 2);
     }
     lc.globalAlpha = 1;
+    // Vignette (intégrée au calque d'obscurité : une seule passe plein écran)
+    lc.globalCompositeOperation = 'source-over';
+    lc.drawImage(this.vignette, 0, 0);
 
     const ctx = this.ctx;
     ctx.setTransform(1, 0, 0, 1, 0, 0);
