@@ -2,7 +2,7 @@
 import { input } from '../core/input.js';
 import { CLASSES, SKILLS } from '../data/classes.js';
 import { WEAPONS, FISTS } from '../data/items.js';
-import { rand, clamp, TAU, dist } from '../core/util.js';
+import { rand, clamp, TAU, dist, angleDiff } from '../core/util.js';
 import { sfx } from '../core/audio.js';
 import { drawHero, drawWarriorWeapon } from './hero.js';
 
@@ -15,7 +15,10 @@ export class Player {
     this.r = 13;
     this.x = 0;
     this.y = 0;
-    this.angle = 0;
+    this.angle = 0; // orientation affichée (lissée)
+    this.aim = 0; // direction exacte vers la souris (attaques)
+    this.vx = 0;
+    this.vy = 0;
     this.stats = {};
     this.maxHp = 100;
     this.hp = 100;
@@ -49,6 +52,8 @@ export class Player {
     this.dead = false;
     this.lowStaWarn = 0;
     this.bowDraw = 0;
+    this.vx = 0;
+    this.vy = 0;
     this.stepT = 0;
     this.ghosts = [];
     this.ghostT = 0;
@@ -162,7 +167,10 @@ export class Player {
     if (regen > 0) this.hp = Math.min(this.maxHp, this.hp + regen * dt);
 
     const mw = g.mouseWorld();
-    this.angle = Math.atan2(mw.y - this.y, mw.x - this.x);
+    this.aim = Math.atan2(mw.y - this.y, mw.x - this.x);
+    // Le corps pivote vers la visée de façon fluide (rapide, mais pas instantanée).
+    const turn = angleDiff(this.angle, this.aim);
+    this.angle += Math.sign(turn) * Math.min(Math.abs(turn), dt * (this.attackCd > 0 ? 30 : 13));
 
     if (this.kbx || this.kby) {
       g.scene.map.move(this, this.kbx * dt, this.kby * dt);
@@ -192,18 +200,31 @@ export class Player {
     if (this.channel) speed = 0;
     if (inMenu) { mx = my = 0; }
 
-    this.moving = ml > 0 && speed > 0 && !inMenu;
+    // Déplacement avec inertie : accélération progressive, freinage doux.
+    const want = ml > 0 && speed > 0 && !inMenu;
+    const tvx = want ? mx * speed : 0, tvy = want ? my * speed : 0;
+    const acc = (want ? 1500 : 2100) * dt;
+    const dvx = tvx - this.vx, dvy = tvy - this.vy;
+    const dl = Math.hypot(dvx, dvy);
+    if (dl > acc) { this.vx += (dvx / dl) * acc; this.vy += (dvy / dl) * acc; } else { this.vx = tvx; this.vy = tvy; }
+    if (this.vx || this.vy) {
+      const ox = this.x, oy = this.y;
+      g.scene.map.move(this, this.vx * dt, this.vy * dt);
+      // on garde la vitesse réellement parcourue (glisse le long des murs sans « coller »)
+      if (dt > 0) { this.vx = (this.x - ox) / dt; this.vy = (this.y - oy) / dt; }
+    }
+    const sp = Math.hypot(this.vx, this.vy);
+    this.moving = sp > 25;
     if (this.moving) {
-      g.scene.map.move(this, mx * speed * dt, my * speed * dt);
-      this.walkT += dt * 10;
+      this.walkT += dt * 10 * Math.min(1.2, sp / 210);
       // Pas : son + petite poussière
-      this.stepT += dt * speed / 210;
+      this.stepT += dt * sp / 210;
       if (this.stepT >= 0.34) {
         this.stepT = 0;
         sfx('step');
-        g.fx.burst(this.x - mx * 6, this.y + 8 - my * 6, g.scene.type === 'dungeon' ? '#4a4540' : '#3a3428', 2, 25, 0.5, 3, { drag: 4, grav: -6 });
+        g.fx.burst(this.x - this.vx * 0.03, this.y + 8 - this.vy * 0.03, g.scene.type === 'dungeon' ? '#4a4540' : '#3a3428', 2, 25, 0.5, 3, { drag: 4, grav: -6 });
       }
-      if (this.channel) g.cancelChannel('Déplacement');
+      if (this.channel && want) g.cancelChannel('Déplacement');
     }
 
     // Tension de l'arc (visuel)
@@ -215,8 +236,8 @@ export class Player {
     // Roulade
     const rollCost = ROLL_COST * (1 - this.stats.rollCost / 100);
     if (input.wasPressed('roll') && this.useStamina(rollCost)) {
-      const a = ml ? Math.atan2(my, mx) : this.angle;
-      this.roll = { t: 0, dur: 0.32, dx: Math.cos(a), dy: Math.sin(a) };
+      const a = ml ? Math.atan2(my, mx) : this.aim;
+      this.roll = { t: 0, dur: 0.34, dx: Math.cos(a), dy: Math.sin(a) };
       this.invuln = Math.max(this.invuln, 0.28);
       this.swing = null;
       if (this.channel) g.cancelChannel('Roulade');
@@ -232,8 +253,8 @@ export class Player {
     if (input.isDown('attack') && this.attackCd <= 0 && g.scene.type === 'dungeon') {
       if (this.useStamina(w.ranged ? ATTACK_COST * 0.6 : ATTACK_COST)) {
         this.attackCd = w.cd / this.attackSpeedMult();
-        if (w.ranged) this.shoot(this.angle, 1, { pierce: (w.pierce || 0) + this.stats.pierce });
-        else this.doSwing(this.angle, w.range, w.arc, 1, w.kb, false);
+        if (w.ranged) this.shoot(this.aim, 1, { pierce: (w.pierce || 0) + this.stats.pierce });
+        else this.doSwing(this.aim, w.range, w.arc, 1, w.kb, false);
         if (this.channel) g.cancelChannel('Attaque');
       } else this.attackCd = 0.15;
     }
@@ -245,9 +266,9 @@ export class Player {
         this.specialCd = sp.cd * this.cdMult();
         this.attackCd = Math.max(this.attackCd, 0.45);
         if (w.ranged) {
-          this.shoot(this.angle, 2.2, { pierce: 99, heavy: true, speed: 1.3 });
+          this.shoot(this.aim, 2.2, { pierce: 99, heavy: true, speed: 1.3 });
           g.fx.shake(3);
-        } else this.doSwing(this.angle, w.range * 1.25, Math.min(200, w.arc + 50), 2.2, w.kb * 2.2, true);
+        } else this.doSwing(this.aim, w.range * 1.25, Math.min(200, w.arc + 50), 2.2, w.kb * 2.2, true);
         if (this.channel) g.cancelChannel('Attaque');
       }
     }
@@ -287,9 +308,11 @@ export class Player {
     this.ghostT -= dt;
     if (this.ghostT <= 0) { this.ghostT = 0.045; this.ghosts.push({ x: this.x, y: this.y, a: this.angle, t: 0.22 }); }
     const k = 1 - r.t / r.dur;
-    const sp = 600 * (0.35 + 0.65 * k);
+    // Courbe d'élan : départ explosif, fin amortie (pas d'arrêt sec)
+    const e = 1 - k;
+    const sp = 640 * (1 - e * e * 0.75);
     this.game.scene.map.move(this, r.dx * sp * dt, r.dy * sp * dt);
-    if (r.t >= r.dur) this.roll = null;
+    if (r.t >= r.dur) { this.roll = null; this.vx = r.dx * 200; this.vy = r.dy * 200; }
   }
 
   updateDash(dt) {
@@ -343,7 +366,7 @@ export class Player {
     const w = this.weapon();
     switch (id) {
       case 'charge':
-        this.dash = { t: 0, dur: 0.26, dx: Math.cos(this.angle), dy: Math.sin(this.angle), hit: new Set(), speed: 950, hits: true, color: '#7a2a1e' };
+        this.dash = { t: 0, dur: 0.26, dx: Math.cos(this.aim), dy: Math.sin(this.aim), hit: new Set(), speed: 950, hits: true, color: '#7a2a1e' };
         this.invuln = Math.max(this.invuln, 0.3);
         sfx('heavy');
         break;
@@ -368,7 +391,7 @@ export class Player {
         sfx('block');
         break;
       case 'salve':
-        for (let i = -2; i <= 2; i++) this.shoot(this.angle + i * 0.14, 0.75, { pierce: this.stats.pierce + (w.pierce || 0) });
+        for (let i = -2; i <= 2; i++) this.shoot(this.aim + i * 0.14, 0.75, { pierce: this.stats.pierce + (w.pierce || 0) });
         this.attackCd = Math.max(this.attackCd, 0.3);
         break;
       case 'piege': {
@@ -382,7 +405,7 @@ export class Player {
       case 'pluie': {
         const mw = g.mouseWorld();
         const d = Math.min(dist(this.x, this.y, mw.x, mw.y), 420);
-        const tx = this.x + Math.cos(this.angle) * d, ty = this.y + Math.sin(this.angle) * d;
+        const tx = this.x + Math.cos(this.aim) * d, ty = this.y + Math.sin(this.aim) * d;
         g.scene.zones.push({ kind: 'rain', x: tx, y: ty, r: 95, t: -0.35, dur: 1.5, tick: 0, interval: 0.25, mult: 0.45 });
         sfx('arrow');
         break;

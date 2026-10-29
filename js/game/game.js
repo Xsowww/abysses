@@ -192,6 +192,7 @@ export class Game {
   }
 
   snapCamera() {
+    this.camV = { x: 0, y: 0 };
     const z = this.renderer.zoom;
     this.cam.x = this.player.x - this.renderer.w / z / 2;
     this.cam.y = this.player.y - this.renderer.h / z / 2;
@@ -266,11 +267,20 @@ export class Game {
       fy0 = p.y + (this.camFocus.y - p.y) * k2;
       if (this.camFocus.t <= 0) { this.camFocus = null; this.zoomTarget = 1; }
     }
+    // Anticipation : la caméra regarde un peu vers la visée et dans le sens de la marche.
+    if (!this.camFocus && !p.dead) {
+      fx0 += Math.cos(p.aim || 0) * 55 + (p.vx || 0) * 0.18;
+      fy0 += Math.sin(p.aim || 0) * 40 + (p.vy || 0) * 0.18;
+    }
     const tx = fx0 - this.renderer.w / z / 2;
     const ty = fy0 - this.renderer.h / z / 2;
-    const k = Math.min(1, dt * 8);
-    this.cam.x += (tx - this.cam.x) * k;
-    this.cam.y += (ty - this.cam.y) * k;
+    // Ressort amorti (pas d'à-coups)
+    this.camV = this.camV || { x: 0, y: 0 };
+    const kS = 28, kD = 2 * Math.sqrt(kS);
+    this.camV.x += ((tx - this.cam.x) * kS - this.camV.x * kD) * dt;
+    this.camV.y += ((ty - this.cam.y) * kS - this.camV.y * kD) * dt;
+    this.cam.x += this.camV.x * dt;
+    this.cam.y += this.camV.y * dt;
 
     this.invFullWarn -= dt;
     if (s.type === 'village') {

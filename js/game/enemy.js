@@ -74,9 +74,23 @@ export class Enemy {
       if (f) { dx = f.x; dy = f.y; }
       else { dx = (tx - this.x) / (d || 1); dy = (ty - this.y) / (d || 1); }
     }
-    map.move(this, dx * speed * dt, dy * speed * dt);
-    this.angle = Math.atan2(dy, dx);
-    this.walkT += dt * 8;
+    // Pilotage avec inertie : les monstres accélèrent, tournent et freinent naturellement.
+    this.mvx = this.mvx || 0; this.mvy = this.mvy || 0;
+    const acc = 650 * dt;
+    const tvx = dx * speed, tvy = dy * speed;
+    const ex = tvx - this.mvx, ey = tvy - this.mvy;
+    const el = Math.hypot(ex, ey);
+    if (el > acc) { this.mvx += (ex / el) * acc; this.mvy += (ey / el) * acc; } else { this.mvx = tvx; this.mvy = tvy; }
+    const ox = this.x, oy = this.y;
+    map.move(this, this.mvx * dt, this.mvy * dt);
+    if (dt > 0) { this.mvx = (this.x - ox) / dt; this.mvy = (this.y - oy) / dt; }
+    this.turnTo(Math.atan2(this.mvy || dy, this.mvx || dx), dt, 7);
+    this.walkT += dt * 8 * Math.min(1.2, Math.hypot(this.mvx, this.mvy) / (this.def.speed || 80));
+  }
+
+  turnTo(a, dt, rate = 8) {
+    const d = angleDiff(this.angle, a);
+    this.angle += Math.sign(d) * Math.min(Math.abs(d), dt * rate);
   }
 
   update(dt, g) {
