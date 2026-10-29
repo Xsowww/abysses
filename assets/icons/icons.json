@@ -1,0 +1,1076 @@
+{
+ "size": 32,
+ "icons": {
+  "sword1": [
+   0,
+   0
+  ],
+  "sword4": [
+   32,
+   0
+  ],
+  "sword3": [
+   64,
+   0
+  ],
+  "sword2": [
+   96,
+   0
+  ],
+  "sword5": [
+   128,
+   0
+  ],
+  "sword5_noir": [
+   160,
+   0
+  ],
+  "sword5_mithril": [
+   192,
+   0
+  ],
+  "sword5_abysses": [
+   224,
+   0
+  ],
+  "axe2": [
+   256,
+   0
+  ],
+  "axe1": [
+   288,
+   0
+  ],
+  "axe3": [
+   320,
+   0
+  ],
+  "axe4": [
+   352,
+   0
+  ],
+  "axe3_noir": [
+   384,
+   0
+  ],
+  "axe3_mithril": [
+   416,
+   0
+  ],
+  "axe3_orichalque": [
+   448,
+   0
+  ],
+  "axe3_abysses": [
+   480,
+   0
+  ],
+  "club1": [
+   0,
+   32
+  ],
+  "mace1": [
+   32,
+   32
+  ],
+  "flail": [
+   64,
+   32
+  ],
+  "morningstar": [
+   96,
+   32
+  ],
+  "mace2": [
+   128,
+   32
+  ],
+  "morningstar_noir": [
+   160,
+   32
+  ],
+  "morningstar_mithril": [
+   192,
+   32
+  ],
+  "morningstar_abysses": [
+   224,
+   32
+  ],
+  "dc_two_handed_sword": [
+   256,
+   32
+  ],
+  "dc_greatsword_1_new": [
+   288,
+   32
+  ],
+  "dc_claymore": [
+   320,
+   32
+  ],
+  "dc_greatsword_3_old": [
+   352,
+   32
+  ],
+  "dc_greatsword_2": [
+   384,
+   32
+  ],
+  "dc_claymore_2": [
+   416,
+   32
+  ],
+  "dc_greatsword_4": [
+   448,
+   32
+  ],
+  "dc_claymore_3": [
+   480,
+   32
+  ],
+  "hammer1": [
+   0,
+   64
+  ],
+  "hammer2": [
+   32,
+   64
+  ],
+  "dc_hammer_1": [
+   64,
+   64
+  ],
+  "dc_war_hammer": [
+   96,
+   64
+  ],
+  "dc_hammer_2": [
+   128,
+   64
+  ],
+  "dc_hammer_3": [
+   160,
+   64
+  ],
+  "hammer2_mithril": [
+   192,
+   64
+  ],
+  "hammer2_abysses": [
+   224,
+   64
+  ],
+  "bow1": [
+   256,
+   64
+  ],
+  "bow3": [
+   288,
+   64
+  ],
+  "bow2": [
+   320,
+   64
+  ],
+  "bow4": [
+   352,
+   64
+  ],
+  "bow4_sombre": [
+   384,
+   64
+  ],
+  "bow4_nuit": [
+   416,
+   64
+  ],
+  "bow4_abysses": [
+   448,
+   64
+  ],
+  "bow1_flip": [
+   480,
+   64
+  ],
+  "bow3_flip": [
+   0,
+   96
+  ],
+  "bow2_flip": [
+   32,
+   96
+  ],
+  "bow4_flip": [
+   64,
+   96
+  ],
+  "bow4_sombre_flip": [
+   96,
+   96
+  ],
+  "bow4_nuit_flip": [
+   128,
+   96
+  ],
+  "bow4_abysses_flip": [
+   160,
+   96
+  ],
+  "crossbow1": [
+   192,
+   96
+  ],
+  "crossbow4": [
+   224,
+   96
+  ],
+  "crossbow2": [
+   256,
+   96
+  ],
+  "crossbow3": [
+   288,
+   96
+  ],
+  "crossbow2_noir": [
+   320,
+   96
+  ],
+  "crossbow2_mithril": [
+   352,
+   96
+  ],
+  "crossbow2_abysses": [
+   384,
+   96
+  ],
+  "wooden_buckler": [
+   416,
+   96
+  ],
+  "wood_kite_shield": [
+   448,
+   96
+  ],
+  "wood_kite_shield_alt": [
+   480,
+   96
+  ],
+  "iron_buckler": [
+   0,
+   128
+  ],
+  "kite_shield": [
+   32,
+   128
+  ],
+  "tower_shield": [
+   64,
+   128
+  ],
+  "df_shield_skull": [
+   96,
+   128
+  ],
+  "df_shield_ornate": [
+   128,
+   128
+  ],
+  "df_quiver_a": [
+   160,
+   128
+  ],
+  "df_quiver_b": [
+   192,
+   128
+  ],
+  "df_quiver_a_sombre": [
+   224,
+   128
+  ],
+  "df_quiver_a_nuit": [
+   256,
+   128
+  ],
+  "df_quiver_a_abysses": [
+   288,
+   128
+  ],
+  "leather_cap": [
+   320,
+   128
+  ],
+  "studded_helmet": [
+   352,
+   128
+  ],
+  "platemail_helmet": [
+   384,
+   128
+  ],
+  "horned_helmet": [
+   416,
+   128
+  ],
+  "platemail_helmet_noir": [
+   448,
+   128
+  ],
+  "platemail_helmet_mithril": [
+   480,
+   128
+  ],
+  "platemail_helmet_abysses": [
+   0,
+   160
+  ],
+  "close_helmet": [
+   32,
+   160
+  ],
+  "close_helmet_noir": [
+   64,
+   160
+  ],
+  "close_helmet_mithril": [
+   96,
+   160
+  ],
+  "close_helmet_orichalque": [
+   128,
+   160
+  ],
+  "close_helmet_abysses": [
+   160,
+   160
+  ],
+  "close_helmet_nuit": [
+   192,
+   160
+  ],
+  "chainmail_coif": [
+   224,
+   160
+  ],
+  "chainmail_coif_noir": [
+   256,
+   160
+  ],
+  "chainmail_coif_mithril": [
+   288,
+   160
+  ],
+  "chainmail_coif_orichalque": [
+   320,
+   160
+  ],
+  "chainmail_coif_abysses": [
+   352,
+   160
+  ],
+  "cloth_hood": [
+   384,
+   160
+  ],
+  "cloth_hood_sombre": [
+   416,
+   160
+  ],
+  "cloth_hood_nuit": [
+   448,
+   160
+  ],
+  "cloth_hood_cramoisi": [
+   480,
+   160
+  ],
+  "cloth_hood_abysses": [
+   0,
+   192
+  ],
+  "breastplate": [
+   32,
+   192
+  ],
+  "platemail": [
+   64,
+   192
+  ],
+  "breastplate_noir": [
+   96,
+   192
+  ],
+  "breastplate_mithril": [
+   128,
+   192
+  ],
+  "platemail_orichalque": [
+   160,
+   192
+  ],
+  "platemail_abysses": [
+   192,
+   192
+  ],
+  "chainmail_jacket": [
+   224,
+   192
+  ],
+  "chainmail_alt": [
+   256,
+   192
+  ],
+  "chainmail_jacket_noir": [
+   288,
+   192
+  ],
+  "chainmail_jacket_mithril": [
+   320,
+   192
+  ],
+  "chainmail_alt_orichalque": [
+   352,
+   192
+  ],
+  "chainmail_alt_abysses": [
+   384,
+   192
+  ],
+  "studded_jacket": [
+   416,
+   192
+  ],
+  "studded_jacket_alt": [
+   448,
+   192
+  ],
+  "studded_jacket_sombre": [
+   480,
+   192
+  ],
+  "studded_jacket_cramoisi": [
+   0,
+   224
+  ],
+  "studded_jacket_alt_nuit": [
+   32,
+   224
+  ],
+  "studded_jacket_alt_abysses": [
+   64,
+   224
+  ],
+  "tattered_shirt": [
+   96,
+   224
+  ],
+  "leather_jacket": [
+   128,
+   224
+  ],
+  "leather_jacket_alt": [
+   160,
+   224
+  ],
+  "quilted_armor": [
+   192,
+   224
+  ],
+  "quilted_armor_sombre": [
+   224,
+   224
+  ],
+  "quilted_armor_nuit": [
+   256,
+   224
+  ],
+  "quilted_armor_abysses": [
+   288,
+   224
+  ],
+  "cloth_pants": [
+   320,
+   224
+  ],
+  "leather_pants": [
+   352,
+   224
+  ],
+  "studded_pants": [
+   384,
+   224
+  ],
+  "chainmail_pants": [
+   416,
+   224
+  ],
+  "platemail_pants": [
+   448,
+   224
+  ],
+  "platemail_pants_mithril": [
+   480,
+   224
+  ],
+  "platemail_pants_abysses": [
+   0,
+   256
+  ],
+  "cloth_shoes": [
+   32,
+   256
+  ],
+  "leather_boots": [
+   64,
+   256
+  ],
+  "studded_boots": [
+   96,
+   256
+  ],
+  "chainmail_boots": [
+   128,
+   256
+  ],
+  "greaves": [
+   160,
+   256
+  ],
+  "greaves_mithril": [
+   192,
+   256
+  ],
+  "greaves_abysses": [
+   224,
+   256
+  ],
+  "cloth_gloves": [
+   256,
+   256
+  ],
+  "leather_gloves": [
+   288,
+   256
+  ],
+  "studded_gloves": [
+   320,
+   256
+  ],
+  "chainmail_gloves": [
+   352,
+   256
+  ],
+  "gauntlets": [
+   384,
+   256
+  ],
+  "gauntlets_mithril": [
+   416,
+   256
+  ],
+  "gauntlets_abysses": [
+   448,
+   256
+  ],
+  "amulet_copper": [
+   480,
+   256
+  ],
+  "amulet_iron": [
+   0,
+   288
+  ],
+  "amulet_silver": [
+   32,
+   288
+  ],
+  "amulet_gold": [
+   64,
+   288
+  ],
+  "amulet_silver_noir": [
+   96,
+   288
+  ],
+  "amulet_silver_mithril": [
+   128,
+   288
+  ],
+  "amulet_silver_abysses": [
+   160,
+   288
+  ],
+  "copper_ring": [
+   192,
+   288
+  ],
+  "iron_ring": [
+   224,
+   288
+  ],
+  "silver_ring": [
+   256,
+   288
+  ],
+  "gold_ring": [
+   288,
+   288
+  ],
+  "silver_ring_noir": [
+   320,
+   288
+  ],
+  "silver_ring_mithril": [
+   352,
+   288
+  ],
+  "silver_ring_abysses": [
+   384,
+   288
+  ],
+  "df_bag": [
+   416,
+   288
+  ],
+  "sack": [
+   448,
+   288
+  ],
+  "sack_sombre": [
+   480,
+   288
+  ],
+  "sack_nuit": [
+   0,
+   320
+  ],
+  "sack_abysses": [
+   32,
+   320
+  ],
+  "potion_red_2": [
+   64,
+   320
+  ],
+  "potion_red_3": [
+   96,
+   320
+  ],
+  "potion_full_1": [
+   128,
+   320
+  ],
+  "potion_half_1": [
+   160,
+   320
+  ],
+  "runestone_water_glow": [
+   192,
+   320
+  ],
+  "runestone_water": [
+   224,
+   320
+  ],
+  "runestone_air": [
+   256,
+   320
+  ],
+  "runestone_earth": [
+   288,
+   320
+  ],
+  "runestone_fire": [
+   320,
+   320
+  ],
+  "crystal_blue": [
+   352,
+   320
+  ],
+  "rotulus_unfurled": [
+   384,
+   320
+  ],
+  "scroll_blank": [
+   416,
+   320
+  ],
+  "parchment": [
+   448,
+   320
+  ],
+  "scroll_spell": [
+   480,
+   320
+  ],
+  "rotulus_rolled": [
+   0,
+   352
+  ],
+  "scroll_bound_1": [
+   32,
+   352
+  ],
+  "scroll": [
+   64,
+   352
+  ],
+  "dc_gold_2": [
+   96,
+   352
+  ],
+  "dc_gold_3": [
+   128,
+   352
+  ],
+  "dc_gold_4": [
+   160,
+   352
+  ],
+  "dc_gold_6": [
+   192,
+   352
+  ],
+  "dc_gold_7": [
+   224,
+   352
+  ],
+  "dc_gold_9": [
+   256,
+   352
+  ],
+  "gold_key": [
+   288,
+   352
+  ],
+  "df_key_blue": [
+   320,
+   352
+  ],
+  "df_key_green": [
+   352,
+   352
+  ],
+  "df_key_red": [
+   384,
+   352
+  ],
+  "dc_key": [
+   416,
+   352
+  ],
+  "raw_green_gem": [
+   448,
+   352
+  ],
+  "cut_green_gem": [
+   480,
+   352
+  ],
+  "raw_purple_gem": [
+   0,
+   384
+  ],
+  "crystal_purple": [
+   32,
+   384
+  ],
+  "crystal_orange": [
+   64,
+   384
+  ],
+  "diamond": [
+   96,
+   384
+  ],
+  "bone": [
+   128,
+   384
+  ],
+  "bone_2": [
+   160,
+   384
+  ],
+  "bonemeal": [
+   192,
+   384
+  ],
+  "dc_skull": [
+   224,
+   384
+  ],
+  "skull_candle": [
+   256,
+   384
+  ]
+ },
+ "map": {
+  "weapon:epee": [
+   "sword1",
+   "sword4",
+   "sword3",
+   "sword2",
+   "sword5",
+   "sword5_noir",
+   "sword5_mithril",
+   "sword5_abysses"
+  ],
+  "weapon:hache": [
+   "axe2",
+   "axe1",
+   "axe3",
+   "axe4",
+   "axe3_noir",
+   "axe3_mithril",
+   "axe3_orichalque",
+   "axe3_abysses"
+  ],
+  "weapon:masse": [
+   "club1",
+   "mace1",
+   "flail",
+   "morningstar",
+   "mace2",
+   "morningstar_noir",
+   "morningstar_mithril",
+   "morningstar_abysses"
+  ],
+  "weapon:espadon": [
+   "dc_two_handed_sword",
+   "dc_greatsword_1_new",
+   "dc_claymore",
+   "dc_greatsword_3_old",
+   "dc_greatsword_2",
+   "dc_claymore_2",
+   "dc_greatsword_4",
+   "dc_claymore_3"
+  ],
+  "weapon:marteau": [
+   "hammer1",
+   "hammer2",
+   "dc_hammer_1",
+   "dc_war_hammer",
+   "dc_hammer_2",
+   "dc_hammer_3",
+   "hammer2_mithril",
+   "hammer2_abysses"
+  ],
+  "weapon:arc": [
+   "bow1",
+   "bow3",
+   "bow2",
+   "bow4",
+   "bow4_sombre",
+   "bow4_nuit",
+   "bow4_abysses"
+  ],
+  "weapon:arccourt": [
+   "bow1_flip",
+   "bow3_flip",
+   "bow2_flip",
+   "bow4_flip",
+   "bow4_sombre_flip",
+   "bow4_nuit_flip",
+   "bow4_abysses_flip"
+  ],
+  "weapon:arbalete": [
+   "crossbow1",
+   "crossbow4",
+   "crossbow2",
+   "crossbow3",
+   "crossbow2_noir",
+   "crossbow2_mithril",
+   "crossbow2_abysses"
+  ],
+  "offhand:shield": [
+   "wooden_buckler",
+   "wood_kite_shield",
+   "wood_kite_shield_alt",
+   "iron_buckler",
+   "kite_shield",
+   "tower_shield",
+   "df_shield_skull",
+   "df_shield_ornate"
+  ],
+  "offhand:quiver": [
+   "df_quiver_a",
+   "df_quiver_b",
+   "df_quiver_a_sombre",
+   "df_quiver_a_nuit",
+   "df_quiver_a_abysses"
+  ],
+  "head:Casque": [
+   "leather_cap",
+   "studded_helmet",
+   "platemail_helmet",
+   "horned_helmet",
+   "platemail_helmet_noir",
+   "platemail_helmet_mithril",
+   "platemail_helmet_abysses"
+  ],
+  "head:Heaume": [
+   "close_helmet",
+   "close_helmet_noir",
+   "close_helmet_mithril",
+   "close_helmet_orichalque",
+   "close_helmet_abysses",
+   "close_helmet_nuit"
+  ],
+  "head:Camail": [
+   "chainmail_coif",
+   "chainmail_coif_noir",
+   "chainmail_coif_mithril",
+   "chainmail_coif_orichalque",
+   "chainmail_coif_abysses"
+  ],
+  "head:Capuche": [
+   "cloth_hood",
+   "cloth_hood_sombre",
+   "cloth_hood_nuit",
+   "cloth_hood_cramoisi",
+   "cloth_hood_abysses"
+  ],
+  "chest:Plastron": [
+   "breastplate",
+   "platemail",
+   "breastplate_noir",
+   "breastplate_mithril",
+   "platemail_orichalque",
+   "platemail_abysses"
+  ],
+  "chest:Haubert": [
+   "chainmail_jacket",
+   "chainmail_alt",
+   "chainmail_jacket_noir",
+   "chainmail_jacket_mithril",
+   "chainmail_alt_orichalque",
+   "chainmail_alt_abysses"
+  ],
+  "chest:Brigandine": [
+   "studded_jacket",
+   "studded_jacket_alt",
+   "studded_jacket_sombre",
+   "studded_jacket_cramoisi",
+   "studded_jacket_alt_nuit",
+   "studded_jacket_alt_abysses"
+  ],
+  "chest:Pourpoint": [
+   "tattered_shirt",
+   "leather_jacket",
+   "leather_jacket_alt",
+   "quilted_armor",
+   "quilted_armor_sombre",
+   "quilted_armor_nuit",
+   "quilted_armor_abysses"
+  ],
+  "legs": [
+   "cloth_pants",
+   "leather_pants",
+   "studded_pants",
+   "chainmail_pants",
+   "platemail_pants",
+   "platemail_pants_mithril",
+   "platemail_pants_abysses"
+  ],
+  "feet": [
+   "cloth_shoes",
+   "leather_boots",
+   "studded_boots",
+   "chainmail_boots",
+   "greaves",
+   "greaves_mithril",
+   "greaves_abysses"
+  ],
+  "hands": [
+   "cloth_gloves",
+   "leather_gloves",
+   "studded_gloves",
+   "chainmail_gloves",
+   "gauntlets",
+   "gauntlets_mithril",
+   "gauntlets_abysses"
+  ],
+  "amulet": [
+   "amulet_copper",
+   "amulet_iron",
+   "amulet_silver",
+   "amulet_gold",
+   "amulet_silver_noir",
+   "amulet_silver_mithril",
+   "amulet_silver_abysses"
+  ],
+  "ring": [
+   "copper_ring",
+   "iron_ring",
+   "silver_ring",
+   "gold_ring",
+   "silver_ring_noir",
+   "silver_ring_mithril",
+   "silver_ring_abysses"
+  ],
+  "pocket": [
+   "df_bag",
+   "sack",
+   "sack_sombre",
+   "sack_nuit",
+   "sack_abysses"
+  ],
+  "potion": [
+   "potion_full_1",
+   "potion_half_1",
+   "potion_red_2",
+   "potion_red_3"
+  ],
+  "pierre": [
+   "runestone_water_glow",
+   "runestone_water",
+   "runestone_air",
+   "runestone_earth",
+   "runestone_fire",
+   "crystal_blue"
+  ],
+  "lore": [
+   "rotulus_unfurled",
+   "scroll_blank",
+   "parchment",
+   "scroll_spell",
+   "rotulus_rolled",
+   "scroll_bound_1",
+   "scroll"
+  ],
+  "gold": [
+   "dc_gold_2",
+   "dc_gold_3",
+   "dc_gold_4",
+   "dc_gold_6",
+   "dc_gold_7",
+   "dc_gold_9"
+  ],
+  "key": [
+   "gold_key",
+   "df_key_blue",
+   "df_key_green",
+   "df_key_red",
+   "dc_key"
+  ],
+  "gem": [
+   "raw_green_gem",
+   "cut_green_gem",
+   "raw_purple_gem",
+   "crystal_purple",
+   "crystal_orange",
+   "diamond"
+  ],
+  "bone": [
+   "bone",
+   "bone_2",
+   "bonemeal"
+  ],
+  "skull": [
+   "skull_candle",
+   "dc_skull"
+  ]
+ }
+}

@@ -43,6 +43,54 @@ export function icon(name, cls = '') {
   return `<svg class="ico ${cls}" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">${p}</svg>`;
 }
 
+// ---------- Icônes d'objets en pixel art (assets/icons) ----------
+let PIX = null;
+const PIX_W = 512, PIX_H = 416;
+export async function loadIcons() {
+  try {
+    PIX = await (await fetch('assets/icons/icons.json')).json();
+    const im = new Image();
+    im.src = 'assets/icons/icons.png';
+    await im.decode();
+  } catch (e) { PIX = null; }
+}
+const hashStr = (str) => { let h = 7; for (const c of str || '') h = (h * 31 + c.charCodeAt(0)) | 0; return Math.abs(h); };
+
+function pixKey(item) {
+  const M = PIX.map;
+  let cat;
+  if (item.kind === 'consumable') cat = item.id;
+  else if (item.kind === 'lore') cat = 'lore';
+  else if (item.slot === 'weapon') cat = 'weapon:' + item.base;
+  else if (item.slot === 'offhand') cat = item.offType === 'quiver' ? 'offhand:quiver' : 'offhand:shield';
+  else if (item.slot === 'pocket') cat = 'pocket';
+  else if (['head', 'chest'].includes(item.slot)) cat = item.slot + ':' + (item.name || '').split(' ')[0];
+  else cat = item.slot;
+  const list = M[cat];
+  if (!list || !list.length) return null;
+  if (item.kind === 'consumable') return list[0];
+  if (item.slot === 'pocket') return list[Math.min(list.length - 1, item.rarity || 0)];
+  // du plus grossier au plus précieux, selon le palier de matériau ; un peu de variété aux premiers paliers
+  const tier = Math.max(0, Math.min(6, Math.floor(((item.ilvl || 1) - 1) / 4)));
+  let i = Math.floor((tier * list.length) / 7);
+  if (tier < 3 && hashStr(item.uid) % 2 && i + 1 < list.length) i++;
+  return list[i];
+}
+
+// HTML d'une icône d'objet (pixel art si disponible, sinon silhouette SVG).
+export function itemIcon(item) {
+  const k = PIX && pixKey(item);
+  const pos = k && PIX.icons[k];
+  if (!pos) return icon(itemIconName(item));
+  const px = (pos[0] / (PIX_W - 32)) * 100, py = (pos[1] / (PIX_H - 32)) * 100;
+  return `<i class="pix" style="background-position:${px.toFixed(3)}% ${py.toFixed(3)}%"></i>`;
+}
+export function pixIcon(key) {
+  const pos = PIX && PIX.icons[key];
+  if (!pos) return '';
+  return `<i class="pix" style="background-position:${((pos[0] / (PIX_W - 32)) * 100).toFixed(3)}% ${((pos[1] / (PIX_H - 32)) * 100).toFixed(3)}%"></i>`;
+}
+
 export function itemIconName(item) {
   if (item.kind === 'consumable') return item.id;
   if (item.slot === 'weapon') return item.base;

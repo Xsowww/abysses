@@ -4,7 +4,7 @@ import { settings, saveSettings, hasSave, loadGame, deleteSave } from '../core/s
 import { sfx, unlockAudio, applyVolumes } from '../core/audio.js';
 import { playMusic, playAmbience } from '../core/music.js';
 import { PROLOGUE, LORE, LORE_BY_ID, npcTalk } from '../data/story.js';
-import { icon, itemIconName } from './icons.js';
+import { icon, itemIconName, itemIcon } from './icons.js';
 import { startTitleBg, stopTitleBg } from './titlebg.js';
 import { drawHero } from '../game/hero.js';
 import { hasSprite, drawSprite, walkFrame } from '../game/sprites.js';
@@ -231,7 +231,7 @@ export class UI {
     const qty = item.kind === 'consumable' && item.qty > 1 ? `<span class="qty">${item.qty}</span>` : '';
     const ic = itemClass(item);
     const other = ic && ic !== this.pd.cls ? ' style="opacity:.45"' : '';
-    return `<div class="slot r${itemRarity(item)}${sel}" data-ref="${ref}" style="--c:${col}"><span${other}>${icon(itemIconName(item))}</span>${qty}${unsafe}${extra}</div>`;
+    return `<div class="slot r${itemRarity(item)}${sel}" data-ref="${ref}" style="--c:${col}"><span${other}>${itemIcon(item)}</span>${qty}${unsafe}${extra}</div>`;
   }
 
   itemTip(item, opts = {}) {
@@ -1044,6 +1044,12 @@ export class UI {
       sk(b[0], 'skill1', ic(0), 's-up') + sk(b[1], 'skill2', ic(1), 's-left') + sk(b[2], 'skill3', ic(2), 's-right') + sk(b[3], 'skill4', ic(3), 's-down') +
       sk('special', 'special', C.special.icon || 'special', 's-mid');
     this.hud.items.innerHTML = sk('potion', 'potion', 'potion', '', Inv.countConsumable(pd, 'potion')) + sk('pierre', 'stone', 'pierre', '', Inv.countConsumable(pd, 'pierre'));
+    // icônes pixel art pour les consommables
+    for (const id of ['potion', 'pierre']) {
+      const el = this.hud.items.querySelector('.sk-' + id);
+      const pix = itemIcon({ kind: 'consumable', id });
+      if (el && pix.startsWith('<i')) el.querySelector('svg').outerHTML = pix;
+    }
     this.hud.skEls = [...this.hud.cross.querySelectorAll('.sk'), ...this.hud.items.querySelectorAll('.sk')];
     this.hud.mapHint.textContent = `${input.label('map')} · carte`;
     const pts = g.talentPoints();

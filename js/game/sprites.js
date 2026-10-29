@@ -41,7 +41,12 @@ export function drawSprite(ctx, name, x, y, o = {}) {
   const A = M[o.anim] || M.walk;
   const fr = Math.max(0, Math.min(A.frames - 1, Math.floor(o.frame || 0)));
   const dir = A.dirs === 1 ? 0 : (o.dir ?? 2);
-  const sx = fr * A.fs, sy = A.y + dir * A.fs;
+  drawFrame(ctx, im, fr * A.fs, A.y + dir * A.fs, A.fs, A.ax, A.ay, x, y, o);
+  return true;
+}
+
+// Dessine une case carrée (fs) d'une image, ancrée aux pieds (ax, ay), avec ombre / flash / écrasement.
+export function drawFrame(ctx, im, sx, sy, fs, ax, ay, x, y, o = {}) {
   const sc = o.scale || 1;
   if (o.shadow !== false) {
     ctx.fillStyle = 'rgba(0,0,0,0.42)';
@@ -54,21 +59,20 @@ export function drawSprite(ctx, name, x, y, o = {}) {
   if (o.rot) ctx.rotate(o.rot);
   ctx.scale(sc * (o.squashX || 1), sc * (o.squashY || 1));
   if (o.alpha !== undefined) ctx.globalAlpha *= o.alpha;
-  ctx.drawImage(im, sx, sy, A.fs, A.fs, -A.ax, -A.ay, A.fs, A.fs);
+  ctx.drawImage(im, sx, sy, fs, fs, -ax, -ay, fs, fs);
   if (o.flash > 0) {
     // Flash blanc limité à la silhouette
     if (!tint) { tint = document.createElement('canvas'); tint.width = tint.height = 192; }
     const tc = tint.getContext('2d');
-    tc.clearRect(0, 0, A.fs, A.fs);
+    tc.clearRect(0, 0, fs, fs);
     tc.globalCompositeOperation = 'source-over';
-    tc.drawImage(im, sx, sy, A.fs, A.fs, 0, 0, A.fs, A.fs);
+    tc.drawImage(im, sx, sy, fs, fs, 0, 0, fs, fs);
     tc.globalCompositeOperation = 'source-atop';
     tc.fillStyle = `rgba(255,245,235,${Math.min(1, o.flash)})`;
-    tc.fillRect(0, 0, A.fs, A.fs);
-    ctx.drawImage(tint, 0, 0, A.fs, A.fs, -A.ax, -A.ay, A.fs, A.fs);
+    tc.fillRect(0, 0, fs, fs);
+    ctx.drawImage(tint, 0, 0, fs, fs, -ax, -ay, fs, fs);
   }
   ctx.restore();
-  return true;
 }
 
 // Frame de marche/course selon une phase continue (cycle sans la frame 0 « debout »)

@@ -5,6 +5,8 @@ import { UI } from './ui/ui.js';
 import { Game } from './game/game.js';
 import { loadSprites } from './game/sprites.js';
 import { loadTiles } from './game/tiles.js';
+import { loadEquip } from './game/equip.js';
+import { loadIcons } from './ui/icons.js';
 
 const canvas = document.getElementById('game');
 input.attach(canvas);
@@ -44,4 +46,4 @@ function frame(now) {
   requestAnimationFrame(frame);
 }
 
-Promise.all([loadSprites(), loadTiles()]).finally(() => { ui.showTitle(); requestAnimationFrame(frame); });
+Promise.all([loadSprites(), loadTiles(), loadEquip(), loadIcons()]).finally(() => { ui.showTitle(); requestAnimationFrame(frame); });

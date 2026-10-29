@@ -5,7 +5,8 @@ import { WEAPONS, FISTS } from '../data/items.js';
 import { rand, clamp, TAU, dist, angleDiff } from '../core/util.js';
 import { sfx } from '../core/audio.js';
 import { drawHero } from './hero.js';
-import { hasSprite, drawSprite, dirFromAngle, walkFrame, animFrames } from './sprites.js';
+import { hasSprite, drawSprite, drawFrame, dirFromAngle, walkFrame, animFrames } from './sprites.js';
+import { hasEquip, lookFor, lookReady, composeLook, LOOK_ANCHOR } from './equip.js';
 
 const ROLL_COST = 22;
 const ATTACK_COST = 6;
@@ -284,7 +285,7 @@ export class Player {
 
   shoot(ang, mult, o = {}) {
     const g = this.game;
-    this.atk = { anim: 'attack', from: 8, to: 12.99, t: 0, dur: o.heavy ? 0.4 : 0.24 };
+    this.atk = { anim: 'attack', from: 8 / 13, to: 0.999, t: 0, dur: o.heavy ? 0.4 : 0.24 }; // fractions de l'animation
     const w = this.weapon();
     const sp = (w.projSpeed || 700) * (o.speed || 1);
     g.spawnProjectile({
@@ -302,7 +303,7 @@ export class Player {
     const g = this.game;
     this.swing = { t: 0, dur: heavy ? 0.22 : 0.15, ang, arc, range, heavy };
     // Animation : on part juste avant l'impact pour que le coup « parte » tout de suite
-    this.atk = { anim: heavy ? 'heavy' : 'attack', from: 1, to: 5.99, t: 0, dur: heavy ? 0.42 : Math.max(0.26, this.weapon().cd * 0.8) };
+    this.atk = { anim: heavy ? 'heavy' : 'attack', from: 1 / 6, to: 0.999, t: 0, dur: heavy ? 0.42 : Math.max(0.26, this.weapon().cd * 0.8) };
     sfx(heavy ? 'heavy' : 'swing');
     const hits = g.meleeFromPlayer(this.x, this.y, ang, range, arc, mult, kb, heavy ? 0.25 : 0);
     if (heavy) { g.fx.shake(hits ? 6 : 2); if (hits) g.hitstop(0.06); }
@@ -432,21 +433,29 @@ export class Player {
   }
 
   // État d'animation du sprite (direction, animation, frame, déformation)
+  // Pièces visibles (recalculées seulement quand l'équipement change)
+  look() {
+    const eq = this.pd.equipment;
+    const sig = this.pd.cls + Object.keys(eq).map((k) => (eq[k] ? eq[k].uid : '-')).join('|');
+    if (sig !== this._lookSig) { this._lookSig = sig; this._look = lookFor(this.pd.cls, eq); }
+    return this._look;
+  }
+
   spriteState(time) {
     const name = this.pd.cls;
     const sp = Math.hypot(this.vx || 0, this.vy || 0);
     let dir = dirFromAngle(this.aim);
     if (this.dead) return { anim: 'hurt', frame: Math.min(5, this.deathT * 9), dir: 0 };
-    if (this.whirl) return { anim: 'attack', frame: 2 + ((this.whirl.t * 14) % 3), dir: Math.floor(this.whirl.t * 12) % 4 };
+    if (this.whirl) return { anim: 'attack', frac: (2 + ((this.whirl.t * 14) % 3)) / 6, dir: Math.floor(this.whirl.t * 12) % 4 };
     if (this.roll) {
       const k = this.roll.t / this.roll.dur;
       dir = dirFromAngle(Math.atan2(this.roll.dy, this.roll.dx));
       return { anim: 'walk', frame: walkFrame(name, 'walk', k * 8), dir, squashY: 1 - 0.18 * Math.sin(k * Math.PI), squashX: 1 + 0.08 * Math.sin(k * Math.PI) };
     }
     if (this.dash) return { anim: 'walk', frame: walkFrame(name, 'walk', this.dash.t * 40), dir };
-    if (this.atk && animFrames(name, this.atk.anim)) {
+    if (this.atk) {
       const a = this.atk;
-      return { anim: a.anim, frame: a.from + (a.to - a.from) * Math.min(1, a.t / a.dur), dir };
+      return { anim: a.anim, frac: a.from + (a.to - a.from) * Math.min(1, a.t / a.dur), dir };
     }
     if (this.channel) return { anim: 'walk', frame: 0, dir: 2, squashY: 1 + 0.015 * Math.sin(time * 3) };
     if (this.moving) {
@@ -470,8 +479,18 @@ export class Player {
       ctx.stroke();
     }
     const name = this.pd.cls;
-    if (hasSprite(name)) {
+    const look = hasEquip() ? this.look() : null;
+    if (look && lookReady(look)) {
+      // Apparence selon l'équipement porté (calques superposés)
       const st = this.spriteState(time);
+      const cnv = composeLook(look, st);
+      const o = { squashX: st.squashX, squashY: st.squashY };
+      const ax = LOOK_ANCHOR.x, ay = LOOK_ANCHOR.y;
+      for (const gh of this.ghosts) drawFrame(ctx, cnv, 0, 0, 192, ax, ay, gh.x, gh.y + this.r * 0.55, { ...o, alpha: (gh.t / 0.22) * 0.3, flash: 0.6, shadow: false });
+      drawFrame(ctx, cnv, 0, 0, 192, ax, ay, this.x, this.y + this.r * 0.55, { ...o, alpha: this.stealth ? 0.3 : blink ? 0.6 : 1, flash: this.flash });
+    } else if (hasSprite(name)) {
+      const st = this.spriteState(time);
+      if (st.frac !== undefined) st.frame = st.frac * (animFrames(name, st.anim) || 6);
       for (const gh of this.ghosts) drawSprite(ctx, name, gh.x, gh.y + this.r * 0.55, { ...st, alpha: (gh.t / 0.22) * 0.3, flash: 0.6, shadow: false });
       drawSprite(ctx, name, this.x, this.y + this.r * 0.55, { ...st, alpha: this.stealth ? 0.3 : blink ? 0.6 : 1, flash: this.flash });
     } else {

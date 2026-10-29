@@ -10,6 +10,12 @@
     "url": "https://opengameart.org/content/lpc-medieval-fantasy-character-sprites"
    },
    {
+    "what": "arms/hands/gloves/male",
+    "authors": "Michael Whitlock (bigbeargames), Matthew Krohn (makrohn), Johannes Sjölund (wulax), bluecarrot16, JaidynReiman",
+    "license": "OGA-BY 3.0, CC-BY-SA 3.0, GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-medieval-fantasy-character-sprites"
+   },
+   {
     "what": "beards/beard/trimmed",
     "authors": "ElizaWy",
     "license": "OGA-BY 3.0",
@@ -100,6 +106,18 @@
     "url": "https://opengameart.org/content/lpc-clothes-and-hair"
    },
    {
+    "what": "feet/boots/rimmed/male",
+    "authors": "JaidynReiman",
+    "license": "OGA-BY 3.0+, CC-BY 3.0+, GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-kimono-relm"
+   },
+   {
+    "what": "feet/shoes/basic/male",
+    "authors": "JaidynReiman, bluecarrot16, Johannes Sjölund (wulax)",
+    "license": "OGA-BY 3.0, CC-BY-SA 3.0, GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-medieval-fantasy-character-sprites"
+   },
+   {
     "what": "hair/bangsshort/adult",
     "authors": "JaidynReiman, Manuel Riecke (MrBeast)",
     "license": "CC-BY-SA 3.0, GPL 3.0",
@@ -124,10 +142,28 @@
     "url": "https://opengameart.org/content/lpc-helmets"
    },
    {
+    "what": "hat/helmet/greathelm/male",
+    "authors": "bluecarrot16",
+    "license": "OGA-BY 3.0, CC-BY 3.0, CC-BY 4.0, GPL 2.0, GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-helmets"
+   },
+   {
     "what": "hat/helmet/horned/adult",
     "authors": "bluecarrot16, Shaun Williams, Matthew Krohn (makrohn), Johannes Sjölund (wulax), Sander Frenken (castelonia)",
     "license": "CC-BY-SA 3.0, GPL 3.0",
     "url": "https://opengameart.org/content/lpc-medieval-fantasy-character-sprites"
+   },
+   {
+    "what": "hat/helmet/mail/adult",
+    "authors": "Napsio (Vitruvian Studio), Johannes Sjölund (wulax), JaidynReiman",
+    "license": "OGA-BY 3.0, CC-BY-SA 3.0, GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-medieval-fantasy-character-sprites"
+   },
+   {
+    "what": "hat/helmet/nasal/adult",
+    "authors": "bluecarrot16",
+    "license": "CC-BY 3.0, CC-BY 4.0, OGA-BY 3.0, GPL 2.0, GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-helmets"
    },
    {
     "what": "head/heads/human/female",
@@ -178,10 +214,28 @@
     "url": "https://opengameart.org/content/lpc-medieval-fantasy-character-sprites"
    },
    {
+    "what": "shield/crusader/bg/walk",
+    "authors": "bluecarrot16, Sander Frenken (castelonia)",
+    "license": "OGA-BY 3.0",
+    "url": "https://opengameart.org/content/lpc-shields"
+   },
+   {
     "what": "shield/kite/male/walk",
     "authors": "DarkwallLKE, Tuomo Untinen (reemax), Michael Whitlock (bigbeargames)",
     "license": "CC-BY-SA 3.0, GPL 2.0, GPL 3.0",
     "url": "https://opengameart.org/content/lpc-kite-shield"
+   },
+   {
+    "what": "shield/round/walk",
+    "authors": "Johannes Sjölund (wulax), Michael Whitlock (bigbeargames), DarkwallLKE, Tuomo Untinen (reemax)",
+    "license": "OGA-BY 3.0, CC-BY-SA 3.0, GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-medieval-fantasy-character-sprites"
+   },
+   {
+    "what": "shield/spartan/bg/walk",
+    "authors": "bluecarrot16, Sander Frenken (castelonia)",
+    "license": "OGA-BY 3.0",
+    "url": "https://opengameart.org/content/lpc-shields"
    },
    {
     "what": "torso/armour/leather/male",
@@ -214,6 +268,18 @@
     "url": "https://opengameart.org/content/lpc-medieval-fantasy-character-sprites"
    },
    {
+    "what": "weapon/blunt/flail/behind/walk",
+    "authors": "Benjamin K. Smith (BenCreating), bluecarrot16, Sander Frenken (castelonia)",
+    "license": "CC-BY-SA 3.0, GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-medieval-weapons"
+   },
+   {
+    "what": "weapon/blunt/mace/walk",
+    "authors": "Johannes Sjölund (wulax), bluecarrot16",
+    "license": "OGA-BY 3.0, CC-BY-SA 3.0",
+    "url": "https://opengameart.org/content/lpc-medieval-fantasy-character-sprites"
+   },
+   {
     "what": "weapon/blunt/waraxe/behind/walk",
     "authors": "Benjamin K. Smith (BenCreating), bluecarrot16, Sander Frenken (castelonia)",
     "license": "CC-BY-SA 3.0, GPL 3.0",
@@ -226,6 +292,12 @@
     "url": "https://opengameart.org/content/lpc-more-weapons"
    },
    {
+    "what": "weapon/ranged/bow/great/universal/background/walk",
+    "authors": "Daniel Eddeland (daneeklu), gr3yh47, Johannes Sjölund (wulax), Pierre Vigier (pvigier)",
+    "license": "CC-BY-SA 3.0",
+    "url": "https://opengameart.org/content/lpc-weapons-two-bows-a-spear-and-a-trident"
+   },
+   {
     "what": "weapon/ranged/bow/normal/universal/background/walk",
     "authors": "Johannes Sjölund (wulax), Pierre Vigier (pvigier)",
     "license": "OGA-BY 3.0+, GPL 3.0, CC-BY 4.0",
@@ -236,6 +308,12 @@
     "authors": "Daniel Eddeland (daneeklu), gr3yh47, Johannes Sjölund (wulax), Pierre Vigier (pvigier)",
     "license": "CC-BY-SA 3.0",
     "url": "https://opengameart.org/content/lpc-weapons-two-bows-a-spear-and-a-trident"
+   },
+   {
+    "what": "weapon/ranged/crossbow/background/walk",
+    "authors": "bluecarrot16, drjamgo@hotmail.com",
+    "license": "CC0",
+    "url": "https://opengameart.org/content/lpc-crossbow-final"
    },
    {
     "what": "weapon/sword/arming/universal/fg/walk",
@@ -289,6 +367,53 @@
     "authors": "bluecarrot16, d'après Lanea Zimmerman (Sharm), Daniel Armstrong (HughSpectrum), Casper Nilsson",
     "license": "CC-BY-SA 3.0 / GPL 3.0",
     "url": "https://opengameart.org/content/lpc-thatched-roof-cottage"
+   }
+  ]
+ },
+ {
+  "title": "Icônes d’objets",
+  "items": [
+   {
+    "what": "Icônes d'objets — Idylwild's Armory (armures, boucliers, bagues, amulettes)",
+    "authors": "Idylwild",
+    "license": "CC0",
+    "url": "https://opengameart.org/content/idylwilds-armory"
+   },
+   {
+    "what": "Icônes d'objets — Idylwild's Arsenal (épées, haches, masses, marteaux, arcs, arbalètes)",
+    "authors": "Idylwild",
+    "license": "CC0",
+    "url": "https://opengameart.org/content/idylwilds-arsenal"
+   },
+   {
+    "what": "Icônes d'objets — Idylwild's Aerial Arsenal (arbalète)",
+    "authors": "Idylwild",
+    "license": "CC0",
+    "url": "https://opengameart.org/content/idylwilds-aerial-arsenal"
+   },
+   {
+    "what": "Icônes d'objets — Idylwild's Inventory (sacoche, parchemins, clé, os)",
+    "authors": "Idylwild",
+    "license": "CC0",
+    "url": "https://opengameart.org/content/idylwilds-inventory"
+   },
+   {
+    "what": "Icônes d'objets — Idylwild's Arcanum (fioles, pierres runiques, gemmes, rouleaux, crâne)",
+    "authors": "Idylwild",
+    "license": "CC0",
+    "url": "https://opengameart.org/content/idylwilds-arcanum"
+   },
+   {
+    "what": "Icônes d'objets — Dungeon Crawl Stone Soup 32x32 tiles (espadons, marteaux, tas d'or, clé, crâne)",
+    "authors": "Dungeon Crawl Stone Soup tile artists (Chris Hamons, mainteneur ; soumis par MedicineStorm) — crawl-tiles / RLTiles",
+    "license": "CC0",
+    "url": "https://opengameart.org/content/dungeon-crawl-32x32-tiles"
+   },
+   {
+    "what": "Icônes d'objets — Dark Fantasy Item Sprites (carquois, bourse, clés, boucliers)",
+    "authors": "ETTiNGRiNDER",
+    "license": "CC0",
+    "url": "https://opengameart.org/content/dark-fantasy-item-sprites"
    }
   ]
  },
