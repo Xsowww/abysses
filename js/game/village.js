@@ -137,6 +137,10 @@ export function buildVillage() {
     { id: 'odile', x: px(36.5), y: px(15) },
     { id: 'aldric', x: px(10.5), y: px(33) },
     { id: 'maelis', x: px(cx + 2.5), y: px(7) },
+    { id: 'anselme', x: px(30), y: px(9.6) },
+    { id: 'gaspard', x: px(41.5), y: px(6.6) },
+    { id: 'mira', x: px(41.5), y: px(18.3) },
+    { id: 'lisette', x: px(32.5), y: px(33) },
   ];
 
   const interactables = [
@@ -152,8 +156,30 @@ export function buildVillage() {
   ];
   for (const b of braziers) if (!b.lamp && !b.camp) map.set(Math.floor(b.x / TILE), Math.floor(b.y / TILE), T.FENCE);
 
+  // Habitants qui vont et viennent (sans quête) : ils donnent vie au village et murmurent des rumeurs.
+  const at = (x, y) => [px(x + 0.5), px(y + 0.5)];
+  const RUMEURS = [
+    'On dit que la cloche a sonné, cette nuit. Treize fois ? Je n’ai pas compté.',
+    'Mon frère est descendu l’an dernier. Il n’est pas remonté. Il paraît que c’est normal.',
+    'Les Sonneurs ? Des voisins. Des gens bien. C’est ça qui fait peur.',
+    'Garde tes trouvailles dans une poche cousue. Le gouffre reprend tout le reste.',
+    'Mira paie cher pour les vieilles armures vertes. Elle dit qu’elles « chantent » ensemble.',
+    'Brann ne parle plus depuis le printemps. Sauf à son enclume.',
+    'L’aubergiste a des contrats. Ça paie mieux que la mine, et on y meurt moins souvent. À peine.',
+    'Le fossoyeur enterre même les os qui remontent tout seuls. Surtout ceux-là.',
+  ];
+  const wanderers = [
+    { sprite: 'villageois', path: [at(6, 21), at(21, 21), at(21, 33), at(8, 33)], speed: 42, barks: RUMEURS },
+    { sprite: 'villageoise', path: [at(41, 21), at(27, 21), at(27, 33), at(42, 33)], speed: 38, barks: RUMEURS },
+    { sprite: 'villageois', path: [at(19, 17), at(28, 17), at(28, 25), at(19, 25)], speed: 34, barks: RUMEURS },
+    { sprite: 'villageoise', path: [at(12, 17), at(17, 18), at(16, 21), at(11, 20)], speed: 30, barks: RUMEURS },
+    { sprite: 'garde', path: [at(24, 10), at(24, 37)], speed: 46, barks: ['Circule.', 'Rien à signaler. Pour l’instant.', 'Si tu entends sonner, préviens le capitaine.', 'On garde le portail. Pas de ce côté-ci : de l’autre.'] },
+    { sprite: 'garde', path: [at(20, 9.5), at(28, 9.5)], speed: 30, barks: ['Le portail ne se ferme jamais vraiment.', 'Reviens vivant. Ça nous fera moins de paperasse.'] },
+  ];
+
   return {
     map,
+    wanderers,
     ground,
     props,
     fences,

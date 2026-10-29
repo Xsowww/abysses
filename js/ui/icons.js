@@ -56,9 +56,11 @@ export async function loadIcons() {
 }
 const hashStr = (str) => { let h = 7; for (const c of str || '') h = (h * 31 + c.charCodeAt(0)) | 0; return Math.abs(h); };
 
+const CONS_ICON = { fer: 'runestone_earth', bronze: 'raw_green_gem', braise: 'crystal_orange', larme: 'diamond', cierge: 'skull_candle', ossement: 'bone' };
 function pixKey(item) {
   const M = PIX.map;
   let cat;
+  if (item.kind === 'consumable' && CONS_ICON[item.id]) return CONS_ICON[item.id];
   if (item.kind === 'consumable') cat = item.id;
   else if (item.kind === 'lore') cat = 'lore';
   else if (item.slot === 'weapon') cat = 'weapon:' + item.base;

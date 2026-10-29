@@ -7,6 +7,7 @@ import { sfx } from '../core/audio.js';
 import { drawHero } from './hero.js';
 import { hasSprite, drawSprite, drawFrame, dirFromAngle, walkFrame, animFrames } from './sprites.js';
 import { hasEquip, lookFor, lookReady, composeLook, LOOK_ANCHOR } from './equip.js';
+import { activeSetStats } from '../data/sets.js';
 
 const ROLL_COST = 22;
 const ATTACK_COST = 6;
@@ -71,9 +72,18 @@ export class Player {
 
   get stealth() { return this.hasBuff('voile'); }
 
+  heal(n) {
+    if (this.dead || n <= 0) return;
+    const before = this.hp;
+    this.hp = Math.min(this.maxHp, this.hp + n);
+    if (this.hp - before >= 1) this.game.fx.text(this.x, this.y - 34, '+' + Math.round(this.hp - before), '#7fbf6a', 12);
+  }
+
   recalc() {
     const pd = this.pd;
-    const s = { hp: 0, hpPct: 0, armor: 0, armorPct: 0, dmgPct: 0, crit: 5, critDmg: 50, atkSpd: 0, moveSpd: 0, stamina: 0, staRegen: 0, lifesteal: 0, cdr: 0, hpRegen: 0, block: 0, thorns: 0, execute: 0, pierce: 0, poison: 0, rollCost: 0 };
+    const s = { hp: 0, hpPct: 0, armor: 0, armorPct: 0, dmgPct: 0, crit: 5, critDmg: 50, atkSpd: 0, moveSpd: 0, stamina: 0, staRegen: 0, lifesteal: 0, cdr: 0, hpRegen: 0, block: 0, thorns: 0, execute: 0, pierce: 0, poison: 0, rollCost: 0, killHeal: 0, rollHeal: 0, eliteDmg: 0, goldFind: 0 };
+    // Bonus d'ensembles (palier le plus haut atteint)
+    for (const [k, v] of Object.entries(activeSetStats(pd.equipment))) s[k] = (s[k] || 0) + v;
     for (const slot in pd.equipment) {
       const it = pd.equipment[slot];
       if (!it) continue;
@@ -131,6 +141,7 @@ export class Player {
     const m = this.mods();
     let d = w.dmg * mult * (1 + (this.stats.dmgPct + m.dmgPct) / 100) * rand(0.9, 1.1);
     if (target && target.hp / target.maxHp < 0.3 && this.stats.execute) d *= 1 + this.stats.execute / 100;
+    if (target && (target.elite || target.boss) && this.stats.eliteDmg) d *= 1 + this.stats.eliteDmg / 100;
     const crit = Math.random() * 100 < Math.max(this.stats.crit, m.crit);
     if (crit) d *= 1 + this.stats.critDmg / 100;
     return { amount: Math.max(1, Math.round(d)), crit };
@@ -248,6 +259,7 @@ export class Player {
       if (this.channel) g.cancelChannel('Roulade');
       sfx('roll');
       g.fx.burst(this.x, this.y + 6, '#4a443c', 6, 60, 0.4, 4);
+      if (this.stats.rollHeal && g.scene.type === 'dungeon') this.heal(this.maxHp * this.stats.rollHeal / 100);
       return;
     }
 

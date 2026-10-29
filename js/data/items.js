@@ -1,5 +1,6 @@
 // Objets : emplacements, raretés, armes (par classe), affixes, textes d'ambiance et génération.
 import { rand, randInt, pick, uid, weightedPick, clamp, hash2 } from '../core/util.js';
+import { SETS } from './sets.js';
 
 export const SLOTS = {
   head: { label: 'Casque' },
@@ -22,6 +23,7 @@ export const RARITIES = [
   { id: 2, name: 'Rare', color: '#6a92c9', affixes: 2, mult: 1.25, value: 6 },
   { id: 3, name: 'Épique', color: '#a57bc7', affixes: 3, mult: 1.4, value: 15 },
   { id: 4, name: 'Légendaire', color: '#d4893a', affixes: 4, mult: 1.6, value: 40 },
+  { id: 5, name: 'Ensemble', color: '#5fb39b', affixes: 1, mult: 0.8, value: 10 },
 ];
 
 // ranged : l'arme tire des projectiles (portée = distance max du projectile).
@@ -103,7 +105,35 @@ export const CONSUMABLES = {
     name: 'Pierre de retour', desc: "Incantation de 5 s, puis retour au village avec votre butin. Interrompue si vous êtes touché.", stack: 5, price: 60, rarity: 2, color: '#79b8c4',
     lore: 'Un galet froid qui se souvient du village. Il murmure le chemin à qui sait écouter.',
   },
+  // ---- Matériaux de forge (Brann renforce l'équipement avec) : perdus à la mort, sauf dans la poche ----
+  fer: {
+    name: 'Fer de Valdrenne', desc: 'Matériau de forge. Brann s’en sert pour renforcer armes et armures (+1, +2).', stack: 50, price: 12, rarity: 0, color: '#a9b0b6', material: true,
+    lore: 'Du fer de la vieille ville, noirci mais sain. Il ne rouille pas. Personne ne sait pourquoi.', icon: 'runestone_earth',
+  },
+  bronze: {
+    name: 'Éclat de bronze noir', desc: 'Matériau de forge rare (profondeur 2 et plus). Nécessaire à partir de +2.', stack: 30, price: 40, rarity: 2, color: '#6fae9a', material: true, minDepth: 2,
+    lore: 'Un éclat de la Noire elle-même ? Il vibre doucement quand on le serre.', icon: 'raw_green_gem',
+  },
+  braise: {
+    name: 'Braise figée', desc: 'Matériau de forge très rare (profondeur 3 et plus). Nécessaire à partir de +3.', stack: 20, price: 90, rarity: 3, color: '#e0894a', material: true, minDepth: 3,
+    lore: 'Une braise qui ne s’éteint pas, prise dans une gangue de verre. Elle a été un feu de fonderie.', icon: 'crystal_orange',
+  },
+  larme: {
+    name: 'Larme de cloche', desc: 'Matériau légendaire (profondeur 4 et plus, Gardiens). Nécessaire pour +4 et +5.', stack: 10, price: 220, rarity: 4, color: '#b9c8e8', material: true, minDepth: 4,
+    lore: 'Une goutte de bronze pur, tombée de la Noire le jour du treizième coup.', icon: 'diamond',
+  },
+  // ---- Reliques de quête : à rapporter au village (une relique perdue en bas est perdue) ----
+  cierge: {
+    name: 'Cierge des morts', desc: 'Relique de quête. Frère Anselme les recueille pour sa chapelle.', stack: 10, price: 0, rarity: 2, color: '#d8c79a', relic: true,
+    lore: 'Un cierge de suif noir, éteint depuis trois siècles. Il se rallume parfois tout seul.', icon: 'skull_candle',
+  },
+  ossement: {
+    name: 'Ossements nommés', desc: 'Relique de quête. Gaspard le fossoyeur veut leur offrir une tombe.', stack: 10, price: 0, rarity: 1, color: '#d6cebd', relic: true,
+    lore: 'Des os liés d’un ruban, avec une plaque de cuivre : un nom, une date. Quelqu’un les a pleurés.', icon: 'bone',
+  },
 };
+export const MATERIAL_IDS = ['fer', 'bronze', 'braise', 'larme'];
+export const RELICS = ['cierge', 'ossement'];
 
 // Textes d'ambiance (choisis selon l'objet, toujours le même pour un objet donné).
 const LORE = {
@@ -309,4 +339,23 @@ export function starterKit(cls) {
   chest.name = 'Gambison usé';
   chest.armor = 4;
   return { weapon: sword, offhand: shield, chest, pocket };
+}
+
+// Pièce d'ensemble : statistiques modestes (rareté « Ensemble »), mais bonus puissants une fois réunie.
+export function generateSetItem(setId, slot = null, ilvl = 1) {
+  const S = SETS[setId];
+  const slots = Object.keys(S.pieces);
+  if (!slot || !S.pieces[slot]) slot = pick(slots);
+  const R = RARITIES[5];
+  const item = { uid: uid(), kind: 'equip', slot, rarity: 5, ilvl: Math.max(1, Math.round(ilvl)), affixes: [], set: setId };
+  const B = ARMOR_BASES[slot];
+  if (B && B.armor) item.armor = Math.max(1, Math.round((B.armor[0] + item.ilvl * B.armor[1]) * R.mult * rand(0.9, 1.05)));
+  const pool = [...SLOT_AFFIXES[slot]];
+  const k = pool[Math.floor(Math.random() * pool.length)];
+  let v = AFFIXES[k].roll(item.ilvl);
+  v = typeof v === 'number' && !Number.isInteger(v) ? +(v * R.mult).toFixed(1) : Math.max(1, Math.round(v * R.mult));
+  item.affixes.push({ k, v });
+  item.name = `${S.pieces[slot]} · ${S.name}`;
+  item.value = Math.round((6 + item.ilvl * 2.5) * R.value);
+  return item;
 }

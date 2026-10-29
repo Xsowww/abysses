@@ -98,6 +98,22 @@ export const NPC_TALK = {
     { when: () => true, lines: ['Ici, tout se vend. Les vivants achètent, les morts fournissent. Le commerce n’a jamais été aussi florissant.', 'Un conseil gratuit, et c’est rare : ce que tu ne mets pas dans ta poche sécurisée, considère-le comme déjà perdu.'] },
     { when: (pd) => pd.maxDepth >= 3, lines: ['Tu descends drôlement bas, pour quelqu’un qui ne se souvient même pas de son chemin.', 'Rapporte-moi des choses brillantes. Et rapporte-toi, surtout. Les clients morts paient mal.'] },
   ],
+  anselme: [
+    { when: () => true, lines: ['Je ne suis pas d’ici. Personne ne l’est vraiment. On arrive, on reste, on oublie d’où l’on vient.', 'Les cierges que tu rapportes, je les allume pour les morts d’en bas. Ils n’ont pas eu de funérailles. Ils auront au moins de la lumière.'] },
+    { when: (pd) => done(pd, 'q_acolytes'), lines: ['Les Sonneurs venaient prier ici, avant. Je leur ai donné la communion. Je les ai mariés, certains.', 'Je ne sais plus pour qui je prie, maintenant. Pour eux, je crois. Surtout pour eux.'] },
+  ],
+  gaspard: [
+    { when: () => true, lines: ['Il y a deux sortes d’os : ceux qui portent un nom, et ceux qui remontent. Les premiers, je les enterre.', 'Les seconds aussi. Mais plus profond. Avec une pierre dessus.'] },
+    { when: (pd) => pd.maxDepth >= 3, lines: ['Tu sens la terre du dessous. Elle est froide, hein ? Elle ne l’était pas, quand j’étais petit.', 'Elle se refroidit à chaque coup de cloche. Je le sais parce que je creuse.'] },
+  ],
+  mira: [
+    { when: () => true, lines: ['Les ensembles de Valdrenne étaient forgés pour aller ensemble. Les pièces se « reconnaissent », comme on dit.', 'Deux pièces, ça aide. Trois, ça change tout. Une tenue complète… je n’en ai vu qu’une seule fois.', 'Alors ne vends jamais une pièce verte. Range-la. Un jour, elle te manquera.'] },
+    { when: (pd) => done(pd, 'mi_trois'), lines: ['Tu as entendu ? Quand on porte trois pièces, elles chantent. Doucement. Comme une cloche très loin.', '… Peut-être que je ne devrais pas trouver ça beau.'] },
+  ],
+  lisette: [
+    { when: () => true, lines: ['Ici, on boit pour oublier ce qu’on a vu en bas. Toi, tu ne te souviens déjà de rien. C’est pratique.', 'Les contrats changent chaque fois que quelqu’un en honore un. Reviens souvent.'] },
+    { when: (pd) => (pd.stats.contracts || 0) >= 5, lines: ['Cinq contrats. On commence à t’appeler « le Revenant », dans la salle.', 'Je ne sais pas si c’est un compliment. Ici, ça l’est sûrement.'] },
+  ],
 };
 
 export function npcTalk(npc, pd) {

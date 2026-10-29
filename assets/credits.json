@@ -292,6 +292,12 @@
     "url": "https://opengameart.org/content/lpc-more-weapons"
    },
    {
+    "what": "weapon/polearm/spear/foreground/walk",
+    "authors": "Pierre Vigier (pvigier), Johannes Sjölund (wulax), Inboxninja",
+    "license": "CC-BY-SA 3.0",
+    "url": "https://opengameart.org/content/lpc-medieval-fantasy-character-sprites"
+   },
+   {
     "what": "weapon/ranged/bow/great/universal/background/walk",
     "authors": "Daniel Eddeland (daneeklu), gr3yh47, Johannes Sjölund (wulax), Pierre Vigier (pvigier)",
     "license": "CC-BY-SA 3.0",

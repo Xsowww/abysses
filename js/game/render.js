@@ -2,7 +2,7 @@
 import { TILE, T } from './world.js';
 import { hash2, TAU, clamp, dist } from '../core/util.js';
 import { itemColor, itemName } from '../data/items.js';
-import { hasSprite, drawSprite, dirFromAngle } from './sprites.js';
+import { hasSprite, drawSprite, dirFromAngle, walkFrame } from './sprites.js';
 import { hasTiles, drawT, drawProp, tileMeta } from './tiles.js';
 
 const LIGHT_SCALE = 0.5;
@@ -468,6 +468,7 @@ export class Renderer {
     for (const e of s.enemies) if ((!e.dead || e.deadT > 0) && inView(e.x, e.y)) ents.push(e);
     ents.push(game.player);
     for (const pe of s.propEnts || []) if (inView(pe.x, pe.y, 120)) ents.push(pe);
+    for (const w of s.wanderers || []) if (inView(w.x, w.y)) ents.push(w.ent || (w.ent = { get x() { return w.x; }, get y() { return w.y; }, draw: (c, t) => drawSprite(c, w.sprite, w.x, w.y + 7, { anim: 'walk', frame: w.moving ? walkFrame(w.sprite, 'walk', w.walkT) : 0, dir: w.dir }) }));
     ents.sort((a, b) => a.y - b.y);
     for (const e of ents) e.draw(ctx, time);
 
@@ -556,8 +557,30 @@ export class Renderer {
     }
     // Inscriptions au sol (lisibles même dans le noir)
     for (const o of s.interactables) if (o.type === 'inscription' && inView(o.x, o.y)) this.drawInscription(ctx, o, time);
+    // Murmures des villageois
+    ctx.font = "12px 'Pixelify Sans', sans-serif";
+    for (const w of s.wanderers || []) {
+      if (!w.bark || w.barkT <= 0 || !inView(w.x, w.y)) continue;
+      ctx.globalAlpha = Math.min(1, w.barkT);
+      const lines = this.wrap(ctx, w.bark, 200);
+      const bw = Math.max(...lines.map((l) => ctx.measureText(l).width)) + 14, bh = lines.length * 14 + 8;
+      const bx = w.x - bw / 2, by = w.y - 56 - bh;
+      ctx.fillStyle = 'rgba(12,10,9,0.85)'; ctx.fillRect(bx, by, bw, bh);
+      ctx.strokeStyle = '#4d463e'; ctx.lineWidth = 1; ctx.strokeRect(bx + 0.5, by + 0.5, bw - 1, bh - 1);
+      ctx.fillStyle = '#d6cebd';
+      lines.forEach((l, i) => ctx.fillText(l, w.x, by + 11 + i * 14));
+      ctx.globalAlpha = 1;
+    }
     fx.drawTexts(ctx);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+  }
+
+  wrap(ctx, text, maxW) {
+    const words = text.split(' '), lines = [];
+    let cur = '';
+    for (const w of words) { const t = cur ? cur + ' ' + w : w; if (ctx.measureText(t).width > maxW && cur) { lines.push(cur); cur = w; } else cur = t; }
+    if (cur) lines.push(cur);
+    return lines;
   }
 
   questMark(game, npcId) {

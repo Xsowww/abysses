@@ -1,5 +1,8 @@
 // Quêtes et PNJ du village — Acte I : « La Cloche Noire ».
-// obj.type : kill (target = id monstre), boss (depth min), elite, extract, depth, lore (id d'un fragment)
+// obj.type : kill (target = id monstre), boss (depth min), elite, extract, depth, lore (id d'un fragment),
+//   bring (rapporter des reliques/matériaux au village : id, count, minDepth), lorecount (fragments trouvés),
+//   setpieces (porter N pièces d'un même ensemble), upgrade (renforcer un objet jusqu'à +N chez Brann)
+// Les objectifs « profondeur », « Gardien », « fragment » déjà accomplis sont validés dès l'acceptation.
 // intro / outro : répliques jouées à l'acceptation et au rendu de la quête.
 
 export const NPCS = {
@@ -22,6 +25,34 @@ export const NPCS = {
     greet: [
       'Fioles, pierres de retour, poches bien cousues… tout ce qu’il faut pour revenir vivant.',
       'Je rachète ce que tu trouves en bas. Sans poser de questions. Surtout sans poser de questions.',
+    ],
+  },
+  anselme: {
+    name: 'Frère Anselme', title: 'Chapelain', color: '#4a3a2a', hood: '#3a2a1c',
+    greet: [
+      'Les morts d’en bas n’ont pas eu de prière. Je leur en dois une chacun. Ça fait beaucoup de prières.',
+      'Assieds-toi un instant. Même ceux qui descendent ont le droit de se reposer.',
+    ],
+  },
+  gaspard: {
+    name: 'Gaspard', title: 'Fossoyeur', color: '#2a2a2c', hood: '#1d1d20',
+    greet: [
+      'Je creuse. C’est tout ce que je sais faire. Et en ce moment, le travail ne manque pas.',
+      'Les os qui remontent, je les enterre. Ceux qui remontent tout seuls… je les enterre plus profond.',
+    ],
+  },
+  mira: {
+    name: 'Mira', title: 'Antiquaire', color: '#4a1d1d', hood: '#1a1414',
+    greet: [
+      'Les armures de Valdrenne étaient faites pour être portées ensemble. Une pièce seule ne vaut rien. Toutes ensemble… ah.',
+      'Rapporte-moi ce que tu trouves en bas. Même ce qui te semble inutile. Surtout ce qui te semble inutile.',
+    ],
+  },
+  lisette: {
+    name: 'Lisette', title: 'Aubergiste', color: '#2a3a5a', hood: '#d8d0c0', contracts: true,
+    greet: [
+      'Une chope ? Non ? Alors un contrat. Les gens du village paient bien ceux qui reviennent.',
+      'Le tableau des primes est là. Prends ce que tu veux, mais reviens le chercher en personne.',
     ],
   },
   maelis: {
@@ -143,7 +174,19 @@ export const QUESTS = [
     reward: { xp: 2200, gold: 450, item: { minRarity: 3 } },
   },
   {
-    id: 'q_boss5', giver: 'maelis', main: true, name: 'Le Roi sans cloche', req: 'q_boss3',
+    id: 'm_varn', giver: 'aldric', main: true, name: 'Le Bourreau muet', req: 'q_boss3',
+    desc: 'À la profondeur 4, Varn, le bourreau de Valdrenne, garde le chemin du trône. L’abattre.',
+    intro: [
+      'Maëlis t’envoie vers le roi ? Pas encore. Il y a quelqu’un entre lui et nous.',
+      'Varn. Le bourreau. Il n’a jamais dit un mot, de son vivant. Il ne parlera pas davantage maintenant.',
+      'Ne reste pas devant lui quand il lève la hache. Personne n’est resté devant lui deux fois.',
+    ],
+    outro: ['Varn est tombé… Alors le chemin du trône est ouvert.', 'Va voir Maëlis. Et promets-moi de remonter, cette fois encore.'],
+    obj: { type: 'boss', depth: 4, count: 1 },
+    reward: { xp: 3200, gold: 700, item: { minRarity: 3 } },
+  },
+  {
+    id: 'q_boss5', giver: 'maelis', main: true, name: 'Le Roi sans cloche', req: 'm_varn',
     desc: 'Tout au fond, à la profondeur 5, le dernier roi de Valdrenne attend sur son trône. L’affronter.',
     intro: [
       'Le roi Aldaric III. C’est lui qui a fait couler la Noire. C’est lui qui l’a fait briser.',
@@ -211,6 +254,114 @@ export const QUESTS = [
     obj: { type: 'lore', id: 'l_tomas', count: 1 },
     reward: { xp: 600, gold: 100, item: { minRarity: 3, slot: 'weapon' } },
   },
+  // ---------------- Frère Anselme (chapelle) ----------------
+  {
+    id: 'a_cierges', giver: 'anselme', name: 'Lumière pour les morts', req: 'm_arrivee',
+    desc: 'Rapporter 3 Cierges des morts trouvés dans la Crypte. Une relique laissée dans le sac est perdue si vous mourez : utilisez la poche sécurisée.',
+    intro: [
+      'Là-dessous, chaque tombe avait son cierge. Ils sont éteints depuis trois siècles.',
+      'Rapporte-m’en trois. Je les rallumerai ici, pour ceux qui n’ont personne.',
+      'Garde-les dans ta poche cousue. Ce qui reste dans ton sac, les Abysses le reprennent.',
+    ],
+    outro: ['Trois flammes de plus. Elles brûleront longtemps.', 'Tiens. Ce n’est pas grand-chose, mais ça soigne.'],
+    obj: { type: 'bring', id: 'cierge', count: 3, minDepth: 1 },
+    reward: { xp: 220, gold: 60, consumable: { id: 'potion', qty: 3 } },
+  },
+  {
+    id: 'a_sonneurs', giver: 'anselme', name: 'Les cierges des Sonneurs', req: 'q_acolytes',
+    desc: 'Les Sonneurs allument des cierges pour la Noire. En rapporter 5, trouvés à la profondeur 2 ou plus.',
+    intro: ['Les Sonneurs prient avec nos cierges. Ils les volent aux morts.', 'Reprends-les. Cinq. Je connais quelqu’un qui en a gardé la robe… elle te reviendra.'],
+    outro: ['Cinq. Bien. La robe est à toi. Porte-la avec les autres pièces, si tu les trouves : seules, elles ne valent rien.'],
+    obj: { type: 'bring', id: 'cierge', count: 5, minDepth: 2 },
+    reward: { xp: 900, gold: 150, set: 'sonneurs' },
+  },
+  {
+    id: 'a_lore', giver: 'anselme', name: 'Ce que disent les pierres', req: 'q_boss1',
+    desc: 'Retrouver 6 fragments de l’histoire de Valdrenne (pages, lettres, gravures) dans les Abysses.',
+    intro: ['On n’enterre pas une ville. On s’en souvient, ou on l’oublie.', 'Rapporte-moi ce qu’ils ont écrit. Six fragments. Je les recopierai.'],
+    outro: ['Six voix de plus qui ne seront pas oubliées.', 'Tu as remarqué ? Ils parlent tous de la même cloche.'],
+    obj: { type: 'lorecount', count: 6 },
+    reward: { xp: 1400, gold: 250, item: { minRarity: 3 } },
+  },
+  // ---------------- Gaspard (fossoyeur) ----------------
+  {
+    id: 'g_os', giver: 'gaspard', name: 'Une tombe pour chacun', req: 'm_arrivee',
+    desc: 'Rapporter 4 Ossements nommés, pour que Gaspard les enterre.',
+    intro: ['Certains os portent encore un nom, gravé sur une plaque. Ceux-là, je veux les enterrer dignement.', 'Quatre. Rapporte-m’en quatre. Et ne les laisse pas traîner dans ton sac si tu tiens à les ramener.'],
+    outro: ['Quatre noms. Quatre tombes. Je les creuserai cette nuit.', 'Prends ça. Du fer de la vieille ville, trouvé en creusant. Brann en fera quelque chose.'],
+    obj: { type: 'bring', id: 'ossement', count: 4, minDepth: 1 },
+    reward: { xp: 260, gold: 90, consumable: { id: 'fer', qty: 12 } },
+  },
+  {
+    id: 'g_squelettes', giver: 'gaspard', name: 'Ceux qui ne restent pas couchés', req: 'q_os',
+    desc: 'Abattre 40 squelettes (guerriers ou archers). Gaspard a gardé quelque chose de la Garde des Cloches.',
+    intro: ['Les squelettes, eux, ne veulent pas de tombe. Ils veulent remonter.', 'Quarante. Et je te donnerai ce que j’ai déterré l’hiver dernier : une pièce d’armure de la Garde des Cloches.'],
+    outro: ['Quarante… Tu sens le vieil os à des lieues. Tiens, voilà la pièce promise.', 'Seule, elle ne vaut pas grand-chose. Mais la Garde ne se battait jamais seule.'],
+    obj: { type: 'kill', target: 'squelette', also: 'archer', count: 40 },
+    reward: { xp: 800, gold: 160, set: 'garde' },
+  },
+  {
+    id: 'g_haldis', giver: 'gaspard', name: 'Les sœurs de la Porte', req: 'm_haldis',
+    desc: 'Rapporter 6 Ossements nommés trouvés à la profondeur 3 ou plus : les gardes d’Haldis.',
+    intro: ['Haldis avait des gardes. Des femmes, toutes. Leurs noms sont gravés sur les plaques.', 'Six. Plus bas que la deuxième profondeur. Je leur dois bien ça.'],
+    outro: ['Elles reposeront côte à côte. Comme à la Porte.', 'Haldis portait ceci. Elle voudrait que quelqu’un continue de veiller.'],
+    obj: { type: 'bring', id: 'ossement', count: 6, minDepth: 3 },
+    reward: { xp: 1800, gold: 300, set: 'haldis' },
+  },
+  // ---------------- Mira (antiquaire) ----------------
+  {
+    id: 'mi_paire', giver: 'mira', name: 'Les pièces vont par paires', req: 'q_boss1',
+    desc: 'Porter en même temps 2 pièces d’un même ensemble (couleur verte). Les ensembles se trouvent sur les élites, les Gardiens et dans les coffres.',
+    intro: [
+      'Tu vois ce vert sur certaines pièces ? Ce sont des tenues entières de Valdrenne, éparpillées.',
+      'Une pièce seule est médiocre. Deux pièces du même ensemble… elles se reconnaissent. Trois, elles chantent. Toutes, elles font de toi autre chose.',
+      'Porte-en deux en même temps, et reviens me voir.',
+    ],
+    outro: ['Tu sens la différence ? Moi, je la vois.', 'Continue. Et quand tu trouves une pièce qui ne te sert à rien aujourd’hui, mets-la dans ta poche. Demain, elle complétera tout.'],
+    obj: { type: 'setpieces', count: 2 },
+    reward: { xp: 700, gold: 200, consumable: { id: 'bronze', qty: 3 } },
+  },
+  {
+    id: 'mi_trois', giver: 'mira', name: 'Trois voix', req: 'mi_paire',
+    desc: 'Porter 3 pièces d’un même ensemble.',
+    intro: ['Trois pièces. C’est là que les ensembles commencent vraiment à parler.', 'Rapporte-les de là-dessous, sécurise-les, assemble-les. Puis viens.'],
+    outro: ['Ah… Elle chante, n’est-ce pas ? Tiens. Une larme de cloche. Brann saura quoi en faire.'],
+    obj: { type: 'setpieces', count: 3 },
+    reward: { xp: 2000, gold: 400, consumable: { id: 'larme', qty: 1 } },
+  },
+  {
+    id: 'mi_complet', giver: 'mira', name: 'La tenue complète', req: 'mi_trois',
+    desc: 'Porter un ensemble complet (4 ou 5 pièces selon l’ensemble).',
+    intro: ['Une tenue complète. Je n’en ai vu qu’une, une fois, sur un mort qui souriait encore.', 'Fais-le. Pour moi. Pour qu’au moins une fois, Valdrenne soit entière.'],
+    outro: ['…', 'Tu ressembles à un portrait que j’ai vu, enfant. Garde-la. Ne la perds jamais.'],
+    obj: { type: 'setpieces', count: 99, full: true },
+    reward: { xp: 5000, gold: 1000, consumable: { id: 'larme', qty: 2 } },
+  },
+  // ---------------- Brann (forge) ----------------
+  {
+    id: 'b_fer', giver: 'brann', name: 'Le fer de Valdrenne', req: 'm_arrivee',
+    desc: 'Rapporter 10 Fers de Valdrenne. Brann pourra alors renforcer votre équipement.',
+    intro: ['Le fer de là-dessous ne rouille pas. Je veux comprendre pourquoi.', 'Rapporte-m’en dix. En échange, je t’apprends ce que la forge peut faire pour toi : renforcer ce que tu portes, +1, +2, et plus si tu as de quoi.'],
+    outro: ['Bon métal. Très bon métal.', 'À partir de maintenant, apporte-moi ce que tu veux renforcer. Il me faudra du fer, de l’or… et plus tard, des choses plus rares.'],
+    obj: { type: 'bring', id: 'fer', count: 10, minDepth: 1 },
+    reward: { xp: 300, gold: 50 },
+  },
+  {
+    id: 'b_renfort', giver: 'brann', name: 'Trempé deux fois', req: 'b_fer',
+    desc: 'Faire renforcer un objet jusqu’à +2 à la forge.',
+    intro: ['Une lame qui a été trempée deux fois ne casse pas. Fais renforcer quelque chose jusqu’à +2.'],
+    outro: ['Tu sens le poids ? C’est celui du travail bien fait.', 'Tiens. Du bronze noir. Pour la suite.'],
+    obj: { type: 'upgrade', level: 2 },
+    reward: { xp: 500, gold: 80, consumable: { id: 'bronze', qty: 4 } },
+  },
 ];
 
 export const QUEST_BY_ID = Object.fromEntries(QUESTS.map((q) => [q.id, q]));
+
+// Quêtes connues (fixes + contrats de l'auberge, générés et stockés dans la sauvegarde).
+export function questDef(pd, id) {
+  return QUEST_BY_ID[id] || (pd && pd.contracts || []).find((c) => c.id === id) || null;
+}
+export function allQuests(pd) {
+  return [...QUESTS, ...((pd && pd.contracts) || [])];
+}

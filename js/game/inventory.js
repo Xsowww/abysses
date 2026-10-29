@@ -205,3 +205,32 @@ export function sortInventory(pd) {
 }
 
 export function describe(item) { return itemName(item); }
+
+// ---- Matériaux / reliques : comptés partout (sac, poche, coffre), utilisés d'abord depuis le coffre ----
+export function countAll(pd, id) {
+  let n = 0;
+  for (const arr of [pd.stash, pd.inventory, pd.pocket]) for (const it of arr || []) if (it && it.kind === 'consumable' && it.id === id) n += it.qty;
+  return n;
+}
+
+export function takeAll(pd, id, count) {
+  let left = count;
+  for (const arr of [pd.stash, pd.inventory, pd.pocket]) {
+    for (let i = 0; i < (arr || []).length && left > 0; i++) {
+      const it = arr[i];
+      if (!it || it.kind !== 'consumable' || it.id !== id) continue;
+      const k = Math.min(left, it.qty);
+      it.qty -= k; left -= k;
+      if (it.qty <= 0) arr[i] = null;
+    }
+  }
+  return left === 0;
+}
+
+// Tous les objets d'équipement possédés (porté, sac, poche, coffre).
+export function allItems(pd) {
+  const out = [];
+  for (const k in pd.equipment) if (pd.equipment[k]) out.push(pd.equipment[k]);
+  for (const arr of [pd.inventory, pd.pocket, pd.stash]) for (const it of arr || []) if (it && it.kind === 'equip') out.push(it);
+  return out;
+}

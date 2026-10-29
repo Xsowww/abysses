@@ -14,8 +14,11 @@ import { Renderer } from './render.js';
 import * as Inv from './inventory.js';
 import { CLASSES, SKILLS, SPEC_LEVEL, xpForLevel } from '../data/classes.js';
 import { ENEMIES, enemyLevel } from '../data/enemies.js';
-import { generateItem, makeConsumable, starterKit, itemClass, itemName, itemColor, RARITIES, CONSUMABLES, POCKETS, buyPrice, sellValue } from '../data/items.js';
-import { QUESTS, QUEST_BY_ID, NPCS } from '../data/quests.js';
+import { generateItem, generateSetItem, makeConsumable, starterKit, itemClass, itemName, itemColor, RARITIES, CONSUMABLES, POCKETS, buyPrice, sellValue } from '../data/items.js';
+import { QUESTS, NPCS, questDef, allQuests } from '../data/quests.js';
+import { dirFromAngle } from './sprites.js';
+import { SETS, setsForDepth, equippedSetCounts } from '../data/sets.js';
+import { refillContracts } from '../data/contracts.js';
 import { LORE, LORE_BY_ID, guardianFor, EPILOGUE_ACT1 } from '../data/story.js';
 
 export const DUNGEON_NAME = 'La Crypte Oubliée';
@@ -115,6 +118,7 @@ export class Game {
     s.houses = v.houses;
     s.braziers = v.braziers;
     s.ground = v.ground;
+    s.wanderers = (v.wanderers || []).map((w, i) => ({ ...w, x: w.path[0][0], y: w.path[0][1], i: 1, wait: i * 0.7, walkT: 0, dir: 2, moving: false, barkCd: 2 + i, bark: null, barkT: 0 }));
     s.props = v.props;
     s.fences = v.fences;
     s.flowers = v.flowers;
@@ -135,6 +139,8 @@ export class Game {
     this.renderer.buildCache(s);
     this.snapCamera();
     if (this.pd.shopDirty || !this.pd.shop) this.refreshShop();
+    refillContracts(this.pd);
+    this.syncQuests();
     this.ui.onSceneChange();
     this.ui.areaTitle('Cendrebourg', 'Dernier refuge avant l’Abîme');
     playMusic('village');
@@ -148,6 +154,7 @@ export class Game {
     const d = generateDungeon(depth);
     const s = this.baseScene('dungeon');
     s.depth = depth;
+    this.pd.deepest = Math.max(this.pd.deepest || 1, depth);
     s.map = d.map;
     s.torches = d.torches;
     s.decor = d.decor;
@@ -298,6 +305,32 @@ export class Game {
     if (s.type === 'village') {
       this.saveTimer -= dt;
       if (this.saveTimer <= 0) { this.saveTimer = 15; this.save(); }
+      this.updateWanderers(dt);
+    }
+  }
+
+  // Villageois qui marchent d'un point à l'autre et murmurent quand on passe près d'eux.
+  updateWanderers(dt) {
+    const p = this.player;
+    for (const w of this.scene.wanderers || []) {
+      w.barkCd -= dt;
+      if (w.barkT > 0) w.barkT -= dt;
+      const near = dist(w.x, w.y, p.x, p.y) < 70;
+      if (near) {
+        w.dir = dirFromAngle(Math.atan2(p.y - w.y, p.x - w.x));
+        w.moving = false;
+        if (w.barkCd <= 0) { w.bark = pick(w.barks); w.barkT = 4; w.barkCd = 9 + Math.random() * 6; }
+        continue;
+      }
+      if (w.wait > 0) { w.wait -= dt; w.moving = false; continue; }
+      const [tx, ty] = w.path[w.i];
+      const dx = tx - w.x, dy = ty - w.y, d = Math.hypot(dx, dy);
+      if (d < 3) { w.i = (w.i + 1) % w.path.length; w.wait = 0.8 + Math.random() * 2.5; w.moving = false; continue; }
+      const st = Math.min(d, w.speed * dt);
+      w.x += (dx / d) * st; w.y += (dy / d) * st;
+      w.dir = dirFromAngle(Math.atan2(dy, dx));
+      w.moving = true;
+      w.walkT += dt * w.speed * 0.2;
     }
   }
 
@@ -535,6 +568,8 @@ export class Game {
     this.fx.burst(e.x, e.y, '#4a4440', 8, 60, 0.9, 6, { drag: 2, grav: -20 });
     sfx(e.boss ? 'bossRoar' : e.type === 'rat' ? 'ratDie' : e.type === 'acolyte' ? 'enemyDie' : 'bones', { x: e.x, y: e.y });
     this.addXp(e.xp, e.x, e.y);
+    const pl = this.player;
+    if (pl.stats.killHeal && !pl.dead) pl.heal(pl.maxHp * pl.stats.killHeal / 100);
     this.pd.stats.kills++;
     if (s.runStats) s.runStats.kills++;
     this.questEvent('kill', { type: e.type, elite: e.elite });
@@ -543,7 +578,7 @@ export class Game {
     const D = e.def;
     const il = s.level + randInt(0, 2);
     // Or
-    const goldN = chance(0.55) ? Math.round(randInt(D.gold[0], D.gold[1]) * 0.7 * (1 + (s.depth - 1) * 0.45) * (e.elite ? 3 : 1)) : 0;
+    const goldN = chance(0.55) ? Math.round(randInt(D.gold[0], D.gold[1]) * 0.7 * (1 + (s.depth - 1) * 0.45) * (e.elite ? 3 : 1) * (1 + (pl.stats.goldFind || 0) / 100)) : 0;
     if (goldN > 0) this.dropGold(e.x, e.y, goldN);
     if (e.summoned) return;
     if (e.boss) { this.onBossKilled(e); return; }
@@ -553,6 +588,33 @@ export class Game {
     if (e.elite && chance(0.12)) this.dropItem(e.x, e.y, this.loot({ ilvl: il, rarityBonus: 1 }));
     if (e.elite && chance(0.12)) this.dropLore(e.x, e.y);
     if (chance(e.elite ? 0.2 : 0.025)) this.dropItem(e.x, e.y, makeConsumable('potion', 1));
+    this.dropExtras(e.x, e.y, e.elite ? 'elite' : 'normal');
+  }
+
+  // Butin « à rapporter » : pièces d'ensemble, matériaux de forge, reliques de quête.
+  dropExtras(x, y, kind) {
+    const s = this.scene, depth = s.depth;
+    const k = kind === 'boss' ? 1 : kind === 'elite' ? 0.35 : kind === 'chest' ? 0.3 : 0.035;
+    // Pièce d'ensemble
+    const setP = kind === 'boss' ? 0.45 : kind === 'elite' ? 0.08 : kind === 'chest' ? 0.12 : 0.006 + depth * 0.001;
+    if (chance(setP)) {
+      const ids = setsForDepth(depth);
+      // les Gardiens lâchent de préférence l'ensemble de leur profondeur
+      const own = { 1: 'garde', 2: chance(0.5) ? 'haldis' : 'sonneurs', 3: 'prieur', 4: 'varn', 5: 'roi' }[depth];
+      const id = kind === 'boss' && own && ids.includes(own) ? own : pick(ids);
+      this.dropItem(x, y, generateSetItem(id, null, s.level + randInt(0, 2)));
+    }
+    // Matériaux de forge
+    if (chance(0.5 * k + 0.04)) this.dropItem(x, y, makeConsumable('fer', kind === 'boss' ? randInt(4, 7) : randInt(1, 2)));
+    if (depth >= 2 && chance(0.3 * k + 0.012)) this.dropItem(x, y, makeConsumable('bronze', kind === 'boss' ? randInt(2, 4) : 1));
+    if (depth >= 3 && chance(0.18 * k + 0.006)) this.dropItem(x, y, makeConsumable('braise', kind === 'boss' ? randInt(1, 3) : 1));
+    if (depth >= 4 && chance(kind === 'boss' ? 0.8 : 0.06 * k)) this.dropItem(x, y, makeConsumable('larme', 1));
+    // Reliques de quête (seulement si une quête active les demande)
+    for (const q of this.activeBringQuests()) {
+      if (depth < (q.obj.minDepth || 1)) continue;
+      const p = kind === 'boss' ? 0.6 : kind === 'elite' ? 0.35 : kind === 'chest' ? 0.4 : 0.03;
+      if (chance(p)) this.dropItem(x, y, makeConsumable(q.obj.id, 1));
+    }
   }
 
   onBossEngaged(b) {
@@ -588,6 +650,7 @@ export class Game {
     if (chance(0.5)) this.dropItem(b.x, b.y, this.loot({ ilvl: il, rarityBonus: 2 }));
     if (chance(0.15)) this.dropItem(b.x, b.y, this.loot({ ilvl: il, slot: 'pocket', rarity: Math.min(4, randInt(1, 3)) }));
     this.dropItem(b.x, b.y, makeConsumable('potion', 1));
+    this.dropExtras(b.x, b.y, 'boss');
     pd.bossKills[s.depth] = (pd.bossKills[s.depth] || 0) + 1;
     const unlocked = s.depth + 1 > pd.maxDepth;
     pd.maxDepth = Math.max(pd.maxDepth, s.depth + 1);
@@ -753,6 +816,7 @@ export class Game {
     this.dropGold(o.x, o.y, Math.round(randInt(5, 12) * (1 + (s.depth - 1) * 0.5) * (o.rich ? 2.5 : 1)));
     if (chance(0.25)) this.dropItem(o.x, o.y, makeConsumable('potion', 1));
     if (chance(0.04 + (o.rich ? 0.08 : 0))) this.dropItem(o.x, o.y, this.loot({ slot: 'pocket', rarity: randInt(1, 3) }));
+    this.dropExtras(o.x, o.y, 'chest');
     this.fx.burst(o.x, o.y - 6, '#c9a45a', 20, 140, 0.7, 2.5, { grav: -40 });
     this.fx.ring(o.x, o.y, 'rgba(201,164,90,0.7)', 50, 0.5);
     sfx('chest', { x: o.x, y: o.y });
@@ -917,7 +981,7 @@ export class Game {
     const p = this.player;
     n = Math.round(n);
     pd.xp += n;
-    if (this.scene.runStats) this.scene.runStats.xp += n;
+    if (this.scene && this.scene.runStats) this.scene.runStats.xp += n;
     if (x !== undefined) this.fx.text(x, y - 24, `+${n} XP`, '#b48cff', 12, { vy: -35 });
     let leveled = false;
     while (pd.xp >= xpForLevel(pd.level)) {
@@ -1008,31 +1072,98 @@ export class Game {
   }
 
   // ---------------- QUÊTES ----------------
+  qdef(id) { return questDef(this.pd, id); }
+
   questsAvailable(npcId) {
     const pd = this.pd;
-    return QUESTS.filter((q) => q.giver === npcId && !pd.quests[q.id] && (!q.req || (pd.quests[q.req] && pd.quests[q.req].status === 'done')));
+    if (npcId === 'lisette') refillContracts(pd);
+    return allQuests(pd).filter((q) => q.giver === npcId && !pd.quests[q.id] && (!q.req || (pd.quests[q.req] && pd.quests[q.req].status === 'done')));
   }
 
   questsOf(npcId, status) {
-    return QUESTS.filter((q) => q.giver === npcId && this.pd.quests[q.id] && this.pd.quests[q.id].status === status);
+    return allQuests(this.pd).filter((q) => q.giver === npcId && this.pd.quests[q.id] && this.pd.quests[q.id].status === status);
+  }
+
+  // Quêtes actives qui demandent de rapporter des reliques ou des matériaux.
+  activeBringQuests() {
+    const pd = this.pd;
+    return allQuests(pd).filter((q) => q.obj.type === 'bring' && pd.quests[q.id] && pd.quests[q.id].status === 'active' && !CONSUMABLES[q.obj.id].material);
   }
 
   acceptQuest(id) {
+    const q = this.qdef(id);
+    if (!q) return;
     this.pd.quests[id] = { status: 'active', progress: 0 };
     sfx('quest');
-    this.ui.toast(`Nouvelle quête : ${QUEST_BY_ID[id].name}`, 'good', 3);
+    this.ui.toast(`Nouvelle quête : ${q.name}`, 'good', 3);
+    this.syncQuests();
     this.save();
     this.ui.refresh();
   }
 
+  // Objectifs vérifiés d'après l'état de la partie : déjà accomplis = validés tout de suite
+  // (profondeur déjà atteinte, Gardien déjà vaincu, fragment déjà lu, reliques rapportées, ensembles portés…).
+  questStateProgress(q) {
+    const pd = this.pd, o = q.obj;
+    const reached = Math.max(pd.deepest || 1, (pd.maxDepth || 1) - 1);
+    switch (o.type) {
+      case 'depth': return reached >= o.depth ? o.count : null;
+      case 'boss': {
+        if (o.fresh) return null;
+        for (const d in pd.bossKills) if (+d >= o.depth && pd.bossKills[d] > 0) return o.count;
+        return null;
+      }
+      case 'lore': return pd.story.lore.includes(o.id) ? o.count : null;
+      case 'lorecount': return Math.min(o.count, pd.story.lore.length);
+      case 'bring': {
+        // seuls les objets à l'abri comptent : au village tout compte, en expédition seulement la poche et le coffre
+        const n = this.scene && this.scene.type === 'village' ? Inv.countAll(pd, o.id)
+          : (pd.pocket || []).concat(pd.stash || []).reduce((a, it) => a + (it && it.kind === 'consumable' && it.id === o.id ? it.qty : 0), 0);
+        return Math.min(o.count, n);
+      }
+      case 'setpieces': {
+        const counts = equippedSetCounts(pd.equipment);
+        if (o.full) {
+          for (const id in counts) if (counts[id] >= Object.keys(SETS[id].pieces).length) return o.count;
+          return 0;
+        }
+        return Math.min(o.count, Math.max(0, ...Object.values(counts)));
+      }
+      case 'upgrade': return Math.max(0, ...Inv.allItems(pd).map((it) => it.up || 0)) >= o.level ? 1 : 0;
+      default: return null;
+    }
+  }
+
+  // Recalcule les quêtes dont l'objectif dépend de l'état (appelé après chaque changement notable).
+  syncQuests() {
+    const pd = this.pd;
+    if (!pd) return;
+    for (const q of allQuests(pd)) {
+      const st = pd.quests[q.id];
+      if (!st || (st.status !== 'active' && st.status !== 'ready')) continue;
+      const v = this.questStateProgress(q);
+      if (v === null) continue;
+      const need = q.obj.type === 'upgrade' ? 1 : q.obj.count;
+      const was = st.status;
+      st.progress = Math.min(v, need);
+      if (q.obj.type === 'bring' || q.obj.type === 'setpieces' || q.obj.type === 'upgrade') st.status = st.progress >= need ? 'ready' : 'active';
+      else if (st.progress >= need) st.status = 'ready';
+      if (was === 'active' && st.status === 'ready') {
+        sfx('quest');
+        this.ui.toast(`Quête terminée : ${q.name} — retournez voir ${NPCS[q.giver].name}`, 'good', 4);
+      }
+    }
+    if (this.ui.refreshTracker) this.ui.refreshTracker();
+  }
+
   questEvent(type, data) {
     const pd = this.pd;
-    for (const q of QUESTS) {
+    for (const q of allQuests(pd)) {
       const st = pd.quests[q.id];
       if (!st || st.status !== 'active') continue;
       const o = q.obj;
       if (o.type !== type) continue;
-      if (type === 'kill' && o.target !== data.type) continue;
+      if (type === 'kill' && o.target !== data.type && o.also !== data.type) continue;
       if ((type === 'boss' || type === 'depth') && data.depth < o.depth) continue;
       if (type === 'lore' && o.id !== data.id) continue;
       st.progress++;
@@ -1043,17 +1174,20 @@ export class Game {
         this.ui.toast(`Quête terminée : ${q.name} — retournez voir ${NPCS[q.giver].name}`, 'good', 4);
       }
     }
-    this.ui.refreshTracker();
+    this.syncQuests();
   }
 
   turnInQuest(id) {
     const pd = this.pd;
-    const q = QUEST_BY_ID[id];
+    const q = this.qdef(id);
     const st = pd.quests[id];
+    if (!q) return;
+    this.syncQuests();
     if (!st || st.status !== 'ready') return;
     const R = q.reward;
-    const needSlots = (R.item ? 1 : 0) + (R.consumable ? 1 : 0);
+    const needSlots = (R.item || R.set || R.setAny ? 1 : 0) + (R.consumable ? 1 : 0);
     if (Inv.freeCount(pd.inventory) < needSlots) { this.ui.toast('Libérez de la place dans votre inventaire.', 'bad', 2); sfx('error'); return; }
+    if (q.obj.type === 'bring' && !Inv.takeAll(pd, q.obj.id, q.obj.count)) { this.ui.toast('Il vous manque des objets.', 'bad', 2); sfx('error'); return; }
     st.status = 'done';
     pd.gold += R.gold || 0;
     if (R.item) {
@@ -1061,10 +1195,23 @@ export class Game {
       Inv.addItem(pd, it);
       this.ui.toast(`Récompense : ${itemName(it)}`, 'good', 4);
     }
+    if (R.set || R.setAny) {
+      const sid = R.set || pick(setsForDepth(Math.max(1, (pd.maxDepth || 1) - 1)));
+      const it = generateSetItem(sid, null, pd.level + 1);
+      Inv.addItem(pd, it);
+      this.ui.toast(`Récompense : ${itemName(it)}`, 'good', 4);
+    }
     if (R.consumable) Inv.addItem(pd, makeConsumable(R.consumable.id, R.consumable.qty));
     this.ui.toast(`Quête rendue : ${q.name} (+${R.gold || 0} or)`, 'good', 3);
     if (R.xp) this.addXp(R.xp, this.player.x, this.player.y);
     sfx('quest');
+    if (q.contract) {
+      pd.stats.contracts = (pd.stats.contracts || 0) + 1;
+      delete pd.quests[id];
+      pd.contracts = (pd.contracts || []).filter((c) => c.id !== id);
+      refillContracts(pd);
+    }
+    this.syncQuests();
     this.save();
     this.ui.refresh();
     if (q.epilogue && !pd.story.epilogue) {
@@ -1074,12 +1221,77 @@ export class Game {
     }
   }
 
+  // Prochaine étape de l'histoire principale (pour guider le joueur).
+  nextMainStep() {
+    const pd = this.pd;
+    for (const q of QUESTS) {
+      if (!q.main) continue;
+      const st = pd.quests[q.id];
+      if (st && st.status === 'done') continue;
+      if (!st) {
+        const ok = !q.req || (pd.quests[q.req] && pd.quests[q.req].status === 'done');
+        return ok ? { q, state: 'available' } : null;
+      }
+      return { q, state: st.status };
+    }
+    return null;
+  }
+
   // Une quête peut-elle être rendue (place dans le sac) ?
   canTurnIn(id) {
-    const R = QUEST_BY_ID[id].reward;
-    const needSlots = (R.item ? 1 : 0) + (R.consumable ? 1 : 0);
+    const R = this.qdef(id).reward;
+    const needSlots = (R.item || R.set || R.setAny ? 1 : 0) + (R.consumable ? 1 : 0);
     return Inv.freeCount(this.pd.inventory) >= needSlots;
   }
+
+  // ---------------- FORGE : RENFORCEMENT ----------------
+  upgradeCost(item) {
+    const up = item.up || 0;
+    if (up >= 5 || item.slot === 'pocket' || item.kind !== 'equip') return null;
+    const f = 1 + (item.ilvl || 1) * 0.05;
+    const T = [
+      { fer: 4, gold: 30 },
+      { fer: 8, gold: 60 },
+      { fer: 6, bronze: 3, gold: 120 },
+      { bronze: 5, braise: 2, gold: 250 },
+      { braise: 4, larme: 1, gold: 500 },
+    ][up];
+    const c = { ...T, gold: Math.round(T.gold * f) };
+    return c;
+  }
+
+  canUpgrade(item) {
+    const c = this.upgradeCost(item);
+    if (!c) return false;
+    if (this.pd.gold < c.gold) return false;
+    for (const k in c) if (k !== 'gold' && Inv.countAll(this.pd, k) < c[k]) return false;
+    return true;
+  }
+
+  upgradeItem(item) {
+    const pd = this.pd;
+    if (!this.forgeUnlocked()) { this.ui.toast('Brann doit d’abord étudier le fer de Valdrenne.', 'bad', 3); sfx('error'); return; }
+    if (!this.canUpgrade(item)) { this.ui.toast('Il vous manque de l’or ou des matériaux.', 'bad', 2); sfx('error'); return; }
+    const c = this.upgradeCost(item);
+    pd.gold -= c.gold;
+    for (const k in c) if (k !== 'gold') Inv.takeAll(pd, k, c[k]);
+    if (!item.base0) item.base0 = { dmg: item.dmg, armor: item.armor, block: item.block, dmgBonus: item.dmgBonus };
+    item.up = (item.up || 0) + 1;
+    const m = 1 + 0.12 * item.up;
+    if (item.base0.dmg) item.dmg = Math.round(item.base0.dmg * m);
+    if (item.base0.armor) item.armor = Math.round(item.base0.armor * m);
+    if (item.base0.dmgBonus) item.dmgBonus = Math.round(item.base0.dmgBonus * m);
+    item.name = item.name.replace(/ \+\d$/, '') + ' +' + item.up;
+    item.value = Math.round(item.value * 1.25);
+    this.player.recalc();
+    sfx('heavy'); setTimeout(() => sfx('block'), 180);
+    this.ui.toast(`${item.name} : renforcé.`, 'good', 3);
+    this.syncQuests();
+    this.save();
+    this.ui.refresh();
+  }
+
+  forgeUnlocked() { const q = this.pd.quests.b_fer; return !!(q && q.status === 'done'); }
 
   // ---------------- COMMERCE ----------------
   refreshShop() {
