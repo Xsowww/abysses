@@ -160,6 +160,25 @@ export const CLASSES = {
   mage: { name: 'Mage', color: '#4a5a8a', title: 'Lettré de l’Abîme', locked: true, desc: 'Maître des arcanes et des sorts de zone. Bientôt disponible.' },
 };
 
+// Progression plus fine et plus lente : deux fois plus de rangs, chaque rang rapporte deux fois moins.
+// (les compétences débloquées restent à 1 rang ; les paliers demandent deux fois plus de points)
+function slowTree(tree) {
+  tree.tierReq = tree.tierReq.map((v) => v * 2);
+  for (const t of tree.talents) {
+    if (t.skill || !t.stats) continue;
+    const st = t.stats, ds = t.desc;
+    const round = (v) => Math.round(v * 10) / 10;
+    t.max *= 2;
+    t.stats = (r) => { const o = st(r / 2); for (const k in o) o[k] = round(o[k]); return o; };
+    t.desc = (r) => ds(r / 2).replace(/\d+\.\d+/g, (m) => String(round(+m)).replace('.', ','));
+  }
+}
+for (const C of Object.values(CLASSES)) {
+  if (!C.talents) continue;
+  slowTree(C);
+  for (const S of Object.values(C.specs)) slowTree(S);
+}
+
 export function xpForLevel(level) {
   // Progression lente : chaque niveau se mérite.
   return Math.round(100 * Math.pow(level, 1.85));

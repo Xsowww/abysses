@@ -468,6 +468,18 @@ export class Renderer {
     for (const e of s.enemies) if ((!e.dead || e.deadT > 0) && inView(e.x, e.y)) ents.push(e);
     ents.push(game.player);
     for (const pe of s.propEnts || []) if (inView(pe.x, pe.y, 120)) ents.push(pe);
+    const mis = s.mission;
+    if (mis && mis.survivor && !mis.failed && inView(mis.survivor.x, mis.survivor.y)) {
+      const v = mis.survivor;
+      ents.push(v.ent || (v.ent = { get x() { return v.x; }, get y() { return v.y; }, draw: (c, t) => drawSprite(c, 'villageois', v.x, v.y + 7, { anim: v.following ? 'walk' : 'hurt', frame: v.following ? (v.moving ? walkFrame('villageois', 'walk', v.walkT) : 0) : 2, dir: v.dir, flash: v.hurtT > 0 ? 0.6 : 0 }) }));
+    }
+    if (mis && mis.seal && mis.seal.active && !mis.done) {
+      const z = mis.seal;
+      ctx.strokeStyle = `rgba(110,170,200,${0.35 + 0.2 * Math.sin(time * 3)})`; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(z.x, z.y, z.r, 0, TAU); ctx.stroke();
+      ctx.strokeStyle = 'rgba(224,174,106,0.8)'; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.arc(z.x, z.y, z.r - 6, -Math.PI / 2, -Math.PI / 2 + TAU * Math.min(1, z.t / z.dur)); ctx.stroke();
+    }
     for (const w of s.wanderers || []) if (inView(w.x, w.y)) ents.push(w.ent || (w.ent = { get x() { return w.x; }, get y() { return w.y; }, draw: (c, t) => drawSprite(c, w.sprite, w.x, w.y + 7, { anim: 'walk', frame: w.moving ? walkFrame(w.sprite, 'walk', w.walkT) : 0, dir: w.dir }) }));
     ents.sort((a, b) => a.y - b.y);
     for (const e of ents) e.draw(ctx, time);
@@ -557,6 +569,20 @@ export class Renderer {
     }
     // Inscriptions au sol (lisibles même dans le noir)
     for (const o of s.interactables) if (o.type === 'inscription' && inView(o.x, o.y)) this.drawInscription(ctx, o, time);
+    // Champion de mission et survivant : nom et vie
+    const ms = s.mission;
+    if (ms && ms.target && !ms.target.dead && inView(ms.target.x, ms.target.y)) {
+      const e = ms.target;
+      ctx.font = "600 13px 'Pixelify Sans', sans-serif"; ctx.textAlign = 'center';
+      ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.fillText(e.champion, e.x + 1, e.y - e.r - 21);
+      ctx.fillStyle = '#e0ae6a'; ctx.fillText(e.champion, e.x, e.y - e.r - 22);
+    }
+    if (ms && ms.survivor && !ms.failed && inView(ms.survivor.x, ms.survivor.y)) {
+      const v = ms.survivor, w = 34;
+      ctx.font = "12px 'Pixelify Sans', sans-serif"; ctx.textAlign = 'center';
+      ctx.fillStyle = '#d6cebd'; ctx.fillText(v.name, v.x, v.y - 44);
+      if (v.following) { ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.fillRect(v.x - w / 2 - 1, v.y - 38, w + 2, 5); ctx.fillStyle = '#7fbf6a'; ctx.fillRect(v.x - w / 2, v.y - 37, w * Math.max(0, v.hp / v.maxHp), 3); }
+    }
     // Murmures des villageois
     ctx.font = "12px 'Pixelify Sans', sans-serif";
     for (const w of s.wanderers || []) {
@@ -804,7 +830,8 @@ export class Renderer {
     const lights = [];
     const p = game.player;
     const flick = (k) => 1 + Math.sin(time * 9 + k) * 0.04 + Math.sin(time * 23 + k * 3) * 0.03;
-    if (!p.dead || s.type === 'village') lights.push({ x: p.x, y: p.y, r: (s.type === 'dungeon' ? 340 : 280) * flick(0), a: 1, c: 'warm', g: 0.1 });
+    const night = s.augures && s.augures.has('nuit') ? 0.55 : 1;
+    if (!p.dead || s.type === 'village') lights.push({ x: p.x, y: p.y, r: (s.type === 'dungeon' ? 340 : 280) * night * flick(0), a: 1, c: 'warm', g: 0.1 });
     for (const t of s.torches) lights.push({ x: t.x, y: t.y, r: 190 * flick(t.x), a: 0.85, c: 'warm', g: 0.18 });
     for (const b of s.braziers) lights.push(b.lamp ? { x: b.x, y: b.y, r: 170 * flick(b.x), a: 0.85, c: 'warm', g: 0.2 } : { x: b.x, y: b.y, r: (b.camp ? 270 : 230) * flick(b.y), a: 0.9, c: 'warm', g: 0.22 });
     for (const o of s.interactables) {
@@ -953,6 +980,25 @@ export class Renderer {
 
   drawInteractable(ctx, o, time, game) {
     const x = o.x, y = o.y;
+    if (o.type === 'reliquary') {
+      ctx.fillStyle = `rgba(224,174,106,${0.18 + 0.1 * Math.sin(time * 3)})`; ctx.beginPath(); ctx.ellipse(x, y + 6, 26, 10, 0, 0, TAU); ctx.fill();
+      if (!drawT(ctx, 'chest2', x - 16, y - 20)) { ctx.fillStyle = '#6a4a2a'; ctx.fillRect(x - 12, y - 10, 24, 16); }
+      return;
+    }
+    if (o.type === 'beacon') {
+      ctx.fillStyle = 'rgba(0,0,0,0.4)'; ctx.beginPath(); ctx.ellipse(x, y + 8, 16, 6, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#3a3438'; ctx.fillRect(x - 12, y - 4, 24, 12); ctx.fillStyle = '#5a5258'; ctx.fillRect(x - 10, y - 6, 20, 4);
+      if (o.lit) drawT(ctx, 'fire' + (Math.floor(time * 9 + x) % 4), x - 16, y - 30);
+      else { ctx.fillStyle = `rgba(224,160,80,${0.25 + 0.2 * Math.sin(time * 2)})`; ctx.fillRect(x - 3, y - 9, 6, 3); }
+      return;
+    }
+    if (o.type === 'seal') {
+      ctx.strokeStyle = `rgba(110,170,200,${0.5 + 0.3 * Math.sin(time * 2)})`; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(x, y, 20, 0, TAU); ctx.stroke();
+      ctx.beginPath(); for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + i * TAU * 2 / 5; ctx[i ? 'lineTo' : 'moveTo'](x + Math.cos(a) * 18, y + Math.sin(a) * 18); } ctx.closePath(); ctx.stroke();
+      return;
+    }
+    if (o.type === 'survivor') return; // dessiné avec les personnages
     if (o.type === 'npc' && hasSprite(o.id)) {
       const p = game.player;
       const near = dist(x, y, p.x, p.y) < 220;

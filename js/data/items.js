@@ -23,7 +23,7 @@ export const RARITIES = [
   { id: 2, name: 'Rare', color: '#6a92c9', affixes: 2, mult: 1.25, value: 6 },
   { id: 3, name: 'Épique', color: '#a57bc7', affixes: 3, mult: 1.4, value: 15 },
   { id: 4, name: 'Légendaire', color: '#d4893a', affixes: 4, mult: 1.6, value: 40 },
-  { id: 5, name: 'Ensemble', color: '#5fb39b', affixes: 1, mult: 0.8, value: 10 },
+  { id: 5, name: 'Ensemble', color: '#5fb39b', affixes: 2, mult: 1.25, value: 10 },
 ];
 
 // ranged : l'arme tire des projectiles (portée = distance max du projectile).
@@ -195,10 +195,10 @@ export function rollRarity(ilvl, bonus = 0) {
   const m = 1 + bonus * 0.8 + ilvl * 0.02;
   return weightedPick([
     { w: 100 / (1 + bonus * 0.5), v: 0 },
-    { w: 35 * m, v: 1 },
-    { w: 10 * m ** 1.5, v: 2 },
-    { w: 2.5 * m ** 2, v: 3 },
-    { w: 0.4 * m ** 2.5 * (ilvl >= 5 ? 1 : 0.25), v: 4 },
+    { w: 30 * m, v: 1 },
+    { w: 6 * m ** 1.5, v: 2 },
+    { w: 1.2 * m ** 2, v: 3 },
+    { w: 0.15 * m ** 2.5 * (ilvl >= 5 ? 1 : 0.25), v: 4 },
   ]);
 }
 
@@ -237,7 +237,7 @@ export function generateItem({ ilvl = 1, rarity = null, slot = null, rarityBonus
     const wt = weaponType || pick(types);
     const W = WEAPONS[wt];
     item.base = wt;
-    item.dmg = Math.max(3, Math.round((5 + ilvl * 2.2) * W.dmg * R.mult * rand(0.9, 1.1)));
+    item.dmg = Math.max(3, Math.round((5 + ilvl * 1.7) * W.dmg * R.mult * rand(0.9, 1.1)));
     baseName = W.name;
     if (W.ranged) mats = WOOD_MATERIALS;
   } else if (slot === 'offhand') {
@@ -255,7 +255,7 @@ export function generateItem({ ilvl = 1, rarity = null, slot = null, rarityBonus
   } else {
     const B = ARMOR_BASES[slot];
     baseName = pick(B.names);
-    if (B.armor) item.armor = Math.max(1, Math.round((B.armor[0] + ilvl * B.armor[1]) * R.mult * rand(0.9, 1.1)));
+    if (B.armor) item.armor = Math.max(1, Math.round((B.armor[0] + ilvl * B.armor[1] * 0.8) * R.mult * rand(0.9, 1.1)));
     if (slot === 'amulet' || slot === 'ring') mats = JEWEL_MATERIALS;
   }
   item.name = `${baseName} ${mats[tier]}`;
@@ -341,21 +341,49 @@ export function starterKit(cls) {
   return { weapon: sword, offhand: shield, chest, pocket };
 }
 
-// Pièce d'ensemble : statistiques modestes (rareté « Ensemble »), mais bonus puissants une fois réunie.
+// Pièce d'ensemble : statistiques d'un objet rare (2 affixes) et — surtout — elle grandit avec votre
+// niveau (rescaleSetItem) : une pièce trouvée tôt reste utile, et l'ensemble complet vaut toujours la peine.
 export function generateSetItem(setId, slot = null, ilvl = 1) {
   const S = SETS[setId];
   const slots = Object.keys(S.pieces);
   if (!slot || !S.pieces[slot]) slot = pick(slots);
   const R = RARITIES[5];
   const item = { uid: uid(), kind: 'equip', slot, rarity: 5, ilvl: Math.max(1, Math.round(ilvl)), affixes: [], set: setId };
-  const B = ARMOR_BASES[slot];
-  if (B && B.armor) item.armor = Math.max(1, Math.round((B.armor[0] + item.ilvl * B.armor[1]) * R.mult * rand(0.9, 1.05)));
+  item.roll = { a: rand(0.92, 1.06), il0: item.ilvl };
   const pool = [...SLOT_AFFIXES[slot]];
-  const k = pool[Math.floor(Math.random() * pool.length)];
-  let v = AFFIXES[k].roll(item.ilvl);
-  v = typeof v === 'number' && !Number.isInteger(v) ? +(v * R.mult).toFixed(1) : Math.max(1, Math.round(v * R.mult));
-  item.affixes.push({ k, v });
+  for (let i = 0; i < R.affixes && pool.length; i++) {
+    const k = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
+    item.affixes.push({ k, v: 0, q: rand(0.85, 1.15) });
+  }
   item.name = `${S.pieces[slot]} · ${S.name}`;
-  item.value = Math.round((6 + item.ilvl * 2.5) * R.value);
+  rescaleSetItem(item, item.ilvl);
   return item;
+}
+
+// Valeur moyenne d'un affixe à un niveau donné (moyenne de tirages, mise en cache).
+const affixMean = {};
+function meanAffix(k, il) {
+  const key = k + ':' + il;
+  if (affixMean[key] === undefined) { let t = 0; for (let i = 0; i < 40; i++) t += AFFIXES[k].roll(il); affixMean[key] = t / 40; }
+  return affixMean[key];
+}
+
+// Remet une pièce d'ensemble au niveau donné (jamais en dessous de son niveau actuel).
+export function rescaleSetItem(item, level) {
+  if (!item || !item.set) return false;
+  const il = Math.max(item.ilvl || 1, Math.round(level));
+  if (item.roll && item.roll.done === il) return false;
+  if (!item.roll) item.roll = { a: 1, il0: item.ilvl };
+  const R = RARITIES[5];
+  item.ilvl = il;
+  const B = ARMOR_BASES[item.slot];
+  if (B && B.armor) item.armor = Math.max(1, Math.round((B.armor[0] + il * B.armor[1] * 0.8) * R.mult * item.roll.a * (1 + 0.12 * (item.up || 0))));
+  for (const a of item.affixes) {
+    if (a.q === undefined) a.q = 1;
+    let v = meanAffix(a.k, il) * R.mult * a.q;
+    a.v = !Number.isInteger(AFFIXES[a.k].roll(il)) ? +v.toFixed(1) : Math.max(1, Math.round(v));
+  }
+  item.value = Math.round((6 + il * 2.5) * R.value);
+  item.roll.done = il;
+  return true;
 }

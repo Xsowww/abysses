@@ -744,3 +744,35 @@ input[type=range] { accent-color: #b9803f; }
 .mat .pix { width: 28px; }
 .up-pips { justify-content: flex-start; margin: 2px 0; }
 .up-row.st-max .si-info > div:first-child::after { content: ' ✓'; color: var(--st-max); }
+/* Atelier de Mira */
+.sets-list { display: flex; flex-direction: column; gap: 6px; }
+.set-row { padding: 6px 8px; border: 2px solid #26221e; background: rgba(0, 0, 0, 0.25); }
+.set-row.st-partial { border-color: #3f4a4f; }
+.set-row.st-max { border-color: var(--st-max); }
+.set-row.st-locked { opacity: .5; }
+.sr-name { color: #5fb39b; font-weight: 600; }
+.sr-lore { font-size: 12px; margin: 2px 0 4px; }
+.sr-pieces { display: flex; flex-wrap: wrap; gap: 4px 6px; align-items: center; }
+.sp.on { color: var(--st-max); font-size: 13px; margin-right: 6px; }
+.sum-mission { text-align: center; font-size: 16px; margin: 6px auto 14px; max-width: 760px; }
+.sum-mission.ok { color: var(--st-max); }
+.sum-mission.bad { color: var(--st-poor); }
+/* Portail : missions et augures */
+.portal-layout { display: grid; grid-template-columns: 1fr 1fr; gap: 28px; }
+@media (max-width: 780px) { .portal-layout { grid-template-columns: 1fr; } }
+.mis-list { display: flex; flex-direction: column; gap: 8px; }
+.mis-card { padding: 8px 10px; border: 2px solid #2c2824; background: rgba(0, 0, 0, 0.3); cursor: pointer; }
+.mis-card:hover { border-color: #5a524a; }
+.mis-card.st-max { border-color: var(--st-max); background: rgba(224, 174, 106, 0.06); }
+.mis-card.st-avail:not(.st-max) { border-color: #4a3a2a; }
+.mc-name { color: var(--gold); font-weight: 600; }
+.mc-desc { font-size: 13px; color: var(--bone2); margin: 3px 0; }
+.mc-rew { font-size: 12px; color: var(--muted); }
+.aug-list { display: flex; flex-direction: column; gap: 4px; margin-bottom: 10px; }
+.aug { display: block; padding: 5px 8px; border: 2px solid #2c2824; cursor: pointer; font-size: 13px; }
+.aug.st-max { border-color: var(--st-avail); background: rgba(240, 138, 58, 0.07); }
+.aug b { color: var(--bone); font-weight: 600; }
+.aug-box { color: var(--st-avail); margin-right: 6px; }
+.tr-q.mission b { color: var(--st-avail); }
+.tr-q.mission.ready b { color: var(--st-max); }
+.tr-q.mission.failed b, .tr-q.mission.failed div { color: var(--st-poor); }

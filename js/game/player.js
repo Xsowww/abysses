@@ -8,6 +8,7 @@ import { drawHero } from './hero.js';
 import { hasSprite, drawSprite, drawFrame, dirFromAngle, walkFrame, animFrames } from './sprites.js';
 import { hasEquip, lookFor, lookReady, composeLook, LOOK_ANCHOR } from './equip.js';
 import { activeSetStats } from '../data/sets.js';
+import { rescaleSetItem } from '../data/items.js';
 
 const ROLL_COST = 22;
 const ATTACK_COST = 6;
@@ -81,6 +82,8 @@ export class Player {
 
   recalc() {
     const pd = this.pd;
+    // Les pièces d'ensemble portées suivent le niveau du personnage
+    for (const k in pd.equipment) if (pd.equipment[k] && pd.equipment[k].set) rescaleSetItem(pd.equipment[k], pd.level);
     const s = { hp: 0, hpPct: 0, armor: 0, armorPct: 0, dmgPct: 0, crit: 5, critDmg: 50, atkSpd: 0, moveSpd: 0, stamina: 0, staRegen: 0, lifesteal: 0, cdr: 0, hpRegen: 0, block: 0, thorns: 0, execute: 0, pierce: 0, poison: 0, rollCost: 0, killHeal: 0, rollHeal: 0, eliteDmg: 0, goldFind: 0 };
     // Bonus d'ensembles (palier le plus haut atteint)
     for (const [k, v] of Object.entries(activeSetStats(pd.equipment))) s[k] = (s[k] || 0) + v;
@@ -211,6 +214,7 @@ export class Player {
     if (this.dash) { this.updateDash(dt); return; }
 
     let speed = this.cls.speed * (1 + this.stats.moveSpd / 100);
+    if (this.carrying) speed *= 0.75;
     if (this.whirl) { speed *= 0.7; this.updateWhirl(dt); }
     if (this.attackCd > 0 && !this.whirl) speed *= this.weapon().ranged ? 0.75 : 0.82;
     if (this.channel) speed = 0;
@@ -251,7 +255,8 @@ export class Player {
 
     // Roulade
     const rollCost = ROLL_COST * (1 - this.stats.rollCost / 100);
-    if (input.wasPressed('roll') && this.useStamina(rollCost)) {
+    if (input.wasPressed('roll') && this.carrying) { g.ui.toast('Le reliquaire est trop lourd pour rouler.', 'bad', 1); }
+    else if (input.wasPressed('roll') && this.useStamina(rollCost)) {
       const a = ml ? Math.atan2(my, mx) : this.aim;
       this.roll = { t: 0, dur: 0.34, dx: Math.cos(a), dy: Math.sin(a) };
       this.invuln = Math.max(this.invuln, 0.28);

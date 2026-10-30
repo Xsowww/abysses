@@ -14,7 +14,9 @@ import {
 } from '../data/items.js';
 import { CLASSES, SKILLS, SPEC_LEVEL, xpForLevel } from '../data/classes.js';
 import { QUESTS, NPCS, questDef, allQuests } from '../data/quests.js';
-import { SETS, SET_STAT_LABEL, setBonusText, equippedSetCounts } from '../data/sets.js';
+import { MISSIONS, AUGURES, augureBonus } from '../data/missions.js';
+import { missionStatus } from '../game/missions.js';
+import { SETS, SET_STAT_LABEL, setBonusText, equippedSetCounts, SET_PIECE_COST } from '../data/sets.js';
 import { enemyLevel } from '../data/enemies.js';
 import * as Inv from '../game/inventory.js';
 import { escapeHtml, fmt, pick } from '../core/util.js';
@@ -300,7 +302,8 @@ export class UI {
     }
     if (c === 'pocket') A.push({ l: 'Sortir de la poche', a: 'fromPocket' });
     if (c === 'stash') A.push({ l: 'Prendre', a: 'fromStash', main: true });
-    if (mode === 'shop' && c !== 'stash') A.push({ l: `Vendre · ${fmt(sellValue(it))} or`, a: 'sell', main: true });
+    if (mode === 'shop' && this.opts.shop === 'atelier') { if (it.set) A.push({ l: 'Donner à Mira · +1 sceau', a: 'recycle', main: true }); }
+    else if (mode === 'shop' && c !== 'stash') A.push({ l: `Vendre · ${fmt(sellValue(it))} or`, a: 'sell', main: true });
     A.push({ l: this.confirmDestroy === ref ? 'Confirmer' : 'Détruire', a: 'destroy', danger: true });
     return A;
   }
@@ -329,6 +332,7 @@ export class UI {
       case 'fromStash': err = Inv.moveBetween(pd, 'stash', r.i, 'inv'); if (!err) { sfx('pickup'); this.selected = null; } break;
       case 'drink': g.usePotion(); break;
       case 'sell': g.sell(r); this.selected = null; break;
+      case 'recycle': g.recycleSetPiece(r); this.selected = null; break;
       case 'buy': g.buy(p[1], +p[2]); this.selected = null; break;
       case 'destroy':
         if (this.confirmDestroy !== ref) { this.confirmDestroy = ref; break; }
@@ -403,11 +407,25 @@ export class UI {
       case 'quest-accept': g.acceptQuest(arg); this.opts.view = null; this.refresh(); break;
       case 'quest-turnin': g.turnInQuest(arg); this.refresh(); break;
       case 'dialog-back': this.opts.view = null; this.refresh(); break;
+      case 'buy-set': { const [sid, slot] = arg.split(':'); g.buySetPiece(sid, slot); break; }
       case 'upgrade': { const it = this.pd.equipment[arg]; if (it) g.upgradeItem(it); break; }
       case 'open-shop': this.open('shop', { shop: arg, npc: this.opts.npc }); break;
       case 'open-portal': this.open('portal'); break;
       case 'buy-cons': { const n = +(el && el.dataset.n) || 1; for (let i = 0; i < n; i++) g.buy('consumable', arg); break; }
-      case 'descend': this.close(); g.enterDungeon(+arg); break;
+      case 'descend': {
+        const sel = (this.pd.missionBoard || []).find((m) => m.id === this.opts.mission) || null;
+        const aug = [...(this.opts.aug || [])];
+        this.close(); g.enterDungeon(+arg, { mission: sel, augures: aug });
+        break;
+      }
+      case 'pick-mission': this.opts.mission = arg || null; sfx('ui'); this.refresh(); break;
+      case 'toggle-aug': {
+        const a = this.opts.aug || (this.opts.aug = []);
+        const i = a.indexOf(arg);
+        if (i >= 0) a.splice(i, 1); else a.push(arg);
+        sfx('ui'); this.refresh();
+        break;
+      }
       case 'resume': this.close(); break;
       case 'options': this.open('options', { from: this.panel === 'pause' ? 'pause' : null }); break;
       case 'quit': g.save(); g.running = false; this.close(); this.showTitle(); break;
@@ -533,7 +551,9 @@ export class UI {
     const pd = this.pd;
     const shop = this.opts.shop;
     let left = '';
-    if (shop === 'forge') {
+    if (shop === 'atelier') {
+      left = this.atelierHTML();
+    } else if (shop === 'forge') {
       left = this.forgeUpgradeHTML() + `<h3>Étal de la forge</h3><p class="hint" style="margin-top:-4px">Le stock change à chaque retour d’expédition.</p>
         <div class="shop-list">${pd.shop.forge.map((it, i) => `<div class="shop-item ${pd.gold < buyPrice(it) ? 'st-poor' : ''}">${this.cell(it, `shop:forge:${i}`)}<div class="si-info"><div style="color:${itemColor(it)}">${escapeHtml(it.name)}</div><div class="dim">${slotLabel(it)} · niveau ${it.ilvl}</div></div><div class="price ${pd.gold < buyPrice(it) ? 'poor' : ''}">${fmt(buyPrice(it))} ${icon('gold', 'gold')}</div></div>`).join('') || '<p class="dim">Plus rien en stock.</p>'}</div>`;
     } else {
@@ -546,8 +566,8 @@ export class UI {
     }
     const html = `<div class="inv-layout"><div class="col">${left}</div><div class="col">${this.bagHTML()}${this.detailHTML()}</div></div>`;
     return {
-      title: shop === 'forge' ? 'La forge de Brann' : 'Le comptoir d’Odile',
-      sub: shop === 'forge' ? '« De l’acier honnête. Paye et il est à toi. »' : '« Je rachète tout. Sans poser de questions. »',
+      title: shop === 'forge' ? 'La forge de Brann' : shop === 'atelier' ? 'L’atelier de Mira' : 'Le comptoir d’Odile',
+      sub: shop === 'forge' ? '« De l’acier honnête. Paye et il est à toi. »' : shop === 'atelier' ? '« Une pièce seule ne vaut rien. Toutes ensemble… ah. »' : '« Je rachète tout. Sans poser de questions. »',
       html, cls: 'wide', footer: '<span><kbd>Clic D</kbd>Acheter / vendre</span><span><kbd>Échap</kbd>Fermer</span>',
     };
   }
@@ -582,6 +602,25 @@ export class UI {
     if (R.set) parts.push(`une pièce d’ensemble « ${SETS[R.set].name} »`);
     if (R.setAny) parts.push('une pièce d’ensemble');
     return parts.join(' · ');
+  }
+
+  // Atelier de Mira : pièces d'ensemble à la demande contre des Sceaux de Valdrenne
+  atelierHTML() {
+    const pd = this.pd;
+    const owned = Inv.allItems(pd).filter((it) => it.set);
+    const reach = Math.max(1, (pd.maxDepth || 1) - 1, pd.deepest || 1);
+    const rows = Object.entries(SETS).map(([id, S]) => {
+      if (S.minDepth > reach) return `<div class="set-row st-locked"><div class="sr-name">${S.name}</div><div class="dim">${icon('lock')} Se trouve à partir de la profondeur ${S.minDepth}.</div></div>`;
+      const pieces = Object.entries(S.pieces).map(([slot, base]) => {
+        const has = owned.some((it) => it.set === id && it.slot === slot);
+        return has ? `<span class="sp on">■ ${base}</span>` : `<button class="btn small ${pd.sceaux >= SET_PIECE_COST ? '' : ''}" data-action="buy-set" data-arg="${id}:${slot}" ${(pd.sceaux || 0) >= SET_PIECE_COST ? '' : 'disabled'}>${base} · ${SET_PIECE_COST} sceaux</button>`;
+      }).join('');
+      const n = new Set(owned.filter((it) => it.set === id).map((it) => it.slot)).size;
+      return `<div class="set-row ${n === Object.keys(S.pieces).length ? 'st-max' : n ? 'st-partial' : ''}"><div class="sr-name">${S.name} <span class="dim">${n} / ${Object.keys(S.pieces).length}</span></div><div class="dim sr-lore">${S.lore}</div><div class="sr-pieces">${pieces}</div></div>`;
+    }).join('');
+    return `<h3>Sceaux de Valdrenne : <b class="glow">${pd.sceaux || 0}</b></h3>
+      <p class="hint" style="margin-top:-4px">Les sceaux se gagnent en réussissant des missions d’expédition (et en me donnant vos pièces en double). Une pièce commandée suit toujours votre niveau.</p>
+      <div class="sets-list">${rows}</div>`;
   }
 
   // Renforcement des objets portés chez Brann
@@ -671,8 +710,13 @@ export class UI {
     for (const q of ready) opts += `<button class="opt ready" data-action="quest-turnin-talk" data-arg="${q.id}">Rendre — ${q.name}<span class="st-tag avail">?</span></button>`;
     for (const q of avail) opts += `<button class="opt new" data-action="quest-view" data-arg="${q.id}">${q.main ? 'Histoire' : q.contract ? 'Contrat' : 'Nouvelle quête'} — ${q.name}<span class="st-tag ${q.main ? 'max' : 'part'}">!</span></button>`;
     for (const q of active) opts += `<button class="opt" data-action="quest-view" data-arg="${q.id}">${q.name} <span class="dim">(${this.pd.quests[q.id].progress} / ${this.questNeed(q)})</span><span class="st-tag part">En cours</span></button>`;
+    if (N.contracts) {
+      const nAct = active.filter((q) => q.contract).length + ready.filter((q) => q.contract).length;
+      const board = (this.pd.contracts || []).filter((c) => !this.pd.quests[c.id]).length;
+      opts += `<div class="hint" style="margin:4px 0 6px">Contrats en cours : ${nAct} / 2 · au tableau : ${board} / 3. Un nouveau contrat est affiché à chaque retour d’expédition.</div>`;
+    }
     if (npcTalk(id, this.pd).length) opts += '<button class="opt" data-action="talk">Parler</button>';
-    if (N.shop) opts += `<button class="opt shop" data-action="open-shop" data-arg="${N.shop}">Commercer</button>`;
+    if (N.shop) opts += `<button class="opt shop" data-action="open-shop" data-arg="${N.shop}">${N.shopLabel || 'Commercer'}</button>`;
     if (N.portal) opts += '<button class="opt portal" data-action="open-portal">Ouvrir le portail des Abysses</button>';
     opts += '<button class="opt" data-action="close">Prendre congé</button>';
     const html = `<div class="dialog"><div class="npc-line">« ${this.opts.greet} »</div><div class="opts">${opts}</div></div>`;
@@ -791,23 +835,42 @@ export class UI {
   // ================= PORTAIL =================
   panel_portal() {
     const pd = this.pd;
+    const o = this.opts;
+    if (!o.aug) o.aug = [];
+    const board = pd.missionBoard || [];
+    const sel = board.find((m) => m.id === o.mission) || null;
+    const bonus = augureBonus(o.aug);
+    // Missions proposées
+    const mCards = [`<div class="mis-card ${!sel ? 'st-max' : ''}" data-action="pick-mission" data-arg=""><div class="mc-name">Exploration libre</div><div class="dim">Descendre où vous voulez, sans objectif. Pas de Sceaux.</div></div>`]
+      .concat(board.map((m) => {
+        const M = MISSIONS[m.type];
+        return `<div class="mis-card ${sel === m ? 'st-max' : 'st-avail'}" data-action="pick-mission" data-arg="${m.id}"><div class="mc-name">${M.name} <span class="dim">· profondeur ${m.depth}</span></div><div class="mc-desc">${M.desc}</div><div class="mc-rew">Récompense à l’extraction : <b>${M.sceaux} Sceaux</b>, or, matériaux${bonus ? ` · <span class="glow">+${bonus} %</span>` : ''}</div></div>`;
+      })).join('');
+    const augs = Object.entries(AUGURES).map(([k, A]) => `<label class="aug ${o.aug.includes(k) ? 'st-max' : ''}" data-action="toggle-aug" data-arg="${k}"><span class="aug-box">${o.aug.includes(k) ? '■' : '□'}</span><b>${A.name}</b> <span class="dim">${A.desc}</span> <span class="glow">+${A.bonus} %</span></label>`).join('');
     let rows = '';
-    for (let d = 1; d <= pd.maxDepth; d++) {
-      const L = enemyLevel(d);
-      const kills = pd.bossKills[d] || 0;
-      const diff = L - pd.level;
-      const warn = diff >= 3 ? '<span class="bad">mortel</span>' : diff >= 1 ? '<span class="warn">périlleux</span>' : '<span class="ok">à votre mesure</span>';
-      const stD = kills ? 'st-max' : d === pd.maxDepth ? 'st-avail' : '';
-      rows += `<div class="depth-row ${stD}"><div><div class="depth-name">Profondeur ${ROMAN[d - 1] || d}</div><div class="dim">Créatures niv. ${L} · Gardien niv. ${L + 1} · ${warn}${kills ? ` · Gardien vaincu ×${kills}` : ''}</div></div><button class="btn main" data-action="descend" data-arg="${d}">Descendre</button></div>`;
+    if (sel) {
+      rows = `<div class="actions" style="justify-content:center;margin-top:10px"><button class="btn main big" data-action="descend" data-arg="${sel.depth}">Partir : ${MISSIONS[sel.type].name} — profondeur ${sel.depth}</button></div>`;
+    } else {
+      for (let d = 1; d <= pd.maxDepth; d++) {
+        const L = enemyLevel(d);
+        const kills = pd.bossKills[d] || 0;
+        const diff = L - pd.level;
+        const warn = diff >= 3 ? '<span class="bad">mortel</span>' : diff >= 1 ? '<span class="warn">périlleux</span>' : '<span class="ok">à votre mesure</span>';
+        const stD = kills ? 'st-max' : d === pd.maxDepth ? 'st-avail' : '';
+        rows += `<div class="depth-row ${stD}"><div><div class="depth-name">Profondeur ${ROMAN[d - 1] || d}</div><div class="dim">Créatures niv. ${L} · Gardien niv. ${L + 1} · ${warn}${kills ? ` · Gardien vaincu ×${kills}` : ''}</div></div><button class="btn main" data-action="descend" data-arg="${d}">Descendre</button></div>`;
+      }
     }
     const ps = Inv.pocketSize(pd);
     const pots = Inv.countConsumable(pd, 'potion'), stones = Inv.countConsumable(pd, 'pierre');
-    const html = `<p class="npc-line" style="font-size:17px;margin-bottom:10px">« Chaque descente ouvre un chemin différent. Ce que tu y trouves, tu ne le gardes que si tu remontes. »</p>
+    const html = `<div class="portal-layout"><div class="col">
+      <h3>Mission</h3><p class="hint" style="margin-top:-4px">Trois missions vous sont proposées ; elles changent à chaque retour. La récompense n’est versée que si vous remontez vivant.</p>
+      <div class="mis-list">${mCards}</div></div>
+      <div class="col"><h3>Augures <span class="dim">bonus de butin, d’or et d’XP : <b class="glow">+${bonus} %</b></span></h3>
+      <div class="aug-list">${augs}</div>
       <div class="rules"><div>Équipement porté — <b>toujours conservé</b></div><div>Poche sécurisée (${ps} empl.) — <b>conservée</b></div><div>Butin du sac et or ramassé — <span class="bad">perdus à la mort</span></div>
-      <div class="dim" style="font-style:italic">Pour remonter : cercle d’extraction, portail du Gardien, ou pierre de retour (${input.label('stone')}).</div></div>
-      <div class="dim">Vous emportez ${pots} fiole(s) de sang et ${stones} pierre(s) de retour.</div>
-      <div class="depths">${rows}</div>`;
-    return { title: 'Portail des Abysses', sub: 'La Crypte Oubliée', html };
+      <div class="dim">Vous emportez ${pots} fiole(s) et ${stones} pierre(s) de retour.</div></div>
+      <div class="depths">${rows}</div></div></div>`;
+    return { title: 'Portail des Abysses', sub: `Sceaux de Valdrenne : ${pd.sceaux || 0}`, html, cls: 'wide' };
   }
 
   // ================= MENUS =================
@@ -948,6 +1011,7 @@ export class UI {
     let body = `<div class="sum-stats"><div><b>${d.kills}</b><span>créatures abattues</span></div><div><b>${d.xp}</b><span>expérience (conservée)</span></div>`;
     body += d.success ? `<div><b>${fmt(d.gold)}</b><span>or rapporté</span></div>` : `<div><b class="bad">${fmt(d.lostGold || 0)}</b><span>or perdu</span></div>`;
     body += '</div>';
+    if (d.mission) body += `<p class="sum-mission ${d.success && !/non accomplie/.test(d.mission) ? 'ok' : 'bad'}">${escapeHtml(d.mission)}</p>`;
     if (d.success) body += `<h3>Butin rapporté</h3>${d.kept.length ? `<ul class="loot">${list(d.kept)}</ul>` : '<p class="dim">Rien.</p>'}`;
     else {
       body += `<h3>Sauvé par la poche</h3>${d.kept.length ? `<ul class="loot">${list(d.kept)}</ul>` : '<p class="dim">Rien.</p>'}`;
@@ -1140,7 +1204,9 @@ export class UI {
     all.sort((a, b) => (b.main ? 1 : 0) - (a.main ? 1 : 0) || (pd.quests[b.id].status === 'ready') - (pd.quests[a.id].status === 'ready'));
     const qs = all.slice(0, 4);
     const nx = this.game.nextMainStep && this.game.nextMainStep();
-    const hint = nx && nx.state === 'available' ? `<div class="tr-q ready"><b>◆ Histoire</b><div>Parlez à ${NPCS[nx.q.giver].name}</div></div>` : '';
+    let hint = nx && nx.state === 'available' ? `<div class="tr-q ready"><b>◆ Histoire</b><div>Parlez à ${NPCS[nx.q.giver].name}</div></div>` : '';
+    const ms = missionStatus(this.game);
+    if (ms) hint = `<div class="tr-q mission ${ms.done ? 'ready' : ''} ${ms.failed ? 'failed' : ''}"><b>⚔ Mission : ${ms.name}</b><div>${ms.line}</div></div>` + hint;
     this.hud.tracker.innerHTML = (qs.length || hint) ? '<div class="tr-title">Quêtes</div>' + hint + qs.map((q) => {
       const st = pd.quests[q.id];
       return `<div class="tr-q ${st.status}"><b>${q.main ? '◆ ' : ''}${q.name}</b><div>${st.status === 'ready' ? `Retournez voir ${NPCS[q.giver].name}` : this.questObjText(q, st)}</div></div>`;
@@ -1184,6 +1250,7 @@ export class UI {
       }
     }
 
+    if (g.scene.mission) { this._misT = (this._misT || 0) - dt; if (this._misT <= 0) { this._misT = 0.5; this.refreshTracker(); } }
     const iconFor = { cri: 'shout', dechainement: 'rage', murdefer: 'wall', oeil: 'eye', voile: 'veil' };
     const bHtml = p.buffs.map((b) => `<div class="buff b-${b.id}">${icon(iconFor[b.id] || 'special')}<span>${Math.ceil(b.t)}</span></div>`).join('');
     if (h.buffs._last !== bHtml) { h.buffs.innerHTML = bHtml; h.buffs._last = bHtml; }

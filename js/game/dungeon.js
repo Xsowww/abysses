@@ -233,5 +233,6 @@ export function generateDungeon(depth) {
     decor,
     props,
     wallDecor,
+    roomOrder: sortedByDist, // salles (hors départ et boss), de la plus proche à la plus lointaine
   };
 }

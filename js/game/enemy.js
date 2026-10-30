@@ -46,7 +46,7 @@ export class Enemy {
   get name() { return (this.elite ? 'Élite · ' : '') + this.def.name; }
 
   alert(g) {
-    if (this.state !== 'idle') return;
+    if (this.state !== 'idle' || this.def.ai === 'static') return;
     this.state = 'chase';
     sfx(this.type === 'rat' ? 'ghoul' : this.type === 'acolyte' || this.boss ? 'alert' : 'bones', { x: this.x, y: this.y, vol: this.type === 'rat' ? 0.6 : 0.45 });
     for (const o of g.scene.enemies) {
@@ -98,6 +98,7 @@ export class Enemy {
 
   update(dt, g) {
     if (this.dead) return;
+    if (this.def.ai === 'static') { this.flash = Math.max(0, this.flash - dt * 5); this.ringT = Math.max(0, (this.ringT || 0) - dt); return; }
     this.squash = Math.max(0, (this.squash || 0) - dt * 6);
     if (this.spawnT > 0) { this.spawnT -= dt; return; }
     const p = g.player;
@@ -400,7 +401,33 @@ export class Enemy {
     return { anim: 'walk', frame: 0, dir, squashY: 1 + 0.012 * Math.sin(time * 2 + this.x) };
   }
 
+  // Cloche rituelle des Sonneurs (objet à détruire) : dessinée en pixel art simple.
+  drawBell(ctx, time) {
+    if (this.dead && !(this.deadT > 0)) return;
+    const x = Math.round(this.x), y = Math.round(this.y);
+    const sw = this.ringT > 0 ? Math.sin(time * 30) * 2 * this.ringT : 0;
+    ctx.save();
+    if (this.dead) ctx.globalAlpha = Math.max(0, this.deadT / (this.deathMax || 0.7));
+    ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.beginPath(); ctx.ellipse(x, y + 10, 18, 6, 0, 0, TAU); ctx.fill();
+    // potence
+    ctx.fillStyle = '#3a2a1c'; ctx.fillRect(x - 16, y - 34, 4, 44); ctx.fillRect(x + 12, y - 34, 4, 44); ctx.fillRect(x - 16, y - 36, 32, 4);
+    // cloche
+    ctx.translate(x + sw, y - 30);
+    ctx.fillStyle = this.flash > 0 ? '#f3ead8' : '#4a3f2a';
+    ctx.fillRect(-7, 2, 14, 4); ctx.fillRect(-9, 6, 18, 8); ctx.fillRect(-11, 14, 22, 8); ctx.fillRect(-13, 22, 26, 4);
+    ctx.fillStyle = this.flash > 0 ? '#fff' : '#7a6640';
+    ctx.fillRect(-6, 6, 3, 14); ctx.fillRect(-12, 22, 24, 2);
+    ctx.fillStyle = '#2a2018'; ctx.fillRect(-2, 26, 4, 4);
+    ctx.restore();
+    // halo violet du rituel
+    if (!this.dead) {
+      ctx.strokeStyle = `rgba(140,90,200,${0.25 + 0.2 * Math.sin(time * 3)})`; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(x, y + 8, 26, 9, 0, 0, TAU); ctx.stroke();
+    }
+  }
+
   draw(ctx, time) {
+    if (this.type === 'cloche') { this.drawBell(ctx, time); return; }
     const sprName = SPRITE_OF[this.type];
     if (hasSprite(sprName)) {
       const sc = this.boss ? 1.7 : this.elite ? 1.14 : 1;
@@ -603,7 +630,7 @@ export class Enemy {
 
   // Yeux lumineux, dessinés par-dessus l'obscurité.
   drawEyes(ctx) {
-    if (this.dead || this.type === 'rat' || this.spawnT > 0) return;
+    if (this.dead || this.type === 'rat' || this.type === 'cloche' || this.spawnT > 0) return;
     if (hasSprite(SPRITE_OF[this.type])) {
       const dir = dirFromAngle(this.angle);
       if (dir === 0) return; // de dos

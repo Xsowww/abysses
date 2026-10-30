@@ -18,6 +18,10 @@ export const ENEMIES = {
     name: 'Acolyte des Abysses', r: 13, hp: 30, dmg: 16, speed: 66, xp: 16, gold: [2, 7],
     color: '#6b3fa0', ai: 'caster', atkRange: 320, windup: 1.1, cd: 3.2, aoeR: 58, aggro: 360, weight: 4,
   },
+  cloche: {
+    name: 'Cloche des Sonneurs', r: 18, hp: 70, dmg: 0, speed: 0, xp: 25, gold: [4, 9],
+    color: '#6b5a3a', ai: 'static', aggro: 0, weight: 0,
+  },
   gardien: {
     name: "Le Gardien d'Os", r: 34, hp: 420, dmg: 20, speed: 78, xp: 160, gold: [60, 90],
     color: '#e6dcc3', ai: 'boss', aggro: 420, boss: true, weight: 50,

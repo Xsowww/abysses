@@ -41,9 +41,16 @@ export function makeContract(pd) {
     outro: [pick(['Le client est content. Voilà ta part.', 'Propre. Je savais que tu reviendrais.', 'Encore un contrat honoré. Les gens commencent à parler de toi.'])] };
 }
 
-// Garde trois contrats disponibles (non acceptés) au tableau.
+// Tableau des contrats : 3 places au maximum. Un nouveau contrat n'arrive qu'après chaque retour
+// d'expédition (pd.boardNew), et on ne peut en mener que MAX_ACTIVE à la fois.
+export const MAX_ACTIVE = 2;
 export function refillContracts(pd) {
   pd.contracts = (pd.contracts || []).filter((c) => !pd.quests[c.id] || pd.quests[c.id].status !== 'done');
+  if (pd.boardInit === undefined) { pd.boardInit = true; pd.boardNew = Math.max(pd.boardNew || 0, 2); }
   const free = pd.contracts.filter((c) => !pd.quests[c.id]);
-  for (let i = free.length; i < 3; i++) pd.contracts.push(makeContract(pd));
+  let n = free.length;
+  while (n < 3 && (pd.boardNew || 0) > 0) { pd.contracts.push(makeContract(pd)); pd.boardNew--; n++; }
+}
+export function activeContracts(pd) {
+  return (pd.contracts || []).filter((c) => pd.quests[c.id] && pd.quests[c.id].status !== 'done').length;
 }

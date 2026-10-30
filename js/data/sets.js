@@ -116,3 +116,6 @@ export function activeSetStats(equipment) {
 export function setsForDepth(depth) {
   return Object.keys(SETS).filter((id) => SETS[id].minDepth <= depth);
 }
+
+// Prix d'une pièce commandée chez Mira (en Sceaux de Valdrenne).
+export const SET_PIECE_COST = 3;

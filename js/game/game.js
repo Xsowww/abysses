@@ -14,11 +14,13 @@ import { Renderer } from './render.js';
 import * as Inv from './inventory.js';
 import { CLASSES, SKILLS, SPEC_LEVEL, xpForLevel } from '../data/classes.js';
 import { ENEMIES, enemyLevel } from '../data/enemies.js';
-import { generateItem, generateSetItem, makeConsumable, starterKit, itemClass, itemName, itemColor, RARITIES, CONSUMABLES, POCKETS, buyPrice, sellValue } from '../data/items.js';
+import { generateItem, generateSetItem, rescaleSetItem, makeConsumable, starterKit, itemClass, itemName, itemColor, RARITIES, CONSUMABLES, POCKETS, buyPrice, sellValue } from '../data/items.js';
 import { QUESTS, NPCS, questDef, allQuests } from '../data/quests.js';
 import { dirFromAngle } from './sprites.js';
-import { SETS, setsForDepth, equippedSetCounts } from '../data/sets.js';
-import { refillContracts } from '../data/contracts.js';
+import { SETS, setsForDepth, equippedSetCounts, SET_PIECE_COST } from '../data/sets.js';
+import { refillContracts, activeContracts, MAX_ACTIVE } from '../data/contracts.js';
+import { makeMissionBoard, augureBonus, AUGURES } from '../data/missions.js';
+import { setupMission, updateMission, missionOnKill, missionInteract, missionReward } from './missions.js';
 import { LORE, LORE_BY_ID, guardianFor, EPILOGUE_ACT1 } from '../data/story.js';
 
 export const DUNGEON_NAME = 'La Crypte Oubliée';
@@ -139,6 +141,9 @@ export class Game {
     this.renderer.buildCache(s);
     this.snapCamera();
     if (this.pd.shopDirty || !this.pd.shop) this.refreshShop();
+    for (const it of Inv.allItems(this.pd)) if (it.set) rescaleSetItem(it, this.pd.level);
+    if (this.cameFromRun || !this.pd.missionBoard || !this.pd.missionBoard.length) this.pd.missionBoard = makeMissionBoard(this.pd);
+    if (this.cameFromRun) { this.pd.boardNew = Math.min(3, (this.pd.boardNew || 0) + 1); this.cameFromRun = false; }
     refillContracts(this.pd);
     this.syncQuests();
     this.ui.onSceneChange();
@@ -150,11 +155,15 @@ export class Game {
     this.save();
   }
 
-  enterDungeon(depth) {
+  enterDungeon(depth, opts = {}) {
     const d = generateDungeon(depth);
     const s = this.baseScene('dungeon');
     s.depth = depth;
+    s.augures = new Set((opts.augures || []).filter((k) => AUGURES[k]));
+    s.bonus = augureBonus([...s.augures]);
+    this.player.carrying = null;
     this.pd.deepest = Math.max(this.pd.deepest || 1, depth);
+    this.cameFromRun = true;
     s.map = d.map;
     s.torches = d.torches;
     s.decor = d.decor;
@@ -164,7 +173,15 @@ export class Game {
     s.runStats = { kills: 0, xp: 0, items: 0, startTime: this.time };
     const lvl = enemyLevel(depth);
     s.level = lvl;
-    for (const sp of d.spawns) s.enemies.push(new Enemy(sp.type, sp.x, sp.y, lvl, sp.elite));
+    const hate = s.augures.has('hate'), horde = s.augures.has('horde'), chair = s.augures.has('chair');
+    const addE = (e) => { if (chair) { e.maxHp = Math.round(e.maxHp * 1.4); e.hp = e.maxHp; } s.enemies.push(e); };
+    for (const sp of d.spawns) {
+      addE(new Enemy(sp.type, sp.x, sp.y, lvl, sp.elite || (hate && chance(0.08))));
+      if (horde && chance(0.5)) {
+        const a = rand(0, TAU), x = sp.x + Math.cos(a) * 26, y = sp.y + Math.sin(a) * 26;
+        if (!d.map.collides(x, y, 14)) addE(new Enemy(sp.type, x, y, lvl, hate && chance(0.08)));
+      }
+    }
     const boss = new Enemy('gardien', d.bossPos.x, d.bossPos.y, lvl + 1, false);
     boss.guardian = guardianFor(depth);
     s.enemies.push(boss);
@@ -173,6 +190,8 @@ export class Game {
     for (const ins of d.inscriptions || []) s.interactables.push({ type: 'inscription', x: ins.x, y: ins.y, r: 14, label: 'Inscription', text: ins.text });
     for (const c of d.chests) s.interactables.push({ type: 'chest', x: c.x, y: c.y, r: 14, label: c.rich ? 'Coffre orné' : 'Coffre', rich: c.rich, opened: false });
     this.scene = s;
+    setupMission(this, d, opts.mission || null);
+    if (opts.mission) { this.pd.missionBoard = (this.pd.missionBoard || []).filter((o) => o.id !== opts.mission.id); }
     this.fx.clear();
     const p = this.player;
     p.resetCombat();
@@ -253,6 +272,7 @@ export class Game {
         e.update(dt, this);
       }
       this.separateEnemies();
+      updateMission(this, dt);
       this.updateTelegraphs(dt);
       this.updateProjectiles(dt);
       this.updateTraps(dt);
@@ -562,12 +582,14 @@ export class Game {
     e.dead = true;
     e.deadT = e.boss ? 1.6 : 0.7;
     e.deathMax = e.deadT;
+    missionOnKill(this, e);
+    if (e.type === 'cloche') { this.addXp(e.xp, e.x, e.y); this.dropExtras(e.x, e.y, 'elite'); return; }
     this.renderer.addDecal(s, e);
     const debris = e.type === 'acolyte' ? '#3a2850' : e.type === 'rat' ? '#3e2f26' : '#b9b19c';
     this.fx.burst(e.x, e.y, debris, e.boss ? 60 : 14, e.boss ? 300 : 170, e.boss ? 1.2 : 0.8, e.boss ? 5 : 4, { drag: 4 });
     this.fx.burst(e.x, e.y, '#4a4440', 8, 60, 0.9, 6, { drag: 2, grav: -20 });
     sfx(e.boss ? 'bossRoar' : e.type === 'rat' ? 'ratDie' : e.type === 'acolyte' ? 'enemyDie' : 'bones', { x: e.x, y: e.y });
-    this.addXp(e.xp, e.x, e.y);
+    this.addXp(e.xp * (1 + (s.bonus || 0) / 200), e.x, e.y);
     const pl = this.player;
     if (pl.stats.killHeal && !pl.dead) pl.heal(pl.maxHp * pl.stats.killHeal / 100);
     this.pd.stats.kills++;
@@ -578,12 +600,12 @@ export class Game {
     const D = e.def;
     const il = s.level + randInt(0, 2);
     // Or
-    const goldN = chance(0.55) ? Math.round(randInt(D.gold[0], D.gold[1]) * 0.7 * (1 + (s.depth - 1) * 0.45) * (e.elite ? 3 : 1) * (1 + (pl.stats.goldFind || 0) / 100)) : 0;
+    const goldN = chance(0.55) ? Math.round(randInt(D.gold[0], D.gold[1]) * 0.7 * (1 + (s.depth - 1) * 0.45) * (e.elite ? 3 : 1) * (1 + (pl.stats.goldFind || 0) / 100) * (1 + (s.bonus || 0) / 100)) : 0;
     if (goldN > 0) this.dropGold(e.x, e.y, goldN);
     if (e.summoned) return;
     if (e.boss) { this.onBossKilled(e); return; }
     // Objets
-    const itemChance = e.elite ? 0.5 : 0.055;
+    const itemChance = (e.elite ? 0.5 : 0.055) * (1 + (s.bonus || 0) / 100) * (e.champion ? 2 : 1);
     if (chance(itemChance)) this.dropItem(e.x, e.y, this.loot({ ilvl: il, rarityBonus: e.elite ? 1 : 0 }));
     if (e.elite && chance(0.12)) this.dropItem(e.x, e.y, this.loot({ ilvl: il, rarityBonus: 1 }));
     if (e.elite && chance(0.12)) this.dropLore(e.x, e.y);
@@ -799,6 +821,8 @@ export class Game {
         this.ui.inscription(o.text);
         sfx('page');
         break;
+      default:
+        missionInteract(this, o);
     }
   }
 
@@ -866,6 +890,7 @@ export class Game {
     const p = this.player;
     if (p.potionCd > 0) return;
     if (p.hp >= p.maxHp) { this.ui.toast('PV déjà au maximum', 'info', 1); return; }
+    if (this.scene.augures && this.scene.augures.has('jeune')) { this.ui.toast('Augure du Jeûne : pas de fiole pendant cette descente.', 'bad', 1.5); sfx('error'); return; }
     if (!Inv.consume(this.pd, 'potion')) { this.ui.toast('Aucune potion !', 'bad', 1.2); sfx('error'); return; }
     p.potionCd = 2.5;
     const heal = Math.round(p.maxHp * 0.4);
@@ -905,6 +930,21 @@ export class Game {
     pd.gold += gold;
     pd.runGold = 0;
     const found = [...pd.inventory, ...pd.pocket].filter((it) => it && it.found).map((it) => ({ name: itemName(it), color: itemColor(it), qty: it.qty }));
+    // Mission : payée seulement maintenant, si elle est accomplie
+    const MR = missionReward(this, reason === 'Portail du boss');
+    let missionLine = null;
+    if (MR && !MR.failed) {
+      pd.sceaux = (pd.sceaux || 0) + MR.sceaux;
+      pd.gold += MR.gold;
+      for (const m of MR.mats) if (!Inv.addItem(pd, makeConsumable(m.id, m.qty))) Inv.addTo(pd.stash, makeConsumable(m.id, m.qty));
+      if (MR.item && !Inv.addItem(pd, MR.item)) Inv.addTo(pd.stash, MR.item);
+      pd.stats.missions = (pd.stats.missions || 0) + 1;
+      this.addXp(MR.xp);
+      missionLine = `Mission « ${MR.name} » accomplie : +${MR.sceaux} Sceaux de Valdrenne, +${MR.gold} or, +${MR.xp} XP${MR.mats.length ? ', ' + MR.mats.map((m) => `${m.qty} × ${CONSUMABLES[m.id].name}`).join(', ') : ''}${MR.item ? ', ' + MR.item.name : ''}`;
+      found.push(...MR.mats.map((m) => ({ name: CONSUMABLES[m.id].name, color: CONSUMABLES[m.id].color, qty: m.qty })));
+      if (MR.item) found.push({ name: MR.item.name, color: itemColor(MR.item) });
+    } else if (MR && MR.failed) missionLine = `Mission « ${MR.name} » non accomplie.`;
+    this.player.carrying = null;
     this.clearFoundFlags();
     pd.inRun = false;
     pd.shopDirty = true;
@@ -922,6 +962,7 @@ export class Game {
       gold,
       kept: found,
       lost: [],
+      mission: missionLine,
     }, () => { this.running = true; this.enterVillage(); });
   }
 
@@ -959,6 +1000,8 @@ export class Game {
     playMusic(null);
     const s = this.scene;
     const pen = this.applyDeathPenalty();
+    const mis = s.mission ? `Mission « ${s.mission.def.name} » perdue${p.carrying ? ' — le reliquaire retourne aux Abysses' : ''}.` : null;
+    p.carrying = null;
     setTimeout(() => {
       this.running = false;
       this.ui.showSummary({
@@ -971,6 +1014,7 @@ export class Game {
         lostGold: pen.lostGold,
         kept: pen.kept,
         lost: pen.lost,
+        mission: mis,
       }, () => { this.ui.dying(false); this.running = true; this.enterVillage(); });
     }, 2200);
   }
@@ -1076,7 +1120,10 @@ export class Game {
 
   questsAvailable(npcId) {
     const pd = this.pd;
-    if (npcId === 'lisette') refillContracts(pd);
+    if (npcId === 'lisette') {
+      refillContracts(pd);
+      if (activeContracts(pd) >= MAX_ACTIVE) return [];
+    }
     return allQuests(pd).filter((q) => q.giver === npcId && !pd.quests[q.id] && (!q.req || (pd.quests[q.req] && pd.quests[q.req].status === 'done')));
   }
 
@@ -1209,7 +1256,6 @@ export class Game {
       pd.stats.contracts = (pd.stats.contracts || 0) + 1;
       delete pd.quests[id];
       pd.contracts = (pd.contracts || []).filter((c) => c.id !== id);
-      refillContracts(pd);
     }
     this.syncQuests();
     this.save();
@@ -1275,6 +1321,16 @@ export class Game {
     const c = this.upgradeCost(item);
     pd.gold -= c.gold;
     for (const k in c) if (k !== 'gold') Inv.takeAll(pd, k, c[k]);
+    if (item.set) {
+      item.up = (item.up || 0) + 1;
+      item.roll.done = -1;
+      rescaleSetItem(item, item.ilvl);
+      item.name = item.name.replace(/ \+\d$/, '') + ' +' + item.up;
+      this.player.recalc(); sfx('heavy'); setTimeout(() => sfx('block'), 180);
+      this.ui.toast(`${item.name} : renforcé.`, 'good', 3);
+      this.syncQuests(); this.save(); this.ui.refresh();
+      return;
+    }
     if (!item.base0) item.base0 = { dmg: item.dmg, armor: item.armor, block: item.block, dmgBonus: item.dmgBonus };
     item.up = (item.up || 0) + 1;
     const m = 1 + 0.12 * item.up;
@@ -1289,6 +1345,28 @@ export class Game {
     this.syncQuests();
     this.save();
     this.ui.refresh();
+  }
+
+  // ---------------- ATELIER DE MIRA ----------------
+  buySetPiece(setId, slot) {
+    const pd = this.pd;
+    if ((pd.sceaux || 0) < SET_PIECE_COST) { this.ui.toast('Pas assez de Sceaux de Valdrenne.', 'bad', 2); sfx('error'); return; }
+    if (!Inv.freeCount(pd.inventory)) { this.ui.toast('Inventaire plein.', 'bad', 2); sfx('error'); return; }
+    pd.sceaux -= SET_PIECE_COST;
+    const it = generateSetItem(setId, slot, pd.level);
+    Inv.addItem(pd, it);
+    sfx('coin'); this.ui.toast(`Mira vous remet : ${it.name}`, 'good', 3);
+    this.save(); this.ui.refresh();
+  }
+
+  recycleSetPiece(r) {
+    const pd = this.pd;
+    const arr = r.c === 'inv' ? pd.inventory : r.c === 'stash' ? pd.stash : r.c === 'pocket' ? pd.pocket : null;
+    if (!arr || !arr[r.i] || !arr[r.i].set) return;
+    arr[r.i] = null;
+    pd.sceaux = (pd.sceaux || 0) + 1;
+    sfx('coin'); this.ui.toast('Mira range la pièce : +1 Sceau de Valdrenne.', 'good', 2);
+    this.save(); this.ui.refresh();
   }
 
   forgeUnlocked() { const q = this.pd.quests.b_fer; return !!(q && q.status === 'done'); }

@@ -42,7 +42,7 @@ export const NPCS = {
     ],
   },
   mira: {
-    name: 'Mira', title: 'Antiquaire', color: '#4a1d1d', hood: '#1a1414',
+    name: 'Mira', title: 'Antiquaire', color: '#4a1d1d', hood: '#1a1414', shop: 'atelier', shopLabel: 'Voir l’atelier (ensembles)',
     greet: [
       'Les armures de Valdrenne étaient faites pour être portées ensemble. Une pièce seule ne vaut rien. Toutes ensemble… ah.',
       'Rapporte-moi ce que tu trouves en bas. Même ce qui te semble inutile. Surtout ce qui te semble inutile.',
