@@ -51,22 +51,39 @@ const SURVIVORS = ['Jehan, le fils du meunier', 'Aude, la lavandière', 'Pérrin
 export function championName() { return pick(CHAMPION_NAMES); }
 export function survivorName() { return pick(SURVIVORS); }
 
-// Trois propositions de mission, adaptées à la profondeur la plus basse débloquée.
-export function makeMissionBoard(pd) {
-  const maxD = Math.max(1, pd.maxDepth || 1);
-  const types = Object.keys(MISSIONS);
-  const board = [];
-  const used = new Set();
-  for (let i = 0; i < 3; i++) {
-    let t;
-    for (let k = 0; k < 20; k++) { t = pick(types); if (!used.has(t)) break; }
-    used.add(t);
-    const minD = MISSIONS[t].minDepth;
-    const depth = Math.max(minD, Math.min(maxD, maxD - Math.floor(Math.random() * Math.min(2, maxD))));
-    if (depth > maxD) continue;
-    board.push({ id: uid(), type: t, depth });
+// La mission n'est PAS choisie par le joueur : les Abysses l'imposent.
+// Ordre de découverte : chaque mode apparaît à tour de rôle (la première descente est libre),
+// puis les missions sont tirées au hasard (jamais deux fois de suite la même).
+export const MISSION_ORDER = ['chasse', 'balises', 'sauvetage', 'reliquaire', 'siege', 'cloches'];
+
+// Mission exigée par un contrat en cours (prioritaire)
+export function contractMission(pd) {
+  for (const c of pd.contracts || []) {
+    const st = pd.quests && pd.quests[c.id];
+    if (st && st.status === 'active' && c.obj.type === 'mission') return c.obj.mtype;
   }
-  return board;
+  return null;
+}
+
+// Prochaine mission prévue (calculée au retour au village, affichée au portail)
+export function planMission(pd) {
+  if (!(pd.stats && pd.stats.runs)) return null;
+  const seen = pd.missionsSeen || [];
+  const fresh = MISSION_ORDER.find((t) => !seen.includes(t) && MISSIONS[t].minDepth <= (pd.maxDepth || 1));
+  if (fresh) return fresh;
+  return pick(MISSION_ORDER.filter((t) => t !== pd.lastMission));
+}
+
+// Mission réellement attribuée en entrant à une profondeur donnée
+export function missionForRun(pd, depth) {
+  const ok = (t) => t && MISSIONS[t] && MISSIONS[t].minDepth <= depth;
+  const c = contractMission(pd);
+  if (ok(c)) return c;
+  if (ok(pd.nextMission)) return pd.nextMission;
+  if (!pd.nextMission) return null;
+  // la mission prévue n'existe pas à cette profondeur : une autre déjà connue la remplace
+  const alt = (pd.missionsSeen || []).filter((t) => ok(t) && t !== pd.lastMission);
+  return alt.length ? pick(alt) : MISSION_ORDER.find(ok);
 }
 
 export function augureBonus(list) {

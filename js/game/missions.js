@@ -275,6 +275,7 @@ export function missionReward(g, viaBoss) {
   const bonus = 1 + (s.bonus || 0) / 100;
   const D = s.depth;
   const R = {
+    type: m.type,
     name: m.def.name,
     sceaux: m.def.sceaux + ((s.bonus || 0) >= 50 ? 1 : 0),
     gold: Math.round((80 + D * 60) * bonus),

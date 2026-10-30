@@ -1,5 +1,6 @@
 // Contrats de l'auberge (Lisette) : tâches secondaires renouvelables, adaptées à la profondeur atteinte.
 import { pick, randInt, uid, chance } from '../core/util.js';
+import { MISSIONS } from './missions.js';
 
 const CLIENTS = ['le meunier', 'la veuve Corbin', 'les gardes', 'le marchand de sel', 'un voyageur pressé', 'le chapelain', 'les enfants du lavoir', 'un inconnu encapuchonné'];
 const PLURAL = { rat: 'goules', squelette: 'squelettes', archer: 'archers squelettes', acolyte: 'acolytes' };
@@ -10,6 +11,9 @@ export function makeContract(pd) {
   const who = pick(CLIENTS);
   const kinds = ['kill', 'kill', 'elite', 'bring', 'extract'];
   if (D >= 2) kinds.push('boss');
+  // missions déjà découvertes : Lisette peut en commander une précise (elle sera imposée à la prochaine descente)
+  const known = (pd.missionsSeen || []).filter((t) => MISSIONS[t] && MISSIONS[t].minDepth <= (pd.maxDepth || 1));
+  if (known.length >= 2) kinds.push('mission', 'mission');
   const k = pick(kinds);
   let c;
   if (k === 'kill') {
@@ -25,6 +29,10 @@ export function makeContract(pd) {
     const mat = D >= 3 && chance(0.4) ? 'bronze' : 'fer';
     const n = mat === 'fer' ? randInt(8, 14) : randInt(3, 6);
     c = { name: mat === 'fer' ? 'Commande de fer' : 'Commande de bronze noir', desc: `${who[0].toUpperCase() + who.slice(1)} a besoin de ${n} ${mat === 'fer' ? 'Fers de Valdrenne' : 'Éclats de bronze noir'}. À rapporter au village.`, obj: { type: 'bring', id: mat, count: n, minDepth: mat === 'fer' ? 1 : 2 } };
+  } else if (k === 'mission') {
+    const t = pick(known);
+    const NAMES = { chasse: 'Tête mise à prix', sauvetage: 'Ramener les disparus', cloches: 'Faire taire les cloches', reliquaire: 'Le reliquaire volé', balises: 'Les feux des veilleurs', siege: 'Le sceau qui cède' };
+    c = { name: `Contrat : ${NAMES[t] || MISSIONS[t].name}`, desc: `De la part de ${who} : accomplir la mission « ${MISSIONS[t].name} » et en revenir vivant. Tant que ce contrat est en cours, les Abysses vous imposeront cette mission.`, obj: { type: 'mission', mtype: t, count: 1 } };
   } else if (k === 'boss') {
     const d = randInt(Math.max(1, D - 1), D);
     c = { name: `Prime : Gardien de la profondeur ${d}`, desc: `De la part de ${who} : vaincre un Gardien à la profondeur ${d} ou plus.`, obj: { type: 'boss', depth: d, count: 1, fresh: true } };

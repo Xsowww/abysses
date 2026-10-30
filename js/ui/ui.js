@@ -14,7 +14,7 @@ import {
 } from '../data/items.js';
 import { CLASSES, SKILLS, SPEC_LEVEL, xpForLevel } from '../data/classes.js';
 import { QUESTS, NPCS, questDef, allQuests } from '../data/quests.js';
-import { MISSIONS, AUGURES, augureBonus } from '../data/missions.js';
+import { MISSIONS, AUGURES, augureBonus, contractMission, MISSION_ORDER as MISSION_ORDER_UI } from '../data/missions.js';
 import { missionStatus } from '../game/missions.js';
 import { SETS, SET_STAT_LABEL, setBonusText, equippedSetCounts, SET_PIECE_COST } from '../data/sets.js';
 import { enemyLevel } from '../data/enemies.js';
@@ -413,12 +413,10 @@ export class UI {
       case 'open-portal': this.open('portal'); break;
       case 'buy-cons': { const n = +(el && el.dataset.n) || 1; for (let i = 0; i < n; i++) g.buy('consumable', arg); break; }
       case 'descend': {
-        const sel = (this.pd.missionBoard || []).find((m) => m.id === this.opts.mission) || null;
         const aug = [...(this.opts.aug || [])];
-        this.close(); g.enterDungeon(+arg, { mission: sel, augures: aug });
+        this.close(); g.enterDungeon(+arg, { augures: aug });
         break;
       }
-      case 'pick-mission': this.opts.mission = arg || null; sfx('ui'); this.refresh(); break;
       case 'toggle-aug': {
         const a = this.opts.aug || (this.opts.aug = []);
         const i = a.indexOf(arg);
@@ -582,6 +580,7 @@ export class UI {
       case 'elite': return `Élites abattues : ${n} / ${o.count}`;
       case 'boss': return `Gardien vaincu (profondeur ${o.depth}${o.fresh ? '' : '+'}) : ${n} / ${o.count}`;
       case 'extract': return `Extractions réussies : ${n} / ${o.count}`;
+      case 'mission': return `Mission « ${MISSIONS[o.mtype].name} » accomplie : ${n} / ${o.count}`;
       case 'depth': return `Atteindre la profondeur ${o.depth} : ${n} / ${o.count}`;
       case 'lore': return `Trouver : ${n ? 'fait' : 'pas encore'}`;
       case 'lorecount': return `Fragments trouvés : ${n} / ${o.count}`;
@@ -838,20 +837,22 @@ export class UI {
     const pd = this.pd;
     const o = this.opts;
     if (!o.aug) o.aug = [];
-    const board = pd.missionBoard || [];
-    const sel = board.find((m) => m.id === o.mission) || null;
     const bonus = augureBonus(o.aug);
-    // Missions proposées
-    const mCards = [`<div class="mis-card ${!sel ? 'st-max' : ''}" data-action="pick-mission" data-arg=""><div class="mc-name">Exploration libre</div><div class="dim">Descendre où vous voulez, sans objectif. Pas de Sceaux.</div></div>`]
-      .concat(board.map((m) => {
-        const M = MISSIONS[m.type];
-        return `<div class="mis-card ${sel === m ? 'st-max' : 'st-avail'}" data-action="pick-mission" data-arg="${m.id}"><div class="mc-name">${M.name} <span class="dim">· profondeur ${m.depth}</span></div><div class="mc-desc">${M.desc}</div><div class="mc-rew">Récompense à l’extraction : <b>${M.sceaux} Sceaux</b>, or, matériaux${bonus ? ` · <span class="glow">+${bonus} %</span>` : ''}</div></div>`;
-      })).join('');
+    // La mission n'est pas choisie : elle est imposée (contrat en cours, sinon mode suivant)
+    const forced = contractMission(pd);
+    const mt = forced || pd.nextMission;
+    const M = mt && MISSIONS[mt];
+    const seen = pd.missionsSeen || [];
+    const mCard = M
+      ? `<div class="mis-card st-avail"><div class="mc-name">${M.name}${seen.includes(mt) ? '' : ' <span class="glow">· nouvelle</span>'}</div><div class="mc-desc">${M.desc}</div>
+        ${M.minDepth > 1 ? `<div class="dim">À partir de la profondeur ${M.minDepth} (plus haut, une autre mission la remplace).</div>` : ''}
+        ${forced ? '<div class="dim">Imposée par votre contrat chez Lisette.</div>' : ''}
+        <div class="mc-rew">Récompense à l’extraction : <b>${M.sceaux} Sceaux</b>, or, matériaux${bonus ? ` · <span class="glow">+${bonus} %</span>` : ''}</div></div>`
+      : `<div class="mis-card st-off"><div class="mc-name">Descente libre</div><div class="dim">Aucune mission cette fois. Explorez, trouvez le Gardien et remontez.</div></div>`;
+    const prog = `<div class="dim" style="margin-top:6px">Modes découverts : ${MISSION_ORDER_UI.map((t) => seen.includes(t) ? `<span class="glow">${MISSIONS[t].name}</span>` : '<span>???</span>').join(' · ')}</div>`;
     const augs = Object.entries(AUGURES).map(([k, A]) => `<label class="aug ${o.aug.includes(k) ? 'st-max' : ''}" data-action="toggle-aug" data-arg="${k}"><span class="aug-box">${o.aug.includes(k) ? '■' : '□'}</span><b>${A.name}</b> <span class="dim">${A.desc}</span> <span class="glow">+${A.bonus} %</span></label>`).join('');
     let rows = '';
-    if (sel) {
-      rows = `<div class="actions" style="justify-content:center;margin-top:10px"><button class="btn main big" data-action="descend" data-arg="${sel.depth}">Partir : ${MISSIONS[sel.type].name} — profondeur ${sel.depth}</button></div>`;
-    } else {
+    {
       for (let d = 1; d <= pd.maxDepth; d++) {
         const L = enemyLevel(d);
         const kills = pd.bossKills[d] || 0;
@@ -864,8 +865,8 @@ export class UI {
     const ps = Inv.pocketSize(pd);
     const pots = Inv.countConsumable(pd, 'potion'), stones = Inv.countConsumable(pd, 'pierre');
     const html = `<div class="portal-layout"><div class="col">
-      <h3>Mission</h3><p class="hint" style="margin-top:-4px">Trois missions vous sont proposées ; elles changent à chaque retour. La récompense n’est versée que si vous remontez vivant.</p>
-      <div class="mis-list">${mCards}</div></div>
+      <h3>Mission de la prochaine descente</h3><p class="hint" style="margin-top:-4px">Ce sont les Abysses qui décident. Chaque descente apporte une mission différente ; la récompense n’est versée que si vous remontez vivant.</p>
+      <div class="mis-list">${mCard}</div>${prog}</div>
       <div class="col"><h3>Augures <span class="dim">bonus de butin, d’or et d’XP : <b class="glow">+${bonus} %</b></span></h3>
       <div class="aug-list">${augs}</div>
       <div class="rules"><div>Équipement porté — <b>toujours conservé</b></div><div>Poche sécurisée (${ps} empl.) — <b>conservée</b></div><div>Butin du sac et or ramassé — <span class="bad">perdus à la mort</span></div>

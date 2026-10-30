@@ -19,7 +19,7 @@ import { QUESTS, NPCS, questDef, allQuests } from '../data/quests.js';
 import { dirFromAngle } from './sprites.js';
 import { SETS, setsForDepth, equippedSetCounts, SET_PIECE_COST } from '../data/sets.js';
 import { refillContracts, activeContracts, MAX_ACTIVE } from '../data/contracts.js';
-import { makeMissionBoard, augureBonus, AUGURES } from '../data/missions.js';
+import { planMission, missionForRun, augureBonus, AUGURES, MISSIONS } from '../data/missions.js';
 import { setupMission, updateMission, missionOnKill, missionInteract, missionReward } from './missions.js';
 import { LORE, LORE_BY_ID, guardianFor, EPILOGUE_ACT1 } from '../data/story.js';
 
@@ -142,7 +142,7 @@ export class Game {
     this.snapCamera();
     if (this.pd.shopDirty || !this.pd.shop) this.refreshShop();
     for (const it of Inv.allItems(this.pd)) if (it.set) rescaleSetItem(it, this.pd.level);
-    if (this.cameFromRun || !this.pd.missionBoard || !this.pd.missionBoard.length) this.pd.missionBoard = makeMissionBoard(this.pd);
+    if (this.cameFromRun || this.pd.nextMission === undefined) this.pd.nextMission = planMission(this.pd);
     if (this.cameFromRun) { this.pd.boardNew = Math.min(3, (this.pd.boardNew || 0) + 1); this.cameFromRun = false; }
     refillContracts(this.pd);
     this.syncQuests();
@@ -190,8 +190,21 @@ export class Game {
     for (const ins of d.inscriptions || []) s.interactables.push({ type: 'inscription', x: ins.x, y: ins.y, r: 14, label: 'Inscription', text: ins.text });
     for (const c of d.chests) s.interactables.push({ type: 'chest', x: c.x, y: c.y, r: 14, label: c.rich ? 'Coffre orné' : 'Coffre', rich: c.rich, opened: false });
     this.scene = s;
-    setupMission(this, d, opts.mission || null);
-    if (opts.mission) { this.pd.missionBoard = (this.pd.missionBoard || []).filter((o) => o.id !== opts.mission.id); }
+    // La mission est imposée (contrat en cours, sinon mode suivant à découvrir, sinon hasard)
+    const mtype = opts.mission ? opts.mission.type : missionForRun(this.pd, depth);
+    const firstTime = mtype && !(this.pd.missionsSeen || []).includes(mtype);
+    setupMission(this, d, mtype ? { type: mtype, depth } : null);
+    if (mtype) {
+      this.pd.missionsSeen = [...new Set([...(this.pd.missionsSeen || []), mtype])];
+      this.pd.lastMission = mtype;
+      this.pd.nextMission = null;
+      const M = MISSIONS[mtype];
+      setTimeout(() => {
+        if (this.scene !== s) return;
+        this.ui.banner((firstTime ? 'Nouvelle mission : ' : 'Mission : ') + M.name, 'gold');
+        this.ui.toast(M.desc + ' Récompense versée si vous remontez vivant.', 'info', firstTime ? 9 : 6);
+      }, 4300);
+    }
     this.fx.clear();
     const p = this.player;
     p.resetCombat();
@@ -986,6 +999,7 @@ export class Game {
       for (const m of MR.mats) if (!Inv.addItem(pd, makeConsumable(m.id, m.qty))) Inv.addTo(pd.stash, makeConsumable(m.id, m.qty));
       if (MR.item && !Inv.addItem(pd, MR.item)) Inv.addTo(pd.stash, MR.item);
       pd.stats.missions = (pd.stats.missions || 0) + 1;
+      this.questEvent('mission', { mtype: MR.type });
       this.addXp(MR.xp);
       missionLine = `Mission « ${MR.name} » accomplie : +${MR.sceaux} Sceaux de Valdrenne, +${MR.gold} or, +${MR.xp} XP${MR.mats.length ? ', ' + MR.mats.map((m) => `${m.qty} × ${CONSUMABLES[m.id].name}`).join(', ') : ''}${MR.item ? ', ' + MR.item.name : ''}`;
       found.push(...MR.mats.map((m) => ({ name: CONSUMABLES[m.id].name, color: CONSUMABLES[m.id].color, qty: m.qty })));
@@ -1260,6 +1274,7 @@ export class Game {
       if (type === 'kill' && o.target !== data.type && o.also !== data.type) continue;
       if ((type === 'boss' || type === 'depth') && data.depth < o.depth) continue;
       if (type === 'lore' && o.id !== data.id) continue;
+      if (type === 'mission' && o.mtype !== data.mtype) continue;
       st.progress++;
       if (st.progress >= o.count) {
         st.progress = o.count;
