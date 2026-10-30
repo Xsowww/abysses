@@ -792,3 +792,7 @@ input[type=range] { accent-color: #b9803f; }
 .spec-play li { position: relative; padding-left: 14px; margin: 4px 0; line-height: 1.35; }
 .spec-play li::before { content: '◆'; position: absolute; left: 0; color: var(--gold); font-size: 9px; top: 3px; }
 .spec-play b { color: var(--gold); font-weight: 600; }
+/* Barre de vie du boss : le cadre 9-slice ne doit pas manger la hauteur intérieure */
+.bb-bar { box-sizing: content-box; height: 18px; }
+.bb-fill, .bb-trail { top: 0; bottom: 0; }
+body:has(#boss-bar:not(.hidden)) #subtitle { bottom: 200px; }
