@@ -360,8 +360,8 @@ export const QUEST_BY_ID = Object.fromEntries(QUESTS.map((q) => [q.id, q]));
 
 // Quêtes connues (fixes + contrats de l'auberge, générés et stockés dans la sauvegarde).
 export function questDef(pd, id) {
-  return QUEST_BY_ID[id] || (pd && pd.contracts || []).find((c) => c.id === id) || null;
+  return QUEST_BY_ID[id] || (pd && pd.contracts || []).find((c) => c.id === id) || (pd && pd.mquest && pd.mquest.id === id ? pd.mquest : null);
 }
 export function allQuests(pd) {
-  return [...QUESTS, ...((pd && pd.contracts) || [])];
+  return [...QUESTS, ...((pd && pd.contracts) || []), ...(pd && pd.mquest ? [pd.mquest] : [])];
 }

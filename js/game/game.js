@@ -19,7 +19,7 @@ import { QUESTS, NPCS, questDef, allQuests } from '../data/quests.js';
 import { dirFromAngle } from './sprites.js';
 import { SETS, setsForDepth, equippedSetCounts, SET_PIECE_COST } from '../data/sets.js';
 import { refillContracts, activeContracts, MAX_ACTIVE } from '../data/contracts.js';
-import { planMission, missionForRun, augureBonus, AUGURES, MISSIONS } from '../data/missions.js';
+import { makeMissionQuest, augureBonus, AUGURES, MISSIONS } from '../data/missions.js';
 import { setupMission, updateMission, missionOnKill, missionInteract, missionReward } from './missions.js';
 import { LORE, LORE_BY_ID, guardianFor, EPILOGUE_ACT1 } from '../data/story.js';
 
@@ -142,7 +142,7 @@ export class Game {
     this.snapCamera();
     if (this.pd.shopDirty || !this.pd.shop) this.refreshShop();
     for (const it of Inv.allItems(this.pd)) if (it.set) rescaleSetItem(it, this.pd.level);
-    if (this.cameFromRun || this.pd.nextMission === undefined) this.pd.nextMission = planMission(this.pd);
+    if (!this.pd.mquest && (this.pd.stats.runs || 0) > 0) this.newMissionQuest();
     if (this.cameFromRun) { this.pd.boardNew = Math.min(3, (this.pd.boardNew || 0) + 1); this.cameFromRun = false; }
     refillContracts(this.pd);
     this.syncQuests();
@@ -190,19 +190,14 @@ export class Game {
     for (const ins of d.inscriptions || []) s.interactables.push({ type: 'inscription', x: ins.x, y: ins.y, r: 14, label: 'Inscription', text: ins.text });
     for (const c of d.chests) s.interactables.push({ type: 'chest', x: c.x, y: c.y, r: 14, label: c.rich ? 'Coffre orné' : 'Coffre', rich: c.rich, opened: false });
     this.scene = s;
-    // La mission est imposée (contrat en cours, sinon mode suivant à découvrir, sinon hasard)
-    const mtype = opts.mission ? opts.mission.type : missionForRun(this.pd, depth);
-    const firstTime = mtype && !(this.pd.missionsSeen || []).includes(mtype);
-    setupMission(this, d, mtype ? { type: mtype, depth } : null);
-    if (mtype) {
-      this.pd.missionsSeen = [...new Set([...(this.pd.missionsSeen || []), mtype])];
-      this.pd.lastMission = mtype;
-      this.pd.nextMission = null;
-      const M = MISSIONS[mtype];
-      setTimeout(() => {
-        if (this.scene !== s) return;
-        this.ui.banner((firstTime ? 'Nouvelle mission : ' : 'Mission : ') + M.name, 'gold');
-      }, 4300);
+    // La mission de descente est celle confiée par un habitant (quête de mission acceptée)
+    const mq = this.pd.mquest, mst = mq && this.pd.quests[mq.id];
+    const offer = opts.mission ? opts.mission
+      : mq && mst && mst.status === 'active' && MISSIONS[mq.mtype].minDepth <= depth ? { type: mq.mtype, who: mq.who, qname: mq.name } : null;
+    setupMission(this, d, offer);
+    if (offer) {
+      const title = offer.qname || MISSIONS[offer.type].name;
+      setTimeout(() => { if (this.scene === s) this.ui.banner(title, 'gold'); }, 4300);
     }
     this.fx.clear();
     const p = this.player;
@@ -1313,6 +1308,11 @@ export class Game {
     this.ui.toast(`Quête rendue : ${q.name} (+${R.gold || 0} or)`, 'good', 3);
     if (R.xp) this.addXp(R.xp, this.player.x, this.player.y);
     sfx('quest');
+    if (q.mission) {
+      delete pd.quests[id];
+      pd.mquest = null;
+      this.newMissionQuest();
+    }
     if (q.contract) {
       pd.stats.contracts = (pd.stats.contracts || 0) + 1;
       delete pd.quests[id];
@@ -1326,6 +1326,16 @@ export class Game {
       this.save();
       setTimeout(() => { this.ui.close(); sfx('bell'); this.ui.showStory(EPILOGUE_ACT1, null, 'Acte I — La Cloche Noire'); }, 600);
     }
+  }
+
+  // Nouvelle mission de descente, confiée par un habitant
+  newMissionQuest() {
+    const pd = this.pd;
+    const q = makeMissionQuest(pd);
+    if (!q) return;
+    pd.mquest = q;
+    pd.missionsSeen = [...new Set([...(pd.missionsSeen || []), q.mtype])];
+    pd.lastMission = q.mtype;
   }
 
   // Prochaine étape de l'histoire principale (pour guider le joueur).

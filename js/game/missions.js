@@ -36,7 +36,7 @@ export function setupMission(g, d, offer) {
       const e = new Enemy(type, p.x, p.y, s.level + 2, true);
       e.maxHp = e.hp = Math.round(e.maxHp * 3.2);
       e.dmg *= 1.25; e.r *= 1.12; e.xp *= 4;
-      e.champion = championName();
+      e.champion = offer.who || championName();
       s.enemies.push(e);
       m.target = e;
       m.label = e.champion;
@@ -46,7 +46,7 @@ export function setupMission(g, d, offer) {
       const r = pick(far.length ? far : rooms);
       const p = floorIn(map, r, 2);
       const lvl = s.level;
-      m.survivor = { x: p.x, y: p.y, hp: 70 + lvl * 10, maxHp: 70 + lvl * 10, following: false, name: survivorName(), walkT: 0, dir: 2, moving: false };
+      m.survivor = { x: p.x, y: p.y, hp: 70 + lvl * 10, maxHp: 70 + lvl * 10, following: false, name: offer.who || survivorName(), walkT: 0, dir: 2, moving: false };
       m.label = m.survivor.name;
       s.interactables.push({ type: 'survivor', x: p.x, y: p.y, r: 16, label: m.survivor.name, mission: true });
       // quelques gardes autour du captif
@@ -105,12 +105,12 @@ export function missionStatus(g) {
   const M = m.def;
   let line;
   if (m.failed) line = 'Échouée';
-  else if (m.done) line = 'Accomplie — remontez vivant pour être payé';
+  else if (m.done) line = 'Accomplie — remontez';
   else switch (m.type) {
     case 'chasse': line = `Abattre ${m.label}`; break;
     case 'sauvetage': line = m.survivor.following ? `Escorter ${m.survivor.name} (${Math.ceil(m.survivor.hp)} PV)` : `Trouver ${m.survivor.name}`; break;
     case 'cloches': line = `Cloches détruites : ${m.progress} / ${m.total}`; break;
-    case 'reliquaire': line = g.player.carrying ? 'Rapporter le reliquaire à la surface' : 'Trouver le reliquaire (salle la plus lointaine)'; break;
+    case 'reliquaire': line = g.player.carrying ? 'Rapporter le reliquaire' : 'Trouver le reliquaire'; break;
     case 'balises': line = `Braseros rallumés : ${m.progress} / ${m.total}`; break;
     case 'siege': line = m.seal.active ? `Tenir le cercle : ${Math.ceil(m.seal.dur - m.seal.t)} s` : 'Trouver et activer le sceau'; break;
   }
@@ -289,4 +289,39 @@ export function missionReward(g, viaBoss) {
   if (D >= 4 && chance(0.35 * bonus)) R.mats.push({ id: 'larme', qty: 1 });
   if (chance(0.35 * bonus)) R.item = generateSetItem(pick(setsForDepth(D)), null, pd.level);
   return R;
+}
+
+// Où aller pour faire avancer la mission (indicateur à l'écran). null = rien à montrer.
+export function missionTarget(g) {
+  const s = g.scene, p = g.player, pd = g.pd;
+  if (!s || !p) return null;
+  const nearest = (list) => {
+    let best = null, bd = Infinity;
+    for (const o of list) { const d = dist(o.x, o.y, p.x, p.y); if (d < bd) { bd = d; best = o; } }
+    return best;
+  };
+  if (s.type === 'village') {
+    const mq = pd.mquest;
+    if (!mq) return null;
+    const st = pd.quests[mq.id];
+    const npcs = s.interactables.filter((o) => o.type === 'npc');
+    const o = st && st.status === 'active' ? npcs.find((n) => n.npc.portal) : npcs.find((n) => n.id === mq.giver);
+    return o ? { npc: true, x: o.x, y: o.y - 52, label: st && st.status === 'active' ? 'Portail' : o.label } : null;
+  }
+  const m = s.mission;
+  if (!m || m.failed) return null;
+  const exitT = () => {
+    const ex = nearest(s.interactables.filter((o) => o.type === 'extract' || o.type === 'exitPortal'));
+    return ex ? { x: ex.x, y: ex.y, label: 'Sortie' } : null;
+  };
+  if (m.done || p.carrying || (m.type === 'sauvetage' && m.survivor.following)) return exitT();
+  switch (m.type) {
+    case 'chasse': return m.target && !m.target.dead ? { x: m.target.x, y: m.target.y - 20, label: m.label } : null;
+    case 'sauvetage': return { x: m.survivor.x, y: m.survivor.y - 20, label: m.survivor.name };
+    case 'cloches': { const b = nearest(m.bells.filter((e) => !e.dead)); return b ? { x: b.x, y: b.y - 24, label: 'Cloche' } : null; }
+    case 'reliquaire': { const o = s.interactables.find((i) => i.type === 'reliquary'); return o ? { x: o.x, y: o.y - 16, label: 'Reliquaire' } : null; }
+    case 'balises': { const o = nearest(s.interactables.filter((i) => i.type === 'beacon' && !i.lit)); return o ? { x: o.x, y: o.y - 16, label: 'Brasero' } : null; }
+    case 'siege': return m.seal.active ? null : { x: m.seal.x, y: m.seal.y, label: 'Sceau' };
+  }
+  return null;
 }

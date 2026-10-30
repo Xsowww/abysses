@@ -4,6 +4,7 @@ import { hash2, TAU, clamp, dist } from '../core/util.js';
 import { itemColor, itemName } from '../data/items.js';
 import { hasSprite, drawSprite, dirFromAngle, walkFrame } from './sprites.js';
 import { hasTiles, drawT, drawProp, tileMeta } from './tiles.js';
+import { missionTarget } from './missions.js';
 
 const LIGHT_SCALE = 0.5;
 
@@ -599,6 +600,52 @@ export class Renderer {
     }
     fx.drawTexts(ctx);
     ctx.setTransform(1, 0, 0, 1, 0, 0);
+    this.drawObjective(game, cx, cy, kk);
+  }
+
+  // Indicateur d'objectif : losange au-dessus de la cible si elle est visible, flèche au bord sinon.
+  drawObjective(game, cx, cy, kk) {
+    const t = missionTarget(game);
+    const p = game.player;
+    if (!t || !p || p.dead) return;
+    const ctx = this.octx, W = this.overlay.width, H = this.overlay.height, D = this.dpr;
+    const sx = (t.x - cx) * kk, sy = (t.y - cy) * kk;
+    const time = game.time;
+    const d = dist(t.x, t.y, p.x, p.y);
+    const m = Math.round(d / TILE);
+    const pulse = 0.75 + 0.25 * Math.sin(time * 5);
+    ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+    const L = 70 * D, R = W - 70 * D, T0 = 130 * D, B = H - 120 * D;
+    if (sx > L && sx < R && sy > T0 * 0.5 && sy < B) {
+      if (d < 70 || t.npc) return; // un PNJ porte déjà sa marque « ! »
+      const y = sy - (14 + Math.sin(time * 4) * 4) * D;
+      ctx.save(); ctx.translate(sx, y); ctx.rotate(Math.PI / 4);
+      const k = 7 * D;
+      ctx.fillStyle = '#000'; ctx.fillRect(-k - D, -k - D, 2 * k + 2 * D, 2 * k + 2 * D);
+      ctx.fillStyle = `rgba(224,174,106,${pulse})`; ctx.fillRect(-k, -k, 2 * k, 2 * k);
+      ctx.fillStyle = '#1a1410'; ctx.fillRect(-k / 3, -k / 3, k / 1.5, k / 1.5);
+      ctx.restore();
+      return;
+    }
+    // hors champ : flèche sur le bord, dans la direction de la cible
+    const ox = W / 2, oy = H / 2;
+    const a = Math.atan2(sy - oy, sx - ox);
+    const ca = Math.cos(a), sa = Math.sin(a);
+    const kx = ca > 0 ? (R - ox) / ca : ca < 0 ? (L - ox) / ca : Infinity;
+    const ky = sa > 0 ? (B - oy) / sa : sa < 0 ? (T0 - oy) / sa : Infinity;
+    const k = Math.min(kx, ky);
+    const ax = ox + ca * k, ay = oy + sa * k;
+    ctx.save(); ctx.translate(ax, ay); ctx.rotate(a);
+    const z = 14 * D;
+    ctx.beginPath(); ctx.moveTo(z + 3 * D, 0); ctx.lineTo(-z * 0.7, -z * 0.85); ctx.lineTo(-z * 0.25, 0); ctx.lineTo(-z * 0.7, z * 0.85); ctx.closePath();
+    ctx.lineWidth = 4 * D; ctx.strokeStyle = '#000'; ctx.stroke();
+    ctx.fillStyle = `rgba(224,174,106,${pulse})`; ctx.fill();
+    ctx.restore();
+    ctx.font = `600 ${12 * D}px 'Pixelify Sans', sans-serif`;
+    const lx = ax - ca * 30 * D, ly = ay - sa * 30 * D;
+    const txt = `${t.label} · ${m} m`;
+    ctx.fillStyle = 'rgba(0,0,0,0.8)'; ctx.fillText(txt, lx + D, ly + D);
+    ctx.fillStyle = '#e0ae6a'; ctx.fillText(txt, lx, ly);
   }
 
   wrap(ctx, text, maxW) {
@@ -611,7 +658,9 @@ export class Renderer {
 
   questMark(game, npcId) {
     if (game.questsOf(npcId, 'ready').length) return { c: '?', color: '#ffd24a' };
-    if (game.questsAvailable(npcId).length) return { c: '!', color: '#ffd24a' };
+    const av = game.questsAvailable(npcId);
+    if (av.some((q) => q.mission)) return { c: '!', color: '#ff7a3a' };
+    if (av.length) return { c: '!', color: '#ffd24a' };
     if (game.questsOf(npcId, 'active').length) return { c: '?', color: '#8a8a8a' };
     return null;
   }

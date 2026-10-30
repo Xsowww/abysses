@@ -56,34 +56,33 @@ export function survivorName() { return pick(SURVIVORS); }
 // puis les missions sont tirées au hasard (jamais deux fois de suite la même).
 export const MISSION_ORDER = ['chasse', 'balises', 'sauvetage', 'reliquaire', 'siege', 'cloches'];
 
-// Mission exigée par un contrat en cours (prioritaire)
-export function contractMission(pd) {
-  for (const c of pd.contracts || []) {
-    const st = pd.quests && pd.quests[c.id];
-    if (st && st.status === 'active' && c.obj.type === 'mission') return c.obj.mtype;
-  }
-  return null;
-}
-
-// Prochaine mission prévue (calculée au retour au village, affichée au portail)
+// Mode suivant : chaque mode à tour de rôle (selon la profondeur débloquée), puis au hasard sans répétition.
 export function planMission(pd) {
-  if (!(pd.stats && pd.stats.runs)) return null;
   const seen = pd.missionsSeen || [];
   const fresh = MISSION_ORDER.find((t) => !seen.includes(t) && MISSIONS[t].minDepth <= (pd.maxDepth || 1));
   if (fresh) return fresh;
-  return pick(MISSION_ORDER.filter((t) => t !== pd.lastMission));
+  return pick(MISSION_ORDER.filter((t) => t !== pd.lastMission && MISSIONS[t].minDepth <= (pd.maxDepth || 1)));
 }
 
-// Mission réellement attribuée en entrant à une profondeur donnée
-export function missionForRun(pd, depth) {
-  const ok = (t) => t && MISSIONS[t] && MISSIONS[t].minDepth <= depth;
-  const c = contractMission(pd);
-  if (ok(c)) return c;
-  if (ok(pd.nextMission)) return pd.nextMission;
-  if (!pd.nextMission) return null;
-  // la mission prévue n'existe pas à cette profondeur : une autre déjà connue la remplace
-  const alt = (pd.missionsSeen || []).filter((t) => ok(t) && t !== pd.lastMission);
-  return alt.length ? pick(alt) : MISSION_ORDER.find(ok);
+// Chaque mission est confiée par un habitant : c'est la raison de la prochaine descente.
+export const MISSION_GIVER = { chasse: 'aldric', balises: 'aldric', sauvetage: 'odile', reliquaire: 'gaspard', siege: 'anselme', cloches: 'maelis' };
+
+export function makeMissionQuest(pd) {
+  const t = planMission(pd);
+  if (!t) return null;
+  const M = MISSIONS[t];
+  let who = null, name, desc, intro;
+  switch (t) {
+    case 'chasse': who = championName(); name = `Tête mise à prix : ${who}`; desc = `${who} rôde dans les Abysses. Abattez-le.`; intro = [`${who}. Trois de mes gardes ne sont pas remontés. Ramène-moi sa tête.`]; break;
+    case 'sauvetage': who = survivorName(); name = `Retrouver ${who}`; desc = `${who} n’est pas remonté. Ramenez-le vivant.`; intro = [`${who} est descendu hier. Personne ne l’a revu. Ramène-le… vivant.`]; break;
+    case 'cloches': name = 'Faire taire les cloches'; desc = 'Détruisez les 3 cloches des Sonneurs.'; intro = ['Elles sonnent encore, en bas. Brise-les avant qu’elles n’appellent autre chose.']; break;
+    case 'reliquaire': name = 'Le reliquaire de Saint-Oren'; desc = 'Rapportez le reliquaire scellé à la surface.'; intro = ['Un reliquaire repose tout au fond. Lourd. Ne le lâche pas.']; break;
+    case 'balises': name = 'Les feux des veilleurs'; desc = 'Rallumez les 4 braseros.'; intro = ['Les veilleurs gardaient quatre feux. Rallume-les, qu’on voie enfin ce qui rampe là-dessous.']; break;
+    case 'siege': name = 'Le sceau qui cède'; desc = 'Tenez le sceau 60 s.'; intro = ['Le sceau se fissure. Tiens-le une minute. Une seule.']; break;
+  }
+  return { id: 'mq_' + uid(), giver: MISSION_GIVER[t], mission: true, mtype: t, who, name, desc,
+    obj: { type: 'mission', mtype: t, count: 1 }, reward: {},
+    intro, outro: [pick(['C’est fait, donc. Bien.', 'Tu es revenu. Peu en reviennent.', 'Les Abysses te laissent passer… pour l’instant.'])] };
 }
 
 export function augureBonus(list) {

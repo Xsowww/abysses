@@ -13,7 +13,7 @@ export function makeContract(pd) {
   if (D >= 2) kinds.push('boss');
   // missions déjà découvertes : Lisette peut en commander une précise (elle sera imposée à la prochaine descente)
   const known = (pd.missionsSeen || []).filter((t) => MISSIONS[t] && MISSIONS[t].minDepth <= (pd.maxDepth || 1));
-  if (known.length >= 2) kinds.push('mission', 'mission');
+  // (les missions de descente sont confiées par les habitants, pas par le tableau)
   const k = pick(kinds);
   let c;
   if (k === 'kill') {
