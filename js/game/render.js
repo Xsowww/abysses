@@ -1224,6 +1224,18 @@ export class Renderer {
       if (hasTiles()) {
         ctx.save(); ctx.translate(x, y + 6); ctx.scale(1.35, 1.35); if (o.opened) ctx.globalAlpha = 0.55;
         drawT(ctx, o.rich ? 'chest2' : 'chest', -16, -26);
+        if (!o.opened) {
+          // le sprite montre un coffre ouvert : on referme le couvercle par-dessus l'intérieur sombre
+          const X = -13, Y = -15; // zone intérieure (26 × 10) dans la case 32 × 32
+          ctx.fillStyle = '#622613'; ctx.fillRect(X, Y, 26, 10);
+          ctx.fillStyle = '#9d6639'; ctx.fillRect(X, Y, 26, 2);
+          ctx.fillStyle = '#7a3c22'; ctx.fillRect(X, Y + 4, 26, 1); ctx.fillRect(X, Y + 7, 26, 1);
+          ctx.fillStyle = '#2b1c1d'; ctx.fillRect(X, Y + 9, 26, 1);
+          ctx.fillStyle = '#1d131e'; ctx.fillRect(X + 2, Y, 5, 10); ctx.fillRect(X + 19, Y, 5, 10);
+          ctx.fillStyle = '#4a3f55'; ctx.fillRect(X + 3, Y, 1, 10); ctx.fillRect(X + 20, Y, 1, 10);
+          ctx.fillStyle = o.rich ? '#e0ae6a' : '#8a8478'; ctx.fillRect(X + 11, Y + 5, 4, 5);
+          ctx.fillStyle = '#1d131e'; ctx.fillRect(X + 12, Y + 7, 2, 2);
+        }
         ctx.restore();
         if (o.opened) { ctx.fillStyle = 'rgba(10,8,6,0.8)'; ctx.fillRect(x - 15, y - 16, 30, 6); }
       } else this.drawChestShape(ctx, x, y, o.opened, o.rich ? '#241c22' : '#2e2218', o.rich ? '#a8884a' : '#5e4c34', o.openT);
