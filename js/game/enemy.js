@@ -107,6 +107,7 @@ export class Enemy {
     if (this.def.ai === 'static') { this.flash = Math.max(0, this.flash - dt * 5); this.ringT = Math.max(0, (this.ringT || 0) - dt); return; }
     this.squash = Math.max(0, (this.squash || 0) - dt * 6);
     if (this.spawnT > 0) { this.spawnT -= dt; return; }
+    if (this.boss && g.scene.gate && !g.scene.gate.open) return; // il attend derrière sa grille
     const p = g.player;
     const map = g.scene.map;
     this.flash = Math.max(0, this.flash - dt * 5);

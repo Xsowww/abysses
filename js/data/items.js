@@ -38,9 +38,9 @@ export const WEAPONS = {
   arc: { name: 'Arc long', cls: 'rodeur', hands: 1, dmg: 1.05, cd: 0.52, range: 620, ranged: true, projSpeed: 820, kb: 80 },
   arbalete: { name: 'Arbalète', cls: 'rodeur', hands: 1, dmg: 1.6, cd: 0.88, range: 560, ranged: true, projSpeed: 950, kb: 160, pierce: 1 },
   // Mage : projectiles magiques (magic) ; le sceptre explose à l'impact (splash)
-  baguette: { name: 'Baguette', cls: 'mage', hands: 1, dmg: 0.72, cd: 0.32, range: 430, ranged: true, magic: true, projSpeed: 600, kb: 40 },
-  baton: { name: 'Bâton', cls: 'mage', hands: 2, dmg: 1.0, cd: 0.52, range: 520, ranged: true, magic: true, projSpeed: 540, kb: 70 },
-  sceptre: { name: 'Sceptre', cls: 'mage', hands: 1, dmg: 1.4, cd: 0.82, range: 470, ranged: true, magic: true, projSpeed: 470, kb: 110, splash: 46 },
+  baguette: { name: 'Baguette', cls: 'mage', hands: 1, dmg: 0.7, cd: 0.34, range: 430, ranged: true, magic: true, projSpeed: 600, kb: 40, aoe: 40, delay: 0.1 },
+  baton: { name: 'Bâton', cls: 'mage', hands: 2, dmg: 1.0, cd: 0.56, range: 520, ranged: true, magic: true, projSpeed: 540, kb: 70, aoe: 54, delay: 0.16 },
+  sceptre: { name: 'Sceptre', cls: 'mage', hands: 1, dmg: 1.4, cd: 0.86, range: 470, ranged: true, magic: true, projSpeed: 470, kb: 110, aoe: 70, delay: 0.24 },
 };
 export const FISTS = { name: 'Poings', hands: 1, dmg: 1, cd: 0.4, range: 42, arc: 90, kb: 60 };
 

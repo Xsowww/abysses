@@ -451,6 +451,29 @@ export class Renderer {
     // Interactifs
     for (const o of s.interactables) if (inView(o.x, o.y)) this.drawInteractable(ctx, o, time, game);
 
+    // Grille de la salle du boss et clé
+    const G = s.gate;
+    if (G && !G.open) {
+      for (const c of G.cells) {
+        const x = c.x * TILE, y = c.y * TILE;
+        if (!inView(x, y, 40)) continue;
+        ctx.fillStyle = 'rgba(0,0,0,0.35)'; ctx.fillRect(x, y + TILE - 6, TILE, 6);
+        ctx.fillStyle = '#2a2622'; ctx.fillRect(x, y - 10, TILE, 4); ctx.fillRect(x, y + TILE - 4, TILE, 3);
+        for (let k = 3; k < TILE; k += 7) { ctx.fillStyle = '#1a1714'; ctx.fillRect(x + k, y - 8, 4, TILE + 5); ctx.fillStyle = '#5a534a'; ctx.fillRect(x + k, y - 8, 2, TILE + 5); }
+        ctx.fillStyle = '#4a433a'; ctx.fillRect(x, y + 6, TILE, 2); ctx.fillRect(x, y + 18, TILE, 2);
+      }
+      if (G.key && inView(G.key.x, G.key.y)) {
+        const kx = G.key.x, ky = G.key.y - 8 + Math.sin(time * 3) * 3;
+        ctx.fillStyle = `rgba(224,174,106,${0.25 + 0.15 * Math.sin(time * 4)})`; ctx.beginPath(); ctx.ellipse(G.key.x, G.key.y + 6, 16, 6, 0, 0, TAU); ctx.fill();
+        {
+          ctx.save(); ctx.translate(kx, ky); ctx.scale(2, 2); ctx.translate(-kx, -ky);
+          ctx.fillStyle = '#e0ae6a'; ctx.fillRect(kx - 8, ky - 3, 5, 6); ctx.fillRect(kx - 3, ky - 1, 12, 2); ctx.fillRect(kx + 6, ky + 1, 2, 3); ctx.fillRect(kx + 3, ky + 1, 2, 2);
+          ctx.fillStyle = '#1a1410'; ctx.fillRect(kx - 7, ky - 1, 2, 2);
+          ctx.restore();
+        }
+      }
+    }
+
     // Butin au sol
     for (const d of s.drops) if (inView(d.x, d.y)) this.drawDrop(ctx, d, time);
 
@@ -884,6 +907,37 @@ export class Renderer {
   }
 
   drawZone(ctx, z, time) {
+    if (z.kind === 'burst') {
+      const col = z.fire ? '255,130,50' : z.bone ? '210,225,190' : '140,170,255';
+      ctx.save();
+      if (z.t < 0) {
+        const k = 1 + z.t / 0.25;
+        ctx.strokeStyle = `rgba(${col},${0.5 + 0.4 * k})`; ctx.lineWidth = 1.5;
+        ctx.beginPath(); ctx.arc(z.x, z.y, z.r, 0, TAU); ctx.stroke();
+        ctx.fillStyle = `rgba(${col},${0.12 + 0.2 * k})`; ctx.beginPath(); ctx.arc(z.x, z.y, z.r * Math.max(0.1, k), 0, TAU); ctx.fill();
+      } else {
+        const k = 1 - z.t / 0.3;
+        ctx.globalCompositeOperation = 'lighter';
+        ctx.fillStyle = `rgba(${col},${0.45 * k})`; ctx.beginPath(); ctx.arc(z.x, z.y, z.r * (1 + 0.2 * (1 - k)), 0, TAU); ctx.fill();
+        if (z.bone) { ctx.globalCompositeOperation = 'source-over'; ctx.fillStyle = `rgba(230,236,215,${k})`; for (let i = 0; i < 7; i++) { const a = i * 0.9 + z.x, rr = z.r * (0.25 + (i % 3) * 0.25); const px = z.x + Math.cos(a) * rr, py = z.y + Math.sin(a) * rr * 0.6; ctx.beginPath(); ctx.moveTo(px - 3, py + 2); ctx.lineTo(px, py - 14 * k); ctx.lineTo(px + 3, py + 2); ctx.fill(); } }
+      }
+      ctx.restore();
+      return;
+    }
+    if (z.kind === 'vortex') {
+      if (z.boom) return;
+      const col = z.fire ? [255, 120, 40] : [130, 90, 255];
+      ctx.save(); ctx.translate(z.x, z.y);
+      ctx.strokeStyle = `rgba(${col},0.35)`; ctx.lineWidth = 1; ctx.setLineDash([4, 6]);
+      ctx.beginPath(); ctx.arc(0, 0, z.pull, time * 2, time * 2 + TAU); ctx.stroke(); ctx.setLineDash([]);
+      ctx.globalCompositeOperation = 'lighter';
+      for (let i = 0; i < 3; i++) { ctx.strokeStyle = `rgba(${col},${0.5 - i * 0.12})`; ctx.lineWidth = 3; ctx.beginPath(); ctx.arc(0, 0, 18 + i * 10, time * (4 + i) + i, time * (4 + i) + i + 3.6); ctx.stroke(); }
+      ctx.fillStyle = `rgba(${col},0.5)`; ctx.beginPath(); ctx.arc(0, 0, 16, 0, TAU); ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = '#0a0612'; ctx.beginPath(); ctx.arc(0, 0, 9, 0, TAU); ctx.fill();
+      ctx.restore();
+      return;
+    }
     if (z.kind === 'meteor') {
       if (z.t >= 0) return;
       const k = 1 + z.t / 0.9; // 0 → 1
@@ -949,6 +1003,8 @@ export class Renderer {
       else if (o.type === 'npc') lights.push({ x: o.x, y: o.y, r: 110, a: 0.5, c: 'warm', g: 0 });
     }
     for (const pr of s.projectiles) lights.push(pr.magic ? { x: pr.x, y: pr.y, r: pr.orb ? 120 : 80, a: 0.75, c: pr.fire ? 'warm' : pr.bone ? 'green' : 'blue', g: 0.25 } : { x: pr.x, y: pr.y, r: 60, a: 0.5, c: 'white', g: 0.15 });
+    for (const z of s.zones) if (z.kind === 'vortex' && !z.boom) lights.push({ x: z.x, y: z.y, r: 150, a: 0.7, c: z.fire ? 'warm' : 'purple', g: 0.3 });
+    if (s.gate && s.gate.key) lights.push({ x: s.gate.key.x, y: s.gate.key.y, r: 140, a: 0.8, c: 'warm', g: 0.35 });
     for (const z of s.zones) if (z.kind === 'meteor') lights.push({ x: z.x, y: z.y, r: z.t < 0 ? 140 : 220, a: 0.8, c: 'warm', g: 0.3 });
     for (const d of s.drops) if (d.item && d.item.kind === 'lore') lights.push({ x: d.x, y: d.y, r: 80, a: 0.6, c: 'warm', g: 0.25 });
     for (const o of s.interactables) if (o.type === 'inscription') lights.push({ x: o.x, y: o.y, r: 50, a: 0.35, c: 'warm', g: 0.15 });

@@ -237,11 +237,11 @@ export const CLASSES = {
     name: 'Mage',
     color: '#4a5a8a',
     title: 'Lettré de l’Abîme',
-    desc: 'Sorts à distance. Très fragile. Bâtons, sceptres, grimoires.',
+    desc: 'Explosions à distance. Très fragile.',
     hpBase: 80, hpPerLvl: 11, speed: 215,
     special: {
-      name: 'Explosion arcanique', icon: 'bolt', cd: 1.8, stamina: 26,
-      desc: 'Un orbe qui explose à l’impact : 200 % des dégâts dans la zone.',
+      name: 'Orbe du vide', icon: 'nova', cd: 3.5, stamina: 30,
+      desc: 'Un orbe lent qui attire les ennemis et les broie, puis explose (160 %).',
     },
     tierReq: [0, 3, 6, 9, 12],
     talents: [
@@ -270,7 +270,7 @@ export const CLASSES = {
         play: [
           '<b>Chaleur</b> : monte à chaque sort, +dégâts.',
           'À 100 : <b>Surchauffe</b> — sorts gratuits, vous brûlez.',
-          'Vos traits <b>explosent</b> et enflamment.',
+          'Vos éclats <b>enflamment</b>.',
         ],
         tierReq: [0, 2, 4, 6],
         talents: [
@@ -290,7 +290,7 @@ export const CLASSES = {
         desc: 'Les morts ne partent jamais vraiment.',
         play: [
           'Spéciale : <b>lever un mort</b> qui combat pour vous (3 max).',
-          'Vos traits d’os <b>transpercent</b>.',
+          'Éclats d’os : <b>pics</b> qui ralentissent.',
           'Chaque ennemi tué prolonge vos serviteurs.',
         ],
         tierReq: [0, 2, 4, 6],

@@ -113,7 +113,7 @@ export function setupMission(g, d, offer) {
       break;
     }
     case 'gardien': {
-      m.timer = 210 + s.depth * 30;
+      m.timer = 480 + s.depth * 60; // il faut d'abord la clé (tous les ennemis)
       m.total = 1;
       break;
     }
@@ -385,6 +385,25 @@ export function missionReward(g, viaBoss) {
   return R;
 }
 
+// Grille du boss : la clé, puis la grille ; s'il reste peu d'ennemis, le plus proche.
+export function gateTarget(g) {
+  const s = g.scene, G = s.gate, p = g.player;
+  if (!G || G.open) return null;
+  if (G.key) return { x: G.key.x, y: G.key.y - 12, label: 'Clé' };
+  if (G.hasKey) {
+    let best = null, bd = Infinity;
+    for (const c of G.cells) { const x = (c.x + 0.5) * TILE, y = (c.y + 0.5) * TILE, d = dist(x, y, p.x, p.y); if (d < bd) { bd = d; best = { x, y: y - 10, label: 'Grille' }; } }
+    return best;
+  }
+  const left = g.gateRemaining();
+  if (left > 0 && left <= 6) {
+    let best = null, bd = Infinity;
+    for (const e of s.enemies) { if (e.dead || e.boss || e.gated) continue; const d = dist(e.x, e.y, p.x, p.y); if (d < bd) { bd = d; best = e; } }
+    if (best) return { x: best.x, y: best.y - 20, label: `Ennemi (${left})` };
+  }
+  return null;
+}
+
 // Où aller pour faire avancer la mission (indicateur à l'écran). null = rien à montrer.
 export function missionTarget(g) {
   const s = g.scene, p = g.player, pd = g.pd;
@@ -403,7 +422,8 @@ export function missionTarget(g) {
     return o ? { npc: true, x: o.x, y: o.y - 52, label: st && st.status === 'active' ? 'Portail' : o.label } : null;
   }
   const m = s.mission;
-  if (!m || m.failed) return null;
+  if (!m || m.failed) return gateTarget(g);
+  if (m.type === 'gardien' && !m.done) { const gt = gateTarget(g); if (gt) return gt; }
   const exitT = () => {
     const ex = nearest(s.interactables.filter((o) => o.type === 'extract' || o.type === 'exitPortal'));
     return ex ? { x: ex.x, y: ex.y, label: 'Sortie' } : null;

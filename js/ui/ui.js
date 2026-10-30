@@ -1208,6 +1208,8 @@ export class UI {
     let hint = nx && nx.state === 'available' ? `<div class="tr-q ready"><b>◆ Histoire</b><div>Parlez à ${NPCS[nx.q.giver].name}</div></div>` : '';
     const mq = pd.mquest;
     if (!ms && mq && !pd.quests[mq.id]) hint = `<div class="tr-q ready"><b>⚔ Mission</b><div>Parlez à ${NPCS[mq.giver].name}</div></div>` + hint;
+    const G = this.game.scene && this.game.scene.gate;
+    if (G && !G.open) hint = `<div class="tr-q ${G.key || G.hasKey ? 'ready' : ''}"><b>◇ Grille du Gardien</b><div>${G.hasKey ? 'Clé en main' : G.key ? 'Ramassez la clé' : `Ennemis restants : ${this.game.gateRemaining()}`}</div></div>` + hint;
     if (ms) hint = `<div class="tr-q mission ${ms.done ? 'ready' : ''} ${ms.failed ? 'failed' : ''}"><b>⚔ ${mq && pd.quests[mq.id] ? mq.name : ms.name}</b><div>${ms.line}</div></div>` + hint;
     this.hud.tracker.innerHTML = (qs.length || hint) ? '<div class="tr-title">Quêtes</div>' + hint + qs.map((q) => {
       const st = pd.quests[q.id];
@@ -1257,7 +1259,7 @@ export class UI {
       }
     }
 
-    if (g.scene.mission) { this._misT = (this._misT || 0) - dt; if (this._misT <= 0) { this._misT = 0.5; this.refreshTracker(); } }
+    if (g.scene.mission || (g.scene.gate && !g.scene.gate.open)) { this._misT = (this._misT || 0) - dt; if (this._misT <= 0) { this._misT = 0.5; this.refreshTracker(); } }
     const iconFor = { cri: 'shout', dechainement: 'rage', murdefer: 'wall', oeil: 'eye', voile: 'veil', riposte: 'special', embuscade: 'veil', manashield: 'mshield' };
     const bHtml = p.buffs.map((b) => `<div class="buff b-${b.id}">${icon(iconFor[b.id] || 'special')}<span>${Math.ceil(b.t)}</span></div>`).join('');
     if (h.buffs._last !== bHtml) { h.buffs.innerHTML = bHtml; h.buffs._last = bHtml; }

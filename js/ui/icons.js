@@ -58,13 +58,16 @@ export function icon(name, cls = '') {
 
 // ---------- Icônes d'objets en pixel art (assets/icons) ----------
 let PIX = null;
-const PIX_W = 512, PIX_H = 416;
+let PIX_W = 512, PIX_H = 512; // lus depuis l'image au chargement
 export async function loadIcons() {
   try {
     PIX = await (await fetch('assets/icons/icons.json')).json();
     const im = new Image();
     im.src = 'assets/icons/icons.png';
     await im.decode();
+    PIX_W = im.naturalWidth; PIX_H = im.naturalHeight;
+    // la taille de fond suit l'atlas (cases de 32 px)
+    document.documentElement.style.setProperty('--pix-bg', `${(PIX_W / 32) * 100}% ${(PIX_H / 32) * 100}%`);
   } catch (e) { PIX = null; }
 }
 const hashStr = (str) => { let h = 7; for (const c of str || '') h = (h * 31 + c.charCodeAt(0)) | 0; return Math.abs(h); };
@@ -81,7 +84,9 @@ function pixKey(item) {
   else if (item.slot === 'pocket') cat = 'pocket';
   else if (['head', 'chest'].includes(item.slot)) cat = item.slot + ':' + (item.name || '').split(' ')[0];
   else cat = item.slot;
-  const list = M[cat];
+  let list = M[cat];
+  // nom inhabituel (objets uniques) : une icône de la même pièce
+  if ((!list || !list.length) && ['head', 'chest'].includes(item.slot)) list = M[item.slot === 'head' ? 'head:Heaume' : 'chest:Robe'];
   if (!list || !list.length) return null;
   if (item.kind === 'consumable') return list[0];
   if (item.slot === 'pocket') return list[Math.min(list.length - 1, item.rarity || 0)];

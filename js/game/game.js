@@ -4,7 +4,7 @@ import { sfx, setListener, setReverb, setSurface } from '../core/audio.js';
 import { playMusic, playAmbience } from '../core/music.js';
 import { saveGame } from '../core/save.js';
 import { rand, randInt, dist, angleDiff, TAU, chance, clamp, pick } from '../core/util.js';
-import { TILE } from './world.js';
+import { TILE, T } from './world.js';
 import { Player } from './player.js';
 import { Enemy } from './enemy.js';
 import { Effects } from './effects.js';
@@ -196,6 +196,7 @@ export class Game {
     const offer = opts.mission ? opts.mission
       : mq && mst && mst.status === 'active' && MISSIONS[mq.mtype].minDepth <= depth ? { type: mq.mtype, who: mq.who, qname: mq.name } : null;
     setupMission(this, d, offer);
+    this.setupBossGate(d);
     if (offer) {
       const title = offer.qname || MISSIONS[offer.type].name;
       setTimeout(() => { if (this.scene === s) this.ui.banner(title, 'gold'); }, 4300);
@@ -286,6 +287,7 @@ export class Game {
       this.updateTraps(dt);
       this.updateZones(dt);
       if (this.scene.allies && this.scene.allies.length) this.updateAllies(dt);
+      if (this.scene.gate) this.updateGate(dt);
       if (this.scene.beams && this.scene.beams.length) { for (const b of this.scene.beams) b.t -= dt; this.scene.beams = this.scene.beams.filter((b) => b.t > 0); }
       for (let i = s.enemies.length - 1; i >= 0; i--) {
         const e = s.enemies[i];
@@ -525,6 +527,74 @@ export class Game {
     if (pr.orb || R > 60) { this.fx.shake(4); sfx('heavy', { x, y }); }
   }
 
+  // ---- Salle du boss : grille scellée, clé lâchée par le dernier ennemi ----
+  setupBossGate(d) {
+    const s = this.scene, map = s.map, br = d.bossRoom;
+    if (!br) return;
+    const cells = [];
+    for (let y = br.y - 1; y <= br.y + br.h; y++) for (let x = br.x - 1; x <= br.x + br.w; x++) {
+      const ring = x === br.x - 1 || x === br.x + br.w || y === br.y - 1 || y === br.y + br.h;
+      if (ring && map.get(x, y) === T.FLOOR) { map.set(x, y, T.PROP); cells.push({ x, y }); }
+    }
+    if (!cells.length) return;
+    s.gate = { cells, open: false, key: null, hasKey: false, keyDropped: false };
+    // ennemis accessibles sans passer la grille (les autres ne comptent pas pour la clé)
+    const W = map.w, seen = new Uint8Array(W * map.h);
+    const st = [Math.floor(d.start.x / TILE) + Math.floor(d.start.y / TILE) * W];
+    seen[st[0]] = 1;
+    while (st.length) {
+      const i = st.pop(), x = i % W, y = (i - x) / W;
+      for (const [nx, ny] of [[x + 1, y], [x - 1, y], [x, y + 1], [x, y - 1]]) {
+        if (!map.inBounds(nx, ny) || map.isSolid(nx, ny)) continue;
+        const j = ny * W + nx;
+        if (!seen[j]) { seen[j] = 1; st.push(j); }
+      }
+    }
+    for (const e of s.enemies) {
+      const j = Math.floor(e.y / TILE) * W + Math.floor(e.x / TILE);
+      if (e.boss || !seen[j]) e.gated = true;
+    }
+  }
+  gateRemaining() {
+    let n = 0;
+    for (const e of this.scene.enemies) if (!e.dead && !e.boss && !e.gated) n++;
+    return n;
+  }
+  updateGate(dt) {
+    const s = this.scene, G = s.gate, p = this.player;
+    if (G.open || p.dead) return;
+    if (G.key && dist(p.x, p.y, G.key.x, G.key.y) < 30) {
+      G.key = null; G.hasKey = true;
+      sfx('quest'); this.ui.toast('Clé du donjon', 'good', 3);
+      this.ui.refreshTracker();
+    }
+    if (G.hasKey) {
+      for (const c of G.cells) {
+        if (dist(p.x, p.y, (c.x + 0.5) * TILE, (c.y + 0.5) * TILE) < 70) {
+          G.open = true;
+          for (const k of G.cells) s.map.set(k.x, k.y, T.FLOOR);
+          for (const e of s.enemies) e.gated = false;
+          sfx('portal'); this.fx.shake(6);
+          this.ui.banner('La grille se lève', 'gold');
+          this.ui.refreshTracker();
+          break;
+        }
+      }
+    }
+  }
+  // appelé à chaque mort : le dernier ennemi lâche la clé
+  checkGateKey(e) {
+    const G = this.scene.gate;
+    if (!G || G.open || G.keyDropped || e.boss) return;
+    if (this.gateRemaining() > 0) return;
+    G.keyDropped = true;
+    G.key = { x: e.x, y: e.y };
+    this.fx.pillar(e.x, e.y, '#e0ae6a');
+    sfx('quest');
+    this.ui.banner('La clé du donjon', 'gold');
+    this.ui.refreshTracker();
+  }
+
   // ---- Serviteurs du Nécromancien ----
   allyCount() { return (this.scene.allies || []).filter((a) => !a.dead).length; }
   spawnThrall(x, y, life, extra = false) {
@@ -592,13 +662,46 @@ export class Game {
       const z = s.zones[i];
       z.t += dt;
       if (z.t < 0) continue;
+      if (z.kind === 'vortex') {
+        // l'orbe avance, attire les ennemis, puis explose
+        const nx = z.x + z.vx * dt, ny = z.y + z.vy * dt;
+        if (!s.map.solidAt(nx, ny)) { z.x = nx; z.y = ny; } else { z.vx = z.vy = 0; }
+        z.vx *= 1 - Math.min(1, dt * 0.6); z.vy *= 1 - Math.min(1, dt * 0.6);
+        for (const e of s.enemies) {
+          if (e.dead || e.boss || e.def.ai === 'static') continue;
+          const dd = dist(e.x, e.y, z.x, z.y);
+          if (dd < z.pull && dd > 8) s.map.move(e, (z.x - e.x) / dd * 140 * dt, (z.y - e.y) / dd * 140 * dt);
+        }
+        if (z.t >= z.dur && !z.boom) {
+          z.boom = true;
+          for (const e of s.enemies) if (!e.dead && dist(e.x, e.y, z.x, z.y) < 100 + e.r) this.damageEnemy(e, this.player.rollDamage(1.6, e), Math.atan2(e.y - z.y, e.x - z.x), 260, z.fire ? 40 : 0, z.fire);
+          this.fx.ring(z.x, z.y, z.fire ? '#ff8a3a' : '#a07aff', 100, 0.45);
+          this.fx.burst(z.x, z.y, z.fire ? '#ff7a2a' : '#8a6aff', 40, 280, 0.6, 4, { drag: 3 });
+          this.fx.shake(7); sfx('heavy', { x: z.x, y: z.y });
+        }
+      }
+      if (z.kind === 'burst') {
+        if (z.boom) { if (z.t > 0.3) s.zones.splice(i, 1); continue; }
+        z.boom = true;
+        const p = this.player;
+        for (const e of s.enemies) {
+          if (e.dead || dist(e.x, e.y, z.x, z.y) > z.r + e.r) continue;
+          this.damageEnemy(e, p.rollDamage(z.mult, e), Math.atan2(e.y - z.y, e.x - z.x), (z.kb || 60) * 0.8, z.fire ? 25 : 0, z.fire);
+          if (z.bone && !e.boss) e.slow = { t: 1.2, amt: 0.35 };
+        }
+        const col = z.fire ? '#ff8a3a' : z.bone ? '#d8e4c8' : '#9ab8ff';
+        this.fx.ring(z.x, z.y, col, z.r, 0.28);
+        this.fx.burst(z.x, z.y, col, z.fire ? 16 : 12, 170, 0.4, 3, { drag: 3 });
+        sfx(z.fire ? 'boom' : 'hit', { x: z.x, y: z.y, vol: 0.5 });
+        continue;
+      }
       z.tick -= dt;
       if (z.tick <= 0 && z.t <= z.dur) {
         z.tick = z.interval;
         const meteor = z.kind === 'meteor';
         for (const e of s.enemies) {
           if (e.dead || dist(e.x, e.y, z.x, z.y) > z.r + e.r) continue;
-          this.damageEnemy(e, this.player.rollDamage(z.mult, e), meteor ? Math.atan2(e.y - z.y, e.x - z.x) : -Math.PI / 2, meteor ? 260 : 0, meteor ? 40 : 0, meteor);
+          this.damageEnemy(e, this.player.rollDamage(z.mult, e), meteor ? Math.atan2(e.y - z.y, e.x - z.x) : -Math.PI / 2, meteor ? 260 : 0, meteor ? 40 : z.fire ? 15 : 0, meteor || !!z.fire);
         }
         if (meteor) {
           this.fx.ring(z.x, z.y, '#ff8a3a', z.r, 0.5);
@@ -608,6 +711,7 @@ export class Game {
           sfx('heavy', { x: z.x, y: z.y });
           continue;
         }
+        if (z.kind === 'vortex') { this.fx.burst(z.x, z.y, z.fire ? '#ff8a3a' : '#8a6aff', 6, 120, 0.3, 2, { drag: 2 }); continue; }
         sfx('arrow');
         for (let k = 0; k < 6; k++) this.fx.burst(z.x + rand(-z.r, z.r) * 0.8, z.y + rand(-z.r, z.r) * 0.8, '#6a6050', 2, 40, 0.25, 2);
       }
@@ -637,6 +741,7 @@ export class Game {
   damageEnemy(e, dm, kbAng, kbForce, poisonPct = 0, fire = false) {
     if (e.dead) return;
     const p = this.player;
+    if (e.boss && this.scene.gate && !this.scene.gate.open) return; // intouchable derrière sa grille
     if (e.mods && e.mods.length && e.mods.includes('cuirasse') && !dm.dot) dm = { ...dm, amount: Math.max(1, Math.round(dm.amount * 0.6)) };
     if (!dm.dot && p.hasUniq('treize')) {
       p.hitN = (p.hitN || 0) + 1;
@@ -677,6 +782,7 @@ export class Game {
     e.deadT = e.boss ? 1.6 : 0.7;
     e.deathMax = e.deadT;
     missionOnKill(this, e);
+    this.checkGateKey(e);
     if (this.player.spec === 'necromancien') for (const a of s.allies || []) a.t = Math.min(25, a.t + 2);
     if (e.type === 'cloche' || e.type === 'nid') { this.addXp(e.xp, e.x, e.y); this.dropExtras(e.x, e.y, 'elite'); return; }
     if (e.mods && e.mods.includes('instable')) this.addTelegraph({ shape: 'circle', x: e.x, y: e.y, r: 80, dur: 0.9, dmg: e.dmg * 1.4, owner: null, onFire: (gg, t) => { gg.fx.burst(t.x, t.y, '#ff6040', 30, 260, 0.5, 4, { glow: true }); gg.fx.shake(6); sfx('boom'); } });

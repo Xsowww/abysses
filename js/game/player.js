@@ -371,7 +371,7 @@ export class Player {
         } else this.attackCd = 0.15;
       } else if (this.useStamina(w.ranged ? ATTACK_COST * 0.6 : ATTACK_COST)) {
         this.attackCd = w.cd / this.attackSpeedMult();
-        if (w.magic) this.castBolt(1, {});
+        if (w.magic) this.castBurst(1);
         else if (w.ranged) this.shoot(this.aim, 1, { pierce: (w.pierce || 0) + this.stats.pierce });
         else this.doSwing(this.aim, w.range, w.arc, 1, w.kb, false);
         if (this.channel) g.cancelChannel('Attaque');
@@ -404,7 +404,7 @@ export class Player {
         } else if (this.useStamina(sp.stamina)) {
           this.specialCd = sp.cd * this.cdMult();
           this.attackCd = Math.max(this.attackCd, 0.4);
-          this.castBolt(2, { orb: true, splash: 80, heat: 15 });
+          this.castVortex();
         }
       } else if (spec === 'ombrelame') {
         if (this.useStamina(16)) {
@@ -436,6 +436,32 @@ export class Player {
     else if (spec === 'necromancien') { opt.bone = true; opt.pierce = (o.orb ? 99 : 1) + this.stats.pierce; }
     this.shoot(this.aim, mult, opt);
     this.atk = { anim: 'attack', from: 0.25, to: 0.999, t: 0, dur: o.orb ? 0.42 : 0.28 };
+  }
+
+  // Mage : éclat qui explose à l'endroit visé (portée limitée, arrêté par les murs)
+  castBurst(mult) {
+    const g = this.game, w = this.weapon(), map = g.scene.map, spec = this.spec;
+    const mw = g.mouseWorld();
+    const maxD = Math.min(w.range * 0.75, Math.max(40, dist(this.x, this.y, mw.x, mw.y)));
+    let d = 30;
+    for (let k = 30; k <= maxD; k += 8) { if (map.solidAt(this.x + Math.cos(this.aim) * k, this.y + Math.sin(this.aim) * k)) break; d = k; }
+    const x = this.x + Math.cos(this.aim) * d, y = this.y + Math.sin(this.aim) * d;
+    const pyro = spec === 'pyromancien', necro = spec === 'necromancien';
+    g.scene.zones.push({ kind: 'burst', x, y, r: (w.aoe || 50) + (pyro ? 8 : 0), t: -(w.delay || 0.15), dur: 0.01, tick: 0, interval: 9, mult, fire: pyro, bone: necro, kb: w.kb });
+    if (pyro) this.addHeat(6);
+    this.atk = { anim: 'attack', from: 0.25, to: 0.999, t: 0, dur: 0.28 };
+    g.fx.burst(this.x + Math.cos(this.aim) * 14, this.y + Math.sin(this.aim) * 14 - 10, pyro ? '#ff8a3a' : necro ? '#c8d8b8' : '#9ab8ff', 4, 60, 0.25, 2);
+    sfx('cast', { vol: 0.45 });
+  }
+
+  // Mage : orbe du vide — lent, attire et broie, puis explose
+  castVortex() {
+    const g = this.game, pyro = this.spec === 'pyromancien';
+    g.scene.zones.push({ kind: 'vortex', x: this.x + Math.cos(this.aim) * 24, y: this.y + Math.sin(this.aim) * 24 - 6, vx: Math.cos(this.aim) * 165, vy: Math.sin(this.aim) * 165,
+      r: 70, pull: 150, t: 0, dur: 2.4, tick: 0.15, interval: 0.3, mult: 0.35, fire: pyro, boom: false });
+    if (pyro) this.addHeat(15);
+    this.atk = { anim: 'attack', from: 0, to: 0.999, t: 0, dur: 0.42 };
+    sfx('heavy');
   }
 
   addHeat(n) {
