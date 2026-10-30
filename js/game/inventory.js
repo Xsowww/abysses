@@ -1,5 +1,5 @@
 // Opérations d'inventaire : sac, poche sécurisée, coffre, équipement.
-import { CONSUMABLES, isTwoHanded, itemName, itemClass } from '../data/items.js';
+import { CONSUMABLES, isTwoHanded, itemName, itemClass, reqLevel } from '../data/items.js';
 import { CLASSES } from '../data/classes.js';
 
 export const INV_SIZE = 30;
@@ -108,6 +108,7 @@ export function equip(pd, ref) {
   if (ref.c === 'equip') return null;
   const ic = itemClass(item);
   if (ic && ic !== pd.cls) return `Réservé à la classe ${CLASSES[ic].name}.`;
+  if (reqLevel(item) > pd.level) return `Niveau ${reqLevel(item)} requis.`;
   const slot = item.slot;
   const old = pd.equipment[slot] || null;
   const extra = []; // objets supplémentaires à ranger dans le sac

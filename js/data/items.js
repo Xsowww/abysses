@@ -275,6 +275,8 @@ export function generateItem({ ilvl = 1, rarity = null, slot = null, rarityBonus
     if (baseName === 'Robe' || baseName === 'Chapeau') { mats = CLOTH_MATERIALS; if (item.armor) item.armor = Math.max(1, Math.round(item.armor * 0.7)); }
   }
   item.name = `${baseName} ${mats[tier]}`;
+  // Niveau requis : le butin des profondeurs peut dépasser le porteur (à rapporter, en poche, pour plus tard)
+  item.req = Math.max(1, ilvl - 3);
 
   const nAff = R.affixes + (slot === 'amulet' || slot === 'ring' ? 1 : 0);
   const pool = [...affixPool];
@@ -319,6 +321,8 @@ const EXTRA_LABELS = {
   eliteDmg: ['% de dégâts aux élites et Gardiens', true], goldFind: ['% d’or ramassé', true], poison: ['% de dégâts en poison', true],
   pierce: ['ennemi(s) transpercé(s)', false], block: ['% de blocage', true], armorPct: ['% d’armure', true],
 };
+export function reqLevel(item) { return (item && item.kind === 'equip' && !item.set && item.req) || 1; }
+
 export function affixText(a) {
   const A = AFFIXES[a.k] || (EXTRA_LABELS[a.k] && { label: EXTRA_LABELS[a.k][0], pct: EXTRA_LABELS[a.k][1] }) || { label: a.k };
   const sign = a.v < 0 ? '' : '+';

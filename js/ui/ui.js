@@ -10,7 +10,7 @@ import { drawHero } from '../game/hero.js';
 import { hasSprite, drawSprite, walkFrame } from '../game/sprites.js';
 import {
   RARITIES, SLOTS, EQUIP_ORDER, WEAPONS, CONSUMABLES, affixText, itemName, itemColor, itemRarity, itemLore, itemClass,
-  buyPrice, sellValue, isTwoHanded, makeConsumable, slotLabel, starterKit,
+  buyPrice, sellValue, isTwoHanded, makeConsumable, slotLabel, starterKit, reqLevel,
 } from '../data/items.js';
 import { CLASSES, SKILLS, SPEC_LEVEL, xpForLevel } from '../data/classes.js';
 import { QUESTS, NPCS, questDef, allQuests } from '../data/quests.js';
@@ -237,7 +237,9 @@ export class UI {
     const ic = itemClass(item);
     const other = ic && ic !== this.pd.cls ? ' style="opacity:.45"' : '';
     const wrong = ic && ic !== this.pd.cls ? ' wrongcls' : '';
-    return `<div class="slot r${itemRarity(item)}${sel}${wrong}" data-ref="${ref}" style="--c:${col}"><span${other}>${itemIcon(item)}</span>${qty}${unsafe}${extra}</div>`;
+    const rq = reqLevel(item);
+    const lvl = rq > this.pd.level ? `<span class="req">${rq}</span>` : '';
+    return `<div class="slot r${itemRarity(item)}${sel}${wrong}${lvl ? ' toohigh' : ''}" data-ref="${ref}" style="--c:${col}"><span${other}>${itemIcon(item)}</span>${qty}${unsafe}${lvl}${extra}</div>`;
   }
 
   itemTip(item, opts = {}) {
@@ -254,8 +256,9 @@ export class UI {
     const R = RARITIES[item.rarity];
     let sub = `${R.name} · ${slotLabel(item)}`;
     if (item.slot === 'weapon') sub += isTwoHanded(item) ? ' · deux mains' : WEAPONS[item.base].ranged ? ' · à distance' : ' · une main';
-    if (item.slot !== 'pocket') sub += ` · niveau ${item.ilvl}`;
-    h += `<div class="tt-sub">${sub}</div><div class="tt-main">`;
+    h += `<div class="tt-sub">${sub}</div>`;
+    if (item.slot !== 'pocket') { const rq = reqLevel(item); h += `<div class="tt-req ${rq > pd.level ? 'bad' : ''}">Niveau ${rq}</div>`; }
+    h += '<div class="tt-main">';
     const eq = pd.equipment[item.slot];
     const cmp = opts.compare && eq && eq !== item ? eq : null;
     const delta = (a, b) => { if (b === undefined) return ''; const d = a - b; return d === 0 ? '' : ` <span class="${d > 0 ? 'up' : 'down'}">${d > 0 ? '+' : ''}${d}</span>`; };
@@ -965,7 +968,7 @@ export class UI {
         g.beginPath(); g.ellipse(180, 205, 110, 40, 0, 0, Math.PI * 2); g.stroke();
         if (CLASSES[id].locked) {
           g.fillStyle = 'rgba(214,206,189,0.15)';
-          g.font = "120px 'Jacquard 24', serif";
+          g.font = "120px 'Grenze Gotisch', serif";
           g.textAlign = 'center'; g.textBaseline = 'middle';
           g.fillText('?', 180, 180);
           continue;
@@ -1015,21 +1018,36 @@ export class UI {
     this.buildHud();
   }
 
-  areaTitle(name, sub) {
-    const a = this.el.area;
-    a.innerHTML = `<div class="a-name">${name}</div><div class="a-rule"></div><div class="a-sub">${sub || ''}</div>`;
-    a.classList.remove('show');
-    void a.offsetWidth;
-    a.classList.add('show');
+  // Titres de zone et bannières passent l'un après l'autre (jamais superposés)
+  announce(kind, a, b) {
+    const q = this._ann || (this._ann = []);
+    if (q.length >= 3) q.shift();
+    q.push({ kind, a, b });
+    if (!this._annBusy) this.nextAnnounce();
   }
-
-  banner(text, kind = 'gold') {
-    const b = this.el.banner;
-    b.className = kind === 'blood' ? 'blood' : '';
-    b.innerHTML = `<span>${text}</span>`;
-    void b.offsetWidth;
-    b.classList.add('show');
+  nextAnnounce() {
+    const it = this._ann.shift();
+    if (!it) { this._annBusy = false; return; }
+    this._annBusy = true;
+    let el, dur;
+    if (it.kind === 'area') {
+      el = this.el.area;
+      el.innerHTML = `<div class="a-name">${it.a}</div><div class="a-rule"></div><div class="a-sub">${it.b || ''}</div>`;
+      dur = 3400;
+    } else {
+      el = this.el.banner;
+      el.className = it.b === 'blood' ? 'blood' : '';
+      el.innerHTML = `<span>${it.a}</span>`;
+      dur = 2600;
+    }
+    el.classList.remove('show');
+    void el.offsetWidth;
+    el.classList.add('show');
+    clearTimeout(this._annT);
+    this._annT = setTimeout(() => this.nextAnnounce(), dur);
   }
+  areaTitle(name, sub) { this.announce('area', name, sub); }
+  banner(text, kind = 'gold') { this.announce('banner', text, kind); }
 
   // ================= RÉCITS (prologue / épilogue) =================
   showStory(slides, done, title = null) {

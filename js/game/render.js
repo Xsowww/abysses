@@ -383,7 +383,7 @@ export class Renderer {
     g.fillStyle = 'rgba(0,0,0,0.35)';
     g.fillRect(x - 4, y + (hh - 22) / 2 - 5, w + 8, 3);
     // enseigne
-    g.font = "15px 'Jacquard 24', serif";
+    g.font = "15px 'Grenze Gotisch', serif";
     g.textAlign = 'center';
     g.fillStyle = 'rgba(0,0,0,0.6)';
     g.fillText(h.name, x + w / 2 + 1, y + (hh - 22) / 2 + 17);
@@ -689,7 +689,12 @@ export class Renderer {
     const kx = ca > 0 ? (R - ox) / ca : ca < 0 ? (L - ox) / ca : Infinity;
     const ky = sa > 0 ? (B - oy) / sa : sa < 0 ? (T0 - oy) / sa : Infinity;
     const k = Math.min(kx, ky);
-    const ax = ox + ca * k, ay = oy + sa * k;
+    let ax = ox + ca * k, ay = oy + sa * k;
+    // ne pas recouvrir l'interface : carte + suivi (haut-droite), vitalité (haut-gauche), compétences et bourse (bas)
+    if (ax > W - 300 * D && ay < 440 * D) ay = 440 * D;
+    if (ax < 430 * D && ay < 190 * D) ay = 190 * D;
+    if (ax < 400 * D && ay > H - 240 * D) ax = 400 * D;
+    if (ax > W - 200 * D && ay > H - 120 * D) ay = H - 120 * D;
     ctx.save(); ctx.translate(ax, ay); ctx.rotate(a);
     const z = 14 * D;
     ctx.beginPath(); ctx.moveTo(z + 3 * D, 0); ctx.lineTo(-z * 0.7, -z * 0.85); ctx.lineTo(-z * 0.25, 0); ctx.lineTo(-z * 0.7, z * 0.85); ctx.closePath();

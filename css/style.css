@@ -21,7 +21,7 @@
   --title: 'Pixelify Sans', sans-serif;
   --fell: 'Pixelify Sans', sans-serif;
   --body: 'Pixelify Sans', sans-serif;
-  --goth: 'Jacquard 24', serif;
+  --goth: 'Grenze Gotisch', serif;
   --noise: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='3' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .07 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
   --c-tl: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='22' height='22'><path d='M1.5 21V7.5L7.5 1.5H21' fill='none' stroke='%23a59c8b' stroke-width='1'/><path d='M4.5 18V9l4.5-4.5h9' fill='none' stroke='%23a59c8b' stroke-opacity='.35' stroke-width='1'/><path d='M1.5 1.5l3 0 0 3z' fill='%23c98a4a'/></svg>");
   --c-tr: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='22' height='22'><g transform='rotate(90 11 11)'><path d='M1.5 21V7.5L7.5 1.5H21' fill='none' stroke='%23a59c8b' stroke-width='1'/><path d='M4.5 18V9l4.5-4.5h9' fill='none' stroke='%23a59c8b' stroke-opacity='.35' stroke-width='1'/><path d='M1.5 1.5l3 0 0 3z' fill='%23c98a4a'/></g></svg>");
@@ -802,3 +802,37 @@ body:has(#boss-bar:not(.hidden)) #subtitle { bottom: 200px; }
 .vbar.res.r-bone.ready .fill { background: #8ac09a; }
 .tt-uniq { margin-top: 6px; color: #e8643c; }
 .slot.r6 { box-shadow: inset 0 0 0 2px rgba(232, 100, 60, 0.55), inset 0 0 14px rgba(232, 100, 60, 0.25); }
+
+/* ===================== AGENCEMENT (rien ne se chevauche) =====================
+   haut-gauche : vitalité + effets · haut-droite : carte + suivi · haut-centre : titres et bannières (une à la fois)
+   gauche : messages courts · bas-gauche : compétences · bas-droite : bourse
+   bas-centre (de bas en haut) : touches · action « E » · barre du boss · incantation · répliques */
+#area { top: 13%; }
+#area .a-name { font-weight: 600; letter-spacing: .02em; font-size: clamp(40px, 5.4vw, 66px); }
+#area .a-sub { font-size: 17px; }
+#area.show { animation-duration: 3.4s; }
+#banner { top: 25%; padding: 10px 0; }
+#banner span { font-weight: 700; letter-spacing: .02em; font-size: clamp(36px, 5vw, 60px); }
+#banner.show { animation-duration: 2.6s; }
+.bb-name { font-weight: 600; letter-spacing: .02em; font-size: 28px; }
+#toasts { top: 196px; left: 16px; transform: none; align-items: flex-start; max-width: min(380px, 30vw); }
+.toast { padding: 4px 14px 4px 10px; font-size: 14px; text-align: left; max-width: 100%; background: linear-gradient(90deg, rgba(0, 0, 0, 0.85) 70%, transparent); border-left: 2px solid var(--line2); }
+.toast.good { border-left-color: var(--gold); }
+.toast.bad { border-left-color: var(--blood2); }
+#keys-hint { bottom: 8px; }
+#prompt { top: auto; bottom: 40px; }
+#boss-bar { bottom: 96px; width: min(760px, 50vw); }
+#channel { top: auto; bottom: 168px; }
+#subtitle { bottom: 168px; max-width: 56vw; }
+body:has(#boss-bar:not(.hidden)) #subtitle { bottom: 214px; }
+body:has(#channel:not(.hidden)) #subtitle { bottom: 222px; }
+#tracker { max-width: 240px; }
+#tracker .tr-q div { font-size: 13px; }
+/* Niveau requis trop élevé : badge rouge dans la case, ligne rouge dans l'infobulle */
+.slot .req { position: absolute; left: 3px; top: 2px; font-size: 11px; font-weight: 600; color: #ff8070; text-shadow: 0 1px 0 #000, 0 0 3px #000; pointer-events: none; }
+.slot.toohigh > span:first-child { filter: grayscale(0.7) brightness(0.75); }
+.tt-req { font-size: 13px; color: var(--bone2); margin: 2px 0 4px; }
+.tt-req.bad { color: #ff8070; }
+.slot > span.req { display: block; width: auto; height: auto; left: 4px; top: 2px; font-size: 12px; background: rgba(0, 0, 0, 0.7); padding: 0 3px; line-height: 14px; }
+body:has(#boss-bar:not(.hidden)) #channel { bottom: 190px; }
+body:has(#boss-bar:not(.hidden)):has(#channel:not(.hidden)) #subtitle { bottom: 250px; }

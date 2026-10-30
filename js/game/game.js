@@ -383,7 +383,10 @@ export class Game {
 
   // Objet aléatoire, adapté le plus souvent à la classe du joueur.
   loot(opts) {
-    return generateItem({ ...opts, cls: opts.cls || (chance(0.85) ? this.pd.cls : null) });
+    // de temps en temps, une pièce « d'en dessous » : plus forte, mais d'un niveau que l'on n'a pas encore
+    const deep = opts.slot !== 'pocket' && this.scene && this.scene.type === 'dungeon' && chance(0.18);
+    const ilvl = (opts.ilvl || 1) + (deep ? randInt(4, 7) : 0);
+    return generateItem({ ...opts, ilvl, cls: opts.cls || (chance(0.85) ? this.pd.cls : null) });
   }
 
   render() {
