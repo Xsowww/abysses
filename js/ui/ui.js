@@ -447,7 +447,6 @@ export class UI {
         this.hideScreen();
         this.showStory(PROLOGUE, () => {
           g.newGame(name.slice(0, 18), cls);
-          setTimeout(() => this.toast(`Maëlis vous attend près du portail, au nord. Parlez avec ${input.label('interact')}.`, 'good', 7), 4000);
         });
         break;
       }
@@ -527,7 +526,6 @@ export class UI {
     const html = `<div class="inv-layout">
       <div class="col">${this.paperdollHTML()}${this.statsHTML()}</div>
       <div class="col">${this.bagHTML()}${this.detailHTML()}
-        <p class="hint">En expédition, le butin du sac marqué <span class="unsafe inline">!</span> est perdu à la mort. L’équipement porté et la poche sécurisée sont toujours conservés.</p>
       </div></div>`;
     return { sub: `${escapeHtml(pd.name)} · ${C.name}${pd.spec ? ' ' + C.specs[pd.spec].name : ''} · niveau ${pd.level}`, html, cls: 'wide', footer: '<span><kbd>Clic</kbd>Sélectionner</span><span><kbd>Clic D</kbd>Action rapide</span><span><kbd>Maj</kbd>+ clic : poche</span><span><kbd>Échap</kbd>Fermer</span>' };
   }
@@ -539,7 +537,7 @@ export class UI {
     const html = `<div class="inv-layout">
       <div class="col"><div class="bag-head"><h3>Coffre <span class="dim">${used} / ${Inv.STASH_SIZE}</span></h3></div>
         <div class="grid stash">${pd.stash.map((it, i) => this.cell(it, 'stash:' + i)).join('')}</div>
-        <p class="hint">Ce qui dort ici ne craint rien des Abysses.</p></div>
+</div>
       <div class="col">${this.bagHTML()}${this.detailHTML()}</div></div>`;
     return { title: 'Coffre', sub: 'Un vieux coffre cerclé de fer', html, cls: 'wide', footer: '<span><kbd>Clic D</kbd>Déposer / prendre</span><span><kbd>Échap</kbd>Fermer</span>' };
   }
@@ -552,7 +550,7 @@ export class UI {
     if (shop === 'atelier') {
       left = this.atelierHTML();
     } else if (shop === 'forge') {
-      left = this.forgeUpgradeHTML() + `<h3>Étal de la forge</h3><p class="hint" style="margin-top:-4px">Le stock change à chaque retour d’expédition.</p>
+      left = this.forgeUpgradeHTML() + `<h3>Étal de la forge</h3>
         <div class="shop-list">${pd.shop.forge.map((it, i) => `<div class="shop-item ${pd.gold < buyPrice(it) ? 'st-poor' : ''}">${this.cell(it, `shop:forge:${i}`)}<div class="si-info"><div style="color:${itemColor(it)}">${escapeHtml(it.name)}</div><div class="dim">${slotLabel(it)} · niveau ${it.ilvl}</div></div><div class="price ${pd.gold < buyPrice(it) ? 'poor' : ''}">${fmt(buyPrice(it))} ${icon('gold', 'gold')}</div></div>`).join('') || '<p class="dim">Plus rien en stock.</p>'}</div>`;
     } else {
       const cons = ['potion', 'pierre'].map((id) => {
@@ -618,14 +616,13 @@ export class UI {
       return `<div class="set-row ${n === Object.keys(S.pieces).length ? 'st-max' : n ? 'st-partial' : ''}"><div class="sr-name">${S.name} <span class="dim">${n} / ${Object.keys(S.pieces).length}</span></div><div class="dim sr-lore">${S.lore}</div><div class="sr-pieces">${pieces}</div></div>`;
     }).join('');
     return `<h3>Sceaux de Valdrenne : <b class="glow">${pd.sceaux || 0}</b></h3>
-      <p class="hint" style="margin-top:-4px">Les sceaux se gagnent en réussissant des missions d’expédition (et en me donnant vos pièces en double). Une pièce commandée suit toujours votre niveau.</p>
       <div class="sets-list">${rows}</div>`;
   }
 
   // Renforcement des objets portés chez Brann
   forgeUpgradeHTML() {
     const g = this.game, pd = this.pd;
-    if (!g.forgeUnlocked()) return `<h3>Renforcement</h3><p class="hint">Brann veut d’abord étudier le fer de Valdrenne (quête « Le fer de Valdrenne »).</p>`;
+    if (!g.forgeUnlocked()) return `<h3>Renforcement</h3><p class="dim">${icon('lock')} Quête « Le fer de Valdrenne »</p>`;
     const mats = ['fer', 'bronze', 'braise', 'larme'].map((k) => `<span class="mat">${itemIcon({ kind: 'consumable', id: k })}<b>${Inv.countAll(pd, k)}</b></span>`).join('');
     const rows = EQUIP_ORDER.filter((k) => k !== 'pocket' && pd.equipment[k]).map((k) => {
       const it = pd.equipment[k];
@@ -635,7 +632,7 @@ export class UI {
       const cost = c ? Object.entries(c).map(([m, n]) => m === 'gold' ? `<span class="${pd.gold >= n ? '' : 'bad'}">${fmt(n)} or</span>` : `<span class="${Inv.countAll(pd, m) >= n ? '' : 'bad'}">${n} ${CONSUMABLES[m].name}</span>`).join(' · ') : '<span class="ok">Renforcement maximal</span>';
       return `<div class="shop-item up-row ${!c ? 'st-max' : can ? '' : 'st-poor'}">${this.cell(it, 'equip:' + k)}<div class="si-info"><div style="color:${itemColor(it)}">${escapeHtml(it.name)}</div><div class="t-pips up-pips">${pips}</div><div class="dim">${cost}</div></div>${c ? `<button class="btn small ${can ? 'main' : ''}" data-action="upgrade" data-arg="${k}" ${can ? '' : 'disabled'}>Renforcer</button>` : ''}</div>`;
     }).join('');
-    return `<h3>Renforcement</h3><div class="mats">${mats}</div><p class="hint" style="margin-top:0">Chaque niveau : +12 % aux dégâts ou à l’armure de base. Les matériaux du coffre comptent aussi.</p><div class="shop-list">${rows}</div>`;
+    return `<h3>Renforcement</h3><div class="mats">${mats}</div><div class="shop-list">${rows}</div>`;
   }
 
   // Ensemble : pièces (portées = or, possédées = argent, manquantes = gris) et paliers (actif = or).
@@ -654,7 +651,7 @@ export class UI {
     const tiers = Object.keys(S.bonus).map(Number).sort((a, b) => a - b);
     const top = tiers.filter((t) => worn >= t).pop();
     h += tiers.map((t) => `<div class="ts-tier ${t === top ? 'on' : worn >= t ? 'past' : ''}"><b>${t === total ? 'Complet' : t + ' pièces'}</b> ${setBonusText(S.bonus[t])}${t === total && S.special ? `<div class="ts-sp">${S.special}</div>` : ''}</div>`).join('');
-    h += '<div class="ts-hint">Seule, cette pièce est faible. Gardez-la (poche sécurisée, coffre) pour compléter l’ensemble.</div></div>';
+    h += '</div>';
     return h;
   }
 
@@ -712,7 +709,7 @@ export class UI {
     if (N.contracts) {
       const nAct = active.filter((q) => q.contract).length + ready.filter((q) => q.contract).length;
       const board = (this.pd.contracts || []).filter((c) => !this.pd.quests[c.id]).length;
-      opts += `<div class="hint" style="margin:4px 0 6px">Contrats en cours : ${nAct} / 2 · au tableau : ${board} / 3. Un nouveau contrat est affiché à chaque retour d’expédition.</div>`;
+      opts += `<div class="dim" style="margin:4px 0 6px">Contrats ${nAct} / 2</div>`;
     }
     if (npcTalk(id, this.pd).length) opts += '<button class="opt" data-action="talk">Parler</button>';
     if (N.shop) opts += `<button class="opt shop" data-action="open-shop" data-arg="${N.shop}">${N.shopLabel || 'Commercer'}</button>`;
@@ -736,23 +733,22 @@ export class UI {
       const pct = Math.round((st.progress / this.questNeed(q)) * 100);
       const tag = st.status === 'ready' ? '<span class="st-tag avail">À rendre</span>' : '<span class="st-tag part">En cours</span>';
       return `<div class="jq ${st.status} ${st.status === 'ready' ? 'st-avail' : 'st-partial'}"><div class="jq-head"><b>${q.main ? '◆ ' : ''}${q.name}${tag}</b><span class="dim">${NPCS[q.giver].name}</span></div>
-        <div class="dim" style="font-style:italic">${q.desc}</div><div>${this.questObjText(q, st)}</div>
+        <div>${this.questObjText(q, st)}</div>
         <div class="pbar"><div style="width:${pct}%"></div></div>
-        ${st.status === 'ready' ? `<div class="warn">Terminée — retournez voir ${NPCS[q.giver].name}.</div>` : ''}
-        <div class="dim">Récompense : ${this.rewardText(q)}</div></div>`;
+        <div class="dim">${this.rewardText(q)}</div></div>`;
     };
     const ready = rows('ready'), active = rows('active'), done = rows('done');
     const S = pd.stats;
     const html = `
       ${ready.length ? `<h3>À rendre</h3>${ready.map(qHTML).join('')}` : ''}
-      <h3>En cours</h3>${active.map(qHTML).join('') || '<p class="hint">Aucune quête en cours. Les habitants qui ont besoin de vous portent un signe au-dessus de la tête.</p>'}
+      <h3>En cours</h3>${active.map(qHTML).join('') || '<p class="dim">—</p>'}
       <h3>Accomplies <span class="dim">${done.length} / ${QUESTS.length}${pd.stats.contracts ? ` · ${pd.stats.contracts} contrat(s) honoré(s)` : ''}</span></h3>
       <div class="done-list">${done.map((q) => `<span class="done-q">✓ ${q.name}</span>`).join('') || '<span>—</span>'}</div>
       <h3>Fragments <span class="dim">${known.length} / ${LORE.length}</span></h3>
       <div class="lore-list">${LORE.map((l) => known.includes(l.id) ? `<button class="opt" data-action="lore-read" data-arg="${l.id}">${l.title}</button>` : '<div class="opt locked-lore">— fragment non découvert —</div>').join('')}</div>
       <h3>Chroniques</h3>
       <div class="stats" style="margin-top:0"><div><span>Créatures abattues</span><b>${fmt(S.kills)}</b></div><div><span>Descentes</span><b>${S.runs}</b></div><div><span>Retours réussis</span><b>${S.extractions}</b></div><div><span>Morts</span><b>${S.deaths}</b></div><div><span>Profondeur atteinte</span><b>${pd.maxDepth}</b></div><div><span>Temps passé</span><b>${Math.floor(pd.playTime / 60)} min</b></div></div>`;
-    return { sub: 'Ce que l’on attend de vous, et ce que vous avez accompli', html, cls: 'wide' };
+    return { sub: '', html, cls: 'wide' };
   }
 
   // ================= TALENTS =================
@@ -813,22 +809,21 @@ export class UI {
     let spec = '';
     if (pd.spec) {
       const S = C.specs[pd.spec];
-      spec = `<h3>Voie du ${S.name}</h3><p class="hint" style="margin-top:-4px">${S.desc}</p>${S.play ? `<ul class="spec-play">${S.play.map((x) => `<li>${x}</li>`).join('')}</ul>` : ''}${this.treeHTML(S)}`;
+      spec = `<h3>Voie du ${S.name}</h3>${S.play ? `<ul class="spec-play">${S.play.map((x) => `<li>${x}</li>`).join('')}</ul>` : ''}${this.treeHTML(S)}`;
     } else {
       const can = pd.level >= SPEC_LEVEL;
-      spec = `<h3>Spécialisation</h3><p class="hint" style="margin-top:-4px">${can ? 'Choisissez votre voie. Ce choix pourra être défait contre de l’or, au village.' : `Une voie s’ouvrira au niveau ${SPEC_LEVEL}.`}</p>
-        <div class="spec-cards">${Object.entries(C.specs).map(([id, S]) => `<div class="spec-card ${can ? 'st-avail' : 'locked st-locked'}" style="--c:${S.color}"><div class="spec-name">${S.name}</div><div class="dim">${S.desc}</div>
+      spec = `<h3>Spécialisation</h3><p class="hint" style="margin-top:-4px">''</p>
+        <div class="spec-cards">${Object.entries(C.specs).map(([id, S]) => `<div class="spec-card ${can ? 'st-avail' : 'locked st-locked'}" style="--c:${S.color}"><div class="spec-name">${S.name}</div>
           ${S.play ? `<ul class="spec-play">${S.play.map((x) => `<li>${x}</li>`).join('')}</ul>` : ''}
-          <ul>${S.talents.map((t) => `<li>${t.name}${t.skill ? ' <span class="warn">(compétence)</span>' : ''}</li>`).join('')}</ul>
           ${can ? `<button class="btn main small" data-action="spec" data-arg="${id}">Embrasser cette voie</button>` : `<div class="dim">${icon('lock')} Niveau ${SPEC_LEVEL}</div>`}</div>`).join('')}</div>`;
     }
     const bar = pd.skillBar.map((s, i) => `<div class="sb-slot ${s ? 'st-max' : 'st-off'}" data-skill="${s || ''}"><span class="key">${input.label('skill' + (i + 1))}</span>${s ? icon(SKILLS[s].icon) : ''}<div class="sb-name">${s ? SKILLS[s].name : '—'}</div></div>`).join('');
     const inVillage = g.scene.type === 'village';
-    const html = `<div class="tal-head"><div class="pts ${pts > 0 ? 'has' : ''}">Points disponibles · <b>${pts}</b></div><div class="dim" style="font-style:italic">Un point par niveau. Cliquez sur un talent pour l’apprendre.</div></div>
+    const html = `<div class="tal-head"><div class="pts ${pts > 0 ? 'has' : ''}">Points disponibles · <b>${pts}</b></div></div>
       ${this.legendHTML([['st-max', 'Maîtrisé'], ['st-partial', 'Rang acquis'], ['st-avail', 'Disponible'], ['st-off', 'Pas de point'], ['st-locked', 'Verrouillé']])}
       <div class="tal-layout"><div class="col"><h3>${C.name}</h3>${this.treeHTML(C)}</div><div class="col">${spec}
       <h3>Compétences</h3><div class="sb-row">${bar}</div>
-      <div class="respec">${inVillage ? `<button class="btn danger small" data-action="respec">Oublier tous les talents · ${fmt(g.respecCost())} or</button>` : '<span class="hint">Les talents ne peuvent être oubliés qu’au village.</span>'}</div></div></div>`;
+      <div class="respec">${inVillage ? `<button class="btn danger small" data-action="respec">Oublier tous les talents · ${fmt(g.respecCost())} or</button>` : ''}</div></div></div>`;
     return { sub: `${C.name}${pd.spec ? ' · ' + C.specs[pd.spec].name : ''}`, html, cls: 'wide' };
   }
 
@@ -845,11 +840,9 @@ export class UI {
     const seen = pd.missionsSeen || [];
     const mCard = M
       ? `<div class="mis-card st-avail"><div class="mc-name">${M.name}${seen.includes(mt) ? '' : ' <span class="glow">· nouvelle</span>'}</div><div class="mc-desc">${M.desc}</div>
-        ${M.minDepth > 1 ? `<div class="dim">À partir de la profondeur ${M.minDepth} (plus haut, une autre mission la remplace).</div>` : ''}
-        ${forced ? '<div class="dim">Imposée par votre contrat chez Lisette.</div>' : ''}
-        <div class="mc-rew">Récompense à l’extraction : <b>${M.sceaux} Sceaux</b>, or, matériaux${bonus ? ` · <span class="glow">+${bonus} %</span>` : ''}</div></div>`
-      : `<div class="mis-card st-off"><div class="mc-name">Descente libre</div><div class="dim">Aucune mission cette fois. Explorez, trouvez le Gardien et remontez.</div></div>`;
-    const prog = `<div class="dim" style="margin-top:6px">Modes découverts : ${MISSION_ORDER_UI.map((t) => seen.includes(t) ? `<span class="glow">${MISSIONS[t].name}</span>` : '<span>???</span>').join(' · ')}</div>`;
+        <div class="mc-rew"><b>${M.sceaux} Sceaux</b>${M.minDepth > 1 ? ` · prof. ${M.minDepth}+` : ''}${forced ? ' · contrat' : ''}${bonus ? ` · <span class="glow">+${bonus} %</span>` : ''}</div></div>`
+      : `<div class="mis-card st-off"><div class="mc-name">Descente libre</div></div>`;
+    const prog = `<div class="dim" style="margin-top:6px">${MISSION_ORDER_UI.map((t) => seen.includes(t) ? `<span class="glow">${MISSIONS[t].name}</span>` : '<span>???</span>').join(' · ')}</div>`;
     const augs = Object.entries(AUGURES).map(([k, A]) => `<label class="aug ${o.aug.includes(k) ? 'st-max' : ''}" data-action="toggle-aug" data-arg="${k}"><span class="aug-box">${o.aug.includes(k) ? '■' : '□'}</span><b>${A.name}</b> <span class="dim">${A.desc}</span> <span class="glow">+${A.bonus} %</span></label>`).join('');
     let rows = '';
     {
@@ -859,18 +852,16 @@ export class UI {
         const diff = L - pd.level;
         const warn = diff >= 3 ? '<span class="bad">mortel</span>' : diff >= 1 ? '<span class="warn">périlleux</span>' : '<span class="ok">à votre mesure</span>';
         const stD = kills ? 'st-max' : d === pd.maxDepth ? 'st-avail' : '';
-        rows += `<div class="depth-row ${stD}"><div><div class="depth-name">Profondeur ${ROMAN[d - 1] || d}</div><div class="dim">Créatures niv. ${L} · Gardien niv. ${L + 1} · ${warn}${kills ? ` · Gardien vaincu ×${kills}` : ''}</div></div><button class="btn main" data-action="descend" data-arg="${d}">Descendre</button></div>`;
+        rows += `<div class="depth-row ${stD}"><div><div class="depth-name">Profondeur ${ROMAN[d - 1] || d}</div><div class="dim">Niv. ${L} · ${warn}${kills ? ` · ✓` : ''}</div></div><button class="btn main" data-action="descend" data-arg="${d}">Descendre</button></div>`;
       }
     }
     const ps = Inv.pocketSize(pd);
     const pots = Inv.countConsumable(pd, 'potion'), stones = Inv.countConsumable(pd, 'pierre');
     const html = `<div class="portal-layout"><div class="col">
-      <h3>Mission de la prochaine descente</h3><p class="hint" style="margin-top:-4px">Ce sont les Abysses qui décident. Chaque descente apporte une mission différente ; la récompense n’est versée que si vous remontez vivant.</p>
-      <div class="mis-list">${mCard}</div>${prog}</div>
-      <div class="col"><h3>Augures <span class="dim">bonus de butin, d’or et d’XP : <b class="glow">+${bonus} %</b></span></h3>
+      <h3>Prochaine mission</h3>      <div class="mis-list">${mCard}</div>${prog}</div>
+      <div class="col"><h3>Augures <span class="dim"><b class="glow">+${bonus} %</b></span></h3>
       <div class="aug-list">${augs}</div>
-      <div class="rules"><div>Équipement porté — <b>toujours conservé</b></div><div>Poche sécurisée (${ps} empl.) — <b>conservée</b></div><div>Butin du sac et or ramassé — <span class="bad">perdus à la mort</span></div>
-      <div class="dim">Vous emportez ${pots} fiole(s) et ${stones} pierre(s) de retour.</div></div>
+      <div class="dim" style="margin:8px 0">Fioles ${pots} · Pierres ${stones}</div>
       <div class="depths">${rows}</div></div></div>`;
     return { title: 'Portail des Abysses', sub: `Sceaux de Valdrenne : ${pd.sceaux || 0}`, html, cls: 'wide' };
   }
@@ -878,13 +869,13 @@ export class UI {
   // ================= MENUS =================
   panel_pause() {
     const html = `<div class="menu"><button class="mi main" data-action="resume">Reprendre</button><button class="mi" data-action="options">Touches et options</button><button class="mi" data-action="quit">Sauvegarder et quitter</button>
-      ${this.pd && this.pd.inRun ? '<p class="hint" style="text-align:center">Quitter pendant une descente compte comme une mort : le butin non sécurisé sera perdu.</p>' : ''}</div>`;
+      ${this.pd && this.pd.inRun ? '<p class="hint" style="text-align:center">Quitter maintenant = mourir.</p>' : ''}</div>`;
     return { title: 'Pause', html, cls: 'narrow', footer: '<span><kbd>Échap</kbd>Reprendre</span>' };
   }
 
   optionsHTML() {
     const rows = ACTIONS.map((a) => `<div class="kb-row"><span>${a.label}</span><button class="btn key ${this.rebindingId === a.id ? 'waiting' : ''}" data-action="rebind" data-arg="${a.id}">${this.rebindingId === a.id ? 'Appuyez…' : codeLabel(input.bindings[a.id])}</button></div>`).join('');
-    return `<div class="opt-layout"><div class="col"><h3>Touches</h3><p class="hint" style="margin-top:-4px">Cliquez puis appuyez sur une touche ou un bouton de souris. Échap annule. Une touche déjà prise est échangée.</p>
+    return `<div class="opt-layout"><div class="col"><h3>Touches</h3>
       <div class="kb">${rows}<div class="kb-row"><span>Menu / fermer</span><button class="btn key" disabled>Échap</button></div></div>
       <button class="btn small" data-action="reset-keys">Rétablir les touches par défaut</button></div>
       <div class="col"><h3>Réglages</h3>
@@ -958,7 +949,7 @@ export class UI {
       <canvas data-portrait="${id}" width="360" height="360"></canvas>
       <div class="cc-name">${C.name}</div><div class="cc-title">${C.title}</div><div class="cc-desc">${C.desc}</div>
       ${C.locked ? '<div class="soon">— Bientôt —</div>' : `<div class="cc-specs">Voies : ${Object.values(C.specs).map((s) => `<b>${s.name}</b>`).join(' ou ')}</div>`}</div>`).join('');
-    this.showScreen(`<div class="screen class-screen"><h1>Qui descend ?</h1><div class="ph-sub">Choisissez votre classe</div><div class="class-cards">${cards}</div>
+    this.showScreen(`<div class="screen class-screen"><h1>Qui descend ?</h1><div class="class-cards">${cards}</div>
       <div class="name-row">Nom <input id="char-name" maxlength="18" placeholder="Sans-nom" value="${escapeHtml(nameVal)}" autocomplete="off" spellcheck="false"></div>
       ${this.confirmNew ? '<p class="warn">Une sauvegarde existe déjà : elle sera effacée. Validez à nouveau pour confirmer.</p>' : ''}
       <div class="menu row"><button class="mi" data-action="back-title">Retour</button><button class="mi main" data-action="start-game">${this.confirmNew ? 'Confirmer' : 'Descendre'}</button></div></div>`, { titleBg: true });
@@ -1251,7 +1242,7 @@ export class UI {
         const id = el.dataset.skill;
         let k = 0;
         if (id === 'special') k = Math.max(0, p.specialCd) / (CLASSES[pd.cls].special.cd * p.cdMult());
-        else if (id === 'potion') k = Math.max(0, p.potionCd) / 2.5;
+        else if (id === 'potion') k = Math.max(0, p.potionCd) / 4;
         else if (SKILLS[id]) k = Math.max(0, p.skillCd[id] || 0) / (SKILLS[id].cd * p.cdMult());
         const cd = el._cd || (el._cd = el.querySelector('.cd'));
         const hv = (Math.min(1, k) * 100).toFixed(1) + '%';

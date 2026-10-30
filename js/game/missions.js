@@ -163,7 +163,7 @@ export function missionInteract(g, o) {
       g.startChannel(3, 'Vous descellez le reliquaire…', () => {
         s.interactables.splice(s.interactables.indexOf(o), 1);
         p.carrying = 'reliquaire';
-        g.ui.toast('Vous portez le reliquaire : pas de roulade, vitesse réduite. Remontez !', 'good', 5);
+        g.ui.toast('Reliquaire en main. Remontez.', 'good', 5);
         sfx('chest');
         m.step = 1;
       });

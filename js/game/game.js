@@ -92,7 +92,7 @@ export class Game {
     let penalty = null;
     if (pd.inRun) penalty = this.applyDeathPenalty();
     this.start();
-    if (penalty) this.ui.toast('Vous avez quitté le jeu pendant une expédition : le butin non sécurisé est perdu.', 'bad', 6);
+    if (penalty) this.ui.toast('Expédition abandonnée : butin perdu.', 'bad', 6);
   }
 
   start() {
@@ -202,7 +202,6 @@ export class Game {
       setTimeout(() => {
         if (this.scene !== s) return;
         this.ui.banner((firstTime ? 'Nouvelle mission : ' : 'Mission : ') + M.name, 'gold');
-        this.ui.toast(M.desc + ' Récompense versée si vous remontez vivant.', 'info', firstTime ? 9 : 6);
       }, 4300);
     }
     this.fx.clear();
@@ -706,7 +705,7 @@ export class Game {
     setTimeout(() => {
       this.ui.banner('Gardien abattu', 'gold');
       this.ui.toast('Un portail de retour s’est ouvert.', 'good', 5);
-      if (unlocked) this.ui.toast(`Profondeur ${s.depth + 1} débloquée au portail du village.`, 'good', 5);
+      if (unlocked) this.ui.toast(`Profondeur ${s.depth + 1} débloquée`, 'good', 5);
       sfx('portal');
     }, 1200);
   }
@@ -926,7 +925,7 @@ export class Game {
     if (!pd.story.lore.includes(id)) pd.story.lore.push(id);
     const L = LORE_BY_ID[id];
     this.fx.text(x, y - 14, L.title, '#d8c79a', 13);
-    this.ui.toast(`Fragment découvert : « ${L.title} » — lisible dans le journal (${input.label('journal')})`, 'good', 5);
+    this.ui.toast(`Fragment : « ${L.title} »`, 'good', 5);
     sfx('page');
     this.questEvent('lore', { id });
     this.save();
@@ -950,10 +949,10 @@ export class Game {
     const p = this.player;
     if (p.potionCd > 0) return;
     if (p.hp >= p.maxHp) { this.ui.toast('PV déjà au maximum', 'info', 1); return; }
-    if (this.scene.augures && this.scene.augures.has('jeune')) { this.ui.toast('Augure du Jeûne : pas de fiole pendant cette descente.', 'bad', 1.5); sfx('error'); return; }
+    if (this.scene.augures && this.scene.augures.has('jeune')) { this.ui.toast('Jeûne : pas de fiole.', 'bad', 1.5); sfx('error'); return; }
     if (!Inv.consume(this.pd, 'potion')) { this.ui.toast('Aucune potion !', 'bad', 1.2); sfx('error'); return; }
-    p.potionCd = 2.5;
-    const heal = Math.round(p.maxHp * 0.4);
+    p.potionCd = 4;
+    const heal = Math.round(p.maxHp * 0.3);
     p.hp = Math.min(p.maxHp, p.hp + heal);
     this.fx.text(p.x, p.y - 28, '+' + heal, '#5fd16f', 17, { bold: true });
     this.fx.burst(p.x, p.y, '#5fd16f', 14, 90, 0.6, 3, { grav: -60 });
@@ -962,7 +961,7 @@ export class Game {
   }
 
   useStone() {
-    if (this.scene.type !== 'dungeon') { this.ui.toast('La pierre de retour ne fonctionne que dans les Abysses.', 'info', 2); return; }
+    if (this.scene.type !== 'dungeon') { this.ui.toast('Inutile ici.', 'info', 2); return; }
     if (this.player.channel) return;
     if (Inv.countConsumable(this.pd, 'pierre') <= 0) { this.ui.toast('Aucune pierre de retour !', 'bad', 1.5); sfx('error'); return; }
     this.startChannel(5, 'La pierre murmure le chemin du retour…', () => {
@@ -1102,8 +1101,8 @@ export class Game {
       this.fx.pillar(p.x, p.y, '#e7c98a');
       this.ui.banner(`Niveau ${pd.level}`, 'gold');
       sfx('levelup');
-      this.ui.toast(`Niveau ${pd.level} ! +1 point de talent (touche ${input.label('talents')})`, 'good', 4);
-      if (pd.level === SPEC_LEVEL && !pd.spec) this.ui.toast('Vous pouvez choisir une spécialisation dans l’arbre de talents !', 'good', 6);
+      this.ui.toast(`Niveau ${pd.level}`, 'good', 4);
+      if (pd.level === SPEC_LEVEL && !pd.spec) this.ui.toast('Spécialisation disponible', 'good', 6);
     }
     this.ui.refresh();
   }
@@ -1140,7 +1139,7 @@ export class Game {
     if (t.skill && !pd.skillBar.includes(t.skill)) {
       const i = pd.skillBar.indexOf(null);
       if (i >= 0) pd.skillBar[i] = t.skill;
-      this.ui.toast(`Nouvelle compétence : ${SKILLS[t.skill].name} (touche ${input.label('skill' + (i + 1))})`, 'good', 4);
+      this.ui.toast(`${SKILLS[t.skill].name} (${input.label('skill' + (i + 1))})`, 'good', 4);
     }
     this.player.recalc();
     sfx('levelup');
@@ -1153,7 +1152,7 @@ export class Game {
     if (pd.level < SPEC_LEVEL || pd.spec) return;
     pd.spec = id;
     sfx('quest');
-    this.ui.toast(`Spécialisation choisie : ${CLASSES[pd.cls].specs[id].name}`, 'good', 4);
+    this.ui.toast(CLASSES[pd.cls].specs[id].name, 'good', 4);
     this.player.recalc();
     this.save();
     this.ui.refresh();
@@ -1258,7 +1257,7 @@ export class Game {
       else if (st.progress >= need) st.status = 'ready';
       if (was === 'active' && st.status === 'ready') {
         sfx('quest');
-        this.ui.toast(`Quête terminée : ${q.name} — retournez voir ${NPCS[q.giver].name}`, 'good', 4);
+        this.ui.toast(`✓ ${q.name}`, 'good', 4);
       }
     }
     if (this.ui.refreshTracker) this.ui.refreshTracker();
@@ -1280,7 +1279,7 @@ export class Game {
         st.progress = o.count;
         st.status = 'ready';
         sfx('quest');
-        this.ui.toast(`Quête terminée : ${q.name} — retournez voir ${NPCS[q.giver].name}`, 'good', 4);
+        this.ui.toast(`✓ ${q.name}`, 'good', 4);
       }
     }
     this.syncQuests();

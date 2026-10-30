@@ -42,6 +42,8 @@ Sombre, pixel art (Souls-like). Polices : *Jacquard 24* (gothique pixel) réserv
 Le monde est dessiné dans `#game` à sa résolution native (`renderer.k`, ≈ 1 pixel du jeu = 1 pixel du canvas) puis agrandi sans lissage ; les textes nets passent par `#overlay` (`renderOverlay`). Le brouillard est composé en très basse résolution. Le HUD n’écrit dans le DOM que ce qui change. Éviter les `filter` / `mix-blend-mode` CSS plein écran.
 
 ## Règles de jeu importantes (décidées avec l’utilisateur)
+- **Textes minimalistes** : pas d’explications ni de conseils dans les menus et les messages (l’utilisateur les trouve envahissants). Libellés courts, chiffres plutôt que phrases.
+- **Le jeu doit être dur** : monstres renforcés (PV ×1,3, dégâts ×1,4, plus rapides, plus nombreux, plus de champions), fiole à 30 % des PV avec 4 s de recharge.
 - L’équipement **porté** n’est jamais perdu, même s’il a été trouvé pendant l’expédition.
 - Les objets trouvés en expédition ont `found: true`. À la mort, les objets `found` du **sac** sont supprimés ; ceux de la **poche sécurisée** sont gardés. L’or ramassé (`pd.runGold`) est perdu.
 - Fermer le jeu pendant une expédition (`pd.inRun`) = mort au prochain chargement.

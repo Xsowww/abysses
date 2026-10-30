@@ -50,7 +50,7 @@ export class Enemy {
     this.state = 'chase';
     sfx(this.type === 'rat' ? 'ghoul' : this.type === 'acolyte' || this.boss ? 'alert' : 'bones', { x: this.x, y: this.y, vol: this.type === 'rat' ? 0.6 : 0.45 });
     for (const o of g.scene.enemies) {
-      if (o !== this && !o.dead && o.state === 'idle' && !o.boss && dist(this.x, this.y, o.x, o.y) < 220) o.state = 'chase';
+      if (o !== this && !o.dead && o.state === 'idle' && !o.boss && dist(this.x, this.y, o.x, o.y) < 320) o.state = 'chase';
     }
   }
 

@@ -53,7 +53,7 @@ export const CLASSES = {
     name: 'Guerrier',
     color: '#8e3a2e',
     title: 'Lame du serment brisé',
-    desc: 'Combattant au corps à corps, robuste et brutal. Épée et bouclier, ou arme à deux mains.',
+    desc: 'Corps à corps. Épée et bouclier, ou arme à deux mains.',
     hpBase: 100, hpPerLvl: 14, speed: 210,
     special: {
       name: 'Frappe lourde', icon: 'special', cd: 1.4, stamina: 25,
@@ -80,9 +80,9 @@ export const CLASSES = {
         color: '#a8402c',
         desc: 'Offensive pure : vitesse, vol de vie et exécutions. Vous vivez en frappant.',
         play: [
-          'Jauge de <b>Rage</b> : se remplit quand vous frappez ou êtes touché, se vide si vous restez inactif. Chaque point augmente dégâts, vitesse d’attaque et vol de vie.',
-          'La roulade devient un <b>Bond</b> : vous sautez et l’atterrissage frappe tout autour.',
-          'Spéciale à 50 de rage ou plus : <b>Fureur</b>, un tourbillon à 360° qui consomme toute la rage.',
+          '<b>Rage</b> : monte en frappant, renforce tout.',
+          'Roulade → <b>Bond</b> qui frappe.',
+          'Spéciale à 50 rage : <b>Fureur</b>.',
         ],
         tierReq: [0, 2, 4],
         talents: [
@@ -98,9 +98,9 @@ export const CLASSES = {
         color: '#4f7aa8',
         desc: 'Défense inébranlable : armure, blocage et représailles. Vous tenez la ligne.',
         play: [
-          'Clic droit <b>maintenu</b> : garde au bouclier. −80 % de dégâts de face et renvoi des coups, mais chaque coup coûte de l’endurance (garde brisée à 0).',
-          'Lever la garde <b>juste avant l’impact</b> : <b>Parade</b> parfaite. Aucun dégât, l’ennemi est sonné et votre coup suivant est une <b>Riposte</b> (×2,5, critique).',
-          'Clic droit <b>tapé</b> : coup de bouclier qui étourdit.',
+          'Clic droit maintenu : <b>garde</b> (−80 %, coûte l’endurance).',
+          'Garde au dernier moment : <b>Parade</b> → <b>Riposte</b> ×2,5.',
+          'Clic droit tapé : coup de bouclier.',
         ],
         tierReq: [0, 2, 4],
         talents: [
@@ -117,7 +117,7 @@ export const CLASSES = {
     name: 'Rôdeur',
     color: '#4f6a3a',
     title: 'Chasseur des profondeurs',
-    desc: 'Archer agile qui frappe de loin. Fragile au contact, mortel à distance. Arcs, arbalètes et pièges.',
+    desc: 'Distance. Fragile au contact. Arcs, arbalètes, pièges.',
     hpBase: 88, hpPerLvl: 12, speed: 225,
     special: {
       name: 'Tir perçant', icon: 'pierce', cd: 1.6, stamina: 22,
@@ -144,8 +144,8 @@ export const CLASSES = {
         color: '#b8964a',
         desc: 'Précision absolue : critiques dévastateurs et flèches qui traversent les rangs ennemis.',
         play: [
-          'Maintenez l’attaque pour <b>bander l’arc</b> (vous ralentissez), relâchez pour tirer : plus la tension est forte, plus la flèche frappe fort.',
-          'Tir à pleine tension : <b>critique assuré</b>, traverse tout et <b>marque</b> la cible. Le tir plein suivant sur une cible marquée inflige +50 %.',
+          'Maintenir : <b>bander l’arc</b>.',
+          'Pleine tension : critique, transperce, <b>marque</b> (+50 %).',
         ],
         tierReq: [0, 2, 4],
         talents: [
@@ -161,9 +161,9 @@ export const CLASSES = {
         color: '#5a6a7a',
         desc: 'Venin et ombres : vos tirs empoisonnent, vous esquivez sans cesse et disparaissez à volonté.',
         play: [
-          'Vous rangez l’arc : combat rapproché à la <b>dague</b>, chaque coup empoisonne.',
-          'Frapper <b>dans le dos</b> ou un ennemi qui ne vous a pas vu : ×1,8 et critique assuré.',
-          'La roulade devient un <b>Pas de l’ombre</b> : courte téléportation, le coup suivant est une embuscade. La spéciale lance une dague empoisonnée.',
+          '<b>Dagues</b> empoisonnées au corps à corps.',
+          '<b>Dans le dos</b> : ×1,8, critique.',
+          'Roulade → <b>Pas de l’ombre</b>.',
         ],
         tierReq: [0, 2, 4],
         talents: [
@@ -176,7 +176,7 @@ export const CLASSES = {
       },
     },
   },
-  mage: { name: 'Mage', color: '#4a5a8a', title: 'Lettré de l’Abîme', locked: true, desc: 'Maître des arcanes et des sorts de zone. Bientôt disponible.' },
+  mage: { name: 'Mage', color: '#4a5a8a', title: 'Lettré de l’Abîme', locked: true, desc: 'Bientôt.' },
 };
 
 // Progression plus fine et plus lente : deux fois plus de rangs, chaque rang rapporte deux fois moins.

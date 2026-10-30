@@ -98,7 +98,7 @@ const SLOT_AFFIXES = {
 
 export const CONSUMABLES = {
   potion: {
-    name: 'Fiole de sang', desc: 'Rend 40 % des PV max.', stack: 20, price: 25, rarity: 0, color: '#b0362c',
+    name: 'Fiole de sang', desc: 'Rend 30 % des PV max.', stack: 20, price: 40, rarity: 0, color: '#b0362c',
     lore: 'Un liquide épais et tiède. Mieux vaut ne pas demander d’où il vient.',
   },
   pierre: {

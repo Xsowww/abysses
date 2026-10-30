@@ -186,14 +186,14 @@ export function generateDungeon(depth) {
   const pool = enemyPool(depth);
   for (const idx of others) {
     const r = rooms[idx];
-    const n = randInt(2, 4) + Math.floor(depth / 2) + (r.w * r.h > 110 ? 1 : 0);
+    const n = randInt(3, 5) + Math.floor(depth / 2) + (r.w * r.h > 110 ? 1 : 0);
     for (let k = 0; k < n; k++) {
       const p = randomFloorIn(r, 1);
-      spawns.push({ type: weightedPick(pool), x: p.x, y: p.y, elite: chance(0.07 + depth * 0.01) });
+      spawns.push({ type: weightedPick(pool), x: p.x, y: p.y, elite: chance(0.1 + depth * 0.02) });
     }
   }
   // Quelques monstres dans les couloirs.
-  for (let k = 0; k < 3 + depth; k++) {
+  for (let k = 0; k < 5 + depth * 2; k++) {
     const x = randInt(2, W - 3), y = randInt(2, H - 3);
     if (map.get(x, y) !== T.FLOOR) continue;
     if (rooms.some((r) => x >= r.x && x < r.x + r.w && y >= r.y && y < r.y + r.h)) continue;
