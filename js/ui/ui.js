@@ -837,39 +837,26 @@ export class UI {
     const o = this.opts;
     if (!o.aug) o.aug = [];
     const bonus = augureBonus(o.aug);
-    // Mission de descente = celle confiée par un habitant
-    const mq = pd.mquest, mst = mq && pd.quests[mq.id];
-    const M = mq && MISSIONS[mq.mtype];
-    const seen = pd.missionsSeen || [];
-    let mCard;
-    if (M && mst && mst.status === 'active') mCard = `<div class="mis-card st-avail"><div class="mc-name">${mq.name}</div><div class="mc-desc">${mq.desc}</div>
-        <div class="mc-rew"><b>${M.sceaux} Sceaux</b>${M.minDepth > 1 ? ` · prof. ${M.minDepth}+` : ''}${bonus ? ` · <span class="glow">+${bonus} %</span>` : ''}</div></div>`;
-    else if (M && mst && mst.status === 'ready') mCard = `<div class="mis-card st-max"><div class="mc-name">${mq.name}</div><div class="dim">✓ Voir ${NPCS[mq.giver].name}</div></div>`;
-    else if (M) mCard = `<div class="mis-card st-off"><div class="mc-name">Aucune mission</div><div class="dim">${NPCS[mq.giver].name} a une mission</div></div>`;
-    else mCard = `<div class="mis-card st-off"><div class="mc-name">Descente libre</div></div>`;
-    const prog = `<div class="dim" style="margin-top:6px">${MISSION_ORDER_UI.map((t) => seen.includes(t) ? `<span class="glow">${MISSIONS[t].name}</span>` : '<span>???</span>').join(' · ')}</div>`;
+    // Mission principale : descendre le plus bas possible, sans remonter. Départ : profondeur 1 ou un téléporteur activé.
+    const starts = [1, ...(pd.waypoints || []).filter((d) => d > 1)];
+    const rows = starts.map((d) => {
+      const L = enemyLevel(d);
+      const diff = L - pd.level;
+      const warn = diff >= 3 ? '<span class="bad">mortel</span>' : diff >= 1 ? '<span class="warn">périlleux</span>' : '<span class="ok">à votre mesure</span>';
+      return `<div class="depth-row ${d === starts[starts.length - 1] ? 'st-avail' : ''}"><div><div class="depth-name">${d === 1 ? 'Entrée' : 'Téléporteur'} · profondeur ${ROMAN[d - 1] || d}</div><div class="dim">Niv. ${L} · ${warn}</div></div><button class="btn main" data-action="descend" data-arg="${d}">Descendre</button></div>`;
+    }).join('');
     const augs = Object.entries(AUGURES).map(([k, A]) => `<label class="aug ${o.aug.includes(k) ? 'st-max' : ''}" data-action="toggle-aug" data-arg="${k}"><span class="aug-box">${o.aug.includes(k) ? '■' : '□'}</span><b>${A.name}</b> <span class="dim">${A.desc}</span> <span class="glow">+${A.bonus} %</span></label>`).join('');
-    let rows = '';
-    {
-      for (let d = 1; d <= pd.maxDepth; d++) {
-        const L = enemyLevel(d);
-        const kills = pd.bossKills[d] || 0;
-        const diff = L - pd.level;
-        const warn = diff >= 3 ? '<span class="bad">mortel</span>' : diff >= 1 ? '<span class="warn">périlleux</span>' : '<span class="ok">à votre mesure</span>';
-        const stD = kills ? 'st-max' : d === pd.maxDepth ? 'st-avail' : '';
-        rows += `<div class="depth-row ${stD}"><div><div class="depth-name">Profondeur ${ROMAN[d - 1] || d}</div><div class="dim">Niv. ${L} · ${warn}${kills ? ` · ✓` : ''}</div></div><button class="btn main" data-action="descend" data-arg="${d}">Descendre</button></div>`;
-      }
-    }
-    const ps = Inv.pocketSize(pd);
     const pots = Inv.countConsumable(pd, 'potion'), stones = Inv.countConsumable(pd, 'pierre');
     const html = `<div class="portal-layout"><div class="col">
-      <h3>Mission</h3>      <div class="mis-list">${mCard}</div>${prog}</div>
+      <h3>Descente</h3>
+      <div class="mis-card st-avail"><div class="mc-name">Record : profondeur ${pd.maxDepth || 1}</div><div class="mc-desc">Retour : téléporteur (1 étage sur 3) ou téléporteur portatif.</div></div>
+      <div class="depths" style="margin-top:10px">${rows}</div></div>
       <div class="col"><h3>Augures <span class="dim"><b class="glow">+${bonus} %</b></span></h3>
       <div class="aug-list">${augs}</div>
-      <div class="dim" style="margin:8px 0">Fioles ${pots} · Pierres ${stones}</div>
-      <div class="depths">${rows}</div></div></div>`;
+      <div class="dim" style="margin:8px 0">Fioles ${pots} · Téléporteurs portatifs ${stones} · Poche ${Inv.pocketSize(pd)}</div></div></div>`;
     return { title: 'Portail des Abysses', sub: `Sceaux de Valdrenne : ${pd.sceaux || 0}`, html, cls: 'wide' };
   }
+
 
   // ================= MENUS =================
   panel_pause() {
@@ -1206,11 +1193,14 @@ export class UI {
     const qs = all.slice(0, 4);
     const nx = this.game.nextMainStep && this.game.nextMainStep();
     let hint = nx && nx.state === 'available' ? `<div class="tr-q ready"><b>◆ Histoire</b><div>Parlez à ${NPCS[nx.q.giver].name}</div></div>` : '';
-    const mq = pd.mquest;
-    if (!ms && mq && !pd.quests[mq.id]) hint = `<div class="tr-q ready"><b>⚔ Mission</b><div>Parlez à ${NPCS[mq.giver].name}</div></div>` + hint;
     const G = this.game.scene && this.game.scene.gate;
     if (G && !G.open) hint = `<div class="tr-q ${G.key || G.hasKey ? 'ready' : ''}"><b>◇ Grille du Gardien</b><div>${G.hasKey ? 'Clé en main' : G.key ? 'Ramassez la clé' : `Ennemis restants : ${this.game.gateRemaining()}`}</div></div>` + hint;
-    if (ms) hint = `<div class="tr-q mission ${ms.done ? 'ready' : ''} ${ms.failed ? 'failed' : ''}"><b>⚔ ${mq && pd.quests[mq.id] ? mq.name : ms.name}</b><div>${ms.line}</div></div>` + hint;
+    if (ms) hint = `<div class="tr-q mission ${ms.done ? 'ready' : ''} ${ms.failed ? 'failed' : ''}"><b>⚔ ${ms.name}</b><div>${ms.line}</div></div>` + hint;
+    const sc = this.game.scene;
+    if (sc && sc.type === 'dungeon') {
+      const run = this.game.run;
+      hint = `<div class="tr-q main-run"><b>▼ Profondeur ${sc.depth}</b><div>Record ${pd.maxDepth || sc.depth}${run && run.sceaux ? ` · ${run.sceaux} Sceaux en jeu` : ''}</div></div>` + hint;
+    }
     this.hud.tracker.innerHTML = (qs.length || hint) ? '<div class="tr-title">Quêtes</div>' + hint + qs.map((q) => {
       const st = pd.quests[q.id];
       return `<div class="tr-q ${st.status} ${q.mission ? 'mission' : ''}"><b>${q.main ? '◆ ' : q.mission ? '⚔ ' : ''}${q.name}</b><div>${st.status === 'ready' ? `Retournez voir ${NPCS[q.giver].name}` : this.questObjText(q, st)}</div></div>`;
@@ -1284,7 +1274,9 @@ export class UI {
     if (o && !p.dead && !this.panel) {
       const verb = o.type === 'npc' ? 'Parler à' : o.type === 'chest' || o.type === 'stash' ? 'Ouvrir' : o.type === 'extract' ? 'Remonter par le' : o.type === 'inscription' ? 'Lire' : 'Franchir le';
       const lbl = o.type === 'extract' ? 'cercle d’extraction' : o.type === 'portal' || o.type === 'exitPortal' ? 'portail' : o.type === 'npc' ? o.label : o.type === 'inscription' ? 'l’inscription' : o.label.toLowerCase();
-      const txt = `<kbd>${input.label('interact')}</kbd> ${verb} ${lbl}`;
+      const txt = o.type === 'teleporter' ? `<kbd>${input.label('interact')}</kbd> ${o.active ? 'Remonter au village' : 'Activer le téléporteur'}`
+        : o.type === 'descendPortal' ? `<kbd>${input.label('interact')}</kbd> ${o.label}`
+        : `<kbd>${input.label('interact')}</kbd> ${verb} ${lbl}`;
       if (h.prompt._last !== txt) { h.prompt.innerHTML = txt; h.prompt._last = txt; }
       h.prompt.classList.remove('hidden');
     } else h.prompt.classList.add('hidden');

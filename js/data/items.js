@@ -110,7 +110,7 @@ export const CONSUMABLES = {
     lore: 'Un liquide épais et tiède. Mieux vaut ne pas demander d’où il vient.',
   },
   pierre: {
-    name: 'Pierre de retour', desc: "Incantation de 5 s, puis retour au village avec votre butin. Interrompue si vous êtes touché.", stack: 5, price: 60, rarity: 2, color: '#79b8c4',
+    name: 'Téléporteur portatif', desc: '5 s d’incantation, puis retour au village avec le butin. Interrompu si touché.', stack: 5, price: 90, rarity: 2, color: '#79b8c4',
     lore: 'Un galet froid qui se souvient du village. Il murmure le chemin à qui sait écouter.',
   },
   // ---- Matériaux de forge (Brann renforce l'équipement avec) : perdus à la mort, sauf dans la poche ----

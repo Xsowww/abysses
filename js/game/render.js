@@ -1000,6 +1000,8 @@ export class Renderer {
       if (o.type === 'extract') lights.push({ x: o.x, y: o.y, r: 200, a: 0.8, c: 'green', g: 0.3 });
       else if (o.type === 'portal') lights.push({ x: o.x, y: o.y, r: 220, a: 0.8, c: 'purple', g: 0.35 });
       else if (o.type === 'exitPortal') lights.push({ x: o.x, y: o.y, r: 240, a: 0.9, c: 'blue', g: 0.35 });
+      else if (o.type === 'descendPortal') lights.push({ x: o.x, y: o.y, r: 240, a: 0.9, c: 'purple', g: 0.35 });
+      else if (o.type === 'teleporter') lights.push({ x: o.x, y: o.y - 10, r: o.active ? 200 : 110, a: o.active ? 0.85 : 0.5, c: o.active ? 'blue' : 'warm', g: 0.25 });
       else if (o.type === 'npc') lights.push({ x: o.x, y: o.y, r: 110, a: 0.5, c: 'warm', g: 0 });
     }
     for (const pr of s.projectiles) lights.push(pr.magic ? { x: pr.x, y: pr.y, r: pr.orb ? 120 : 80, a: 0.75, c: pr.fire ? 'warm' : pr.bone ? 'green' : 'blue', g: 0.25 } : { x: pr.x, y: pr.y, r: 60, a: 0.5, c: 'white', g: 0.15 });
@@ -1211,8 +1213,19 @@ export class Renderer {
     } else if (o.type === 'chest') {
       if (o.openT !== undefined) o.openT = Math.min(1, o.openT + 1 / 30);
       this.drawChestShape(ctx, x, y, o.opened, o.rich ? '#241c22' : '#2e2218', o.rich ? '#a8884a' : '#5e4c34', o.openT);
-    } else if (o.type === 'portal' || o.type === 'exitPortal') {
-      const abyss = o.type === 'portal';
+    } else if (o.type === 'teleporter') {
+      // stèle de téléportation : runes éteintes, ou bleues une fois activée
+      ctx.save(); ctx.translate(x, y);
+      ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.beginPath(); ctx.ellipse(0, 10, 24, 8, 0, 0, TAU); ctx.fill();
+      ctx.strokeStyle = o.active ? `rgba(120,200,255,${0.5 + 0.3 * Math.sin(time * 3)})` : 'rgba(110,100,90,0.5)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(0, 8, 26, 10, 0, 0, TAU); ctx.stroke();
+      ctx.fillStyle = '#2e2a28'; ctx.fillRect(-9, -34, 18, 44); ctx.fillStyle = '#4a4440'; ctx.fillRect(-9, -34, 18, 3); ctx.fillRect(-11, 6, 22, 5);
+      ctx.fillStyle = o.active ? `rgba(150,215,255,${0.7 + 0.3 * Math.sin(time * 4)})` : '#1a1816';
+      for (let k = 0; k < 4; k++) ctx.fillRect(-3, -28 + k * 8, 6, 3);
+      if (o.active) { ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = 'rgba(120,190,255,0.15)'; ctx.fillRect(-12, -38, 24, 50); ctx.globalCompositeOperation = 'source-over'; }
+      ctx.restore();
+    } else if (o.type === 'portal' || o.type === 'exitPortal' || o.type === 'descendPortal') {
+      const abyss = o.type !== 'exitPortal';
       ctx.save();
       ctx.translate(x, y);
       // gouffre
@@ -1394,7 +1407,8 @@ export class Renderer {
       const [mx, my] = toM(o.x, o.y);
       let col = null, r = 3;
       if (o.type === 'extract') { col = '#8fd0b0'; r = 4; }
-      else if (o.type === 'exitPortal') { col = '#d6cebd'; r = 5; }
+      else if (o.type === 'exitPortal' || o.type === 'descendPortal') { col = '#d6cebd'; r = 5; }
+      else if (o.type === 'teleporter') { col = o.active ? '#7ac8ff' : '#8a8070'; r = 4; }
       else if (o.type === 'portal') { col = '#6fa8a4'; r = 4; }
       else if (o.type === 'chest' && !o.opened) col = '#c9a45a';
       else if (o.type === 'npc') col = '#f0e0b8';

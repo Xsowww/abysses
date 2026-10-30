@@ -208,7 +208,7 @@ export const QUESTS = [
     desc: 'Un aventurier mort n’achète rien. Réussir 2 extractions.',
     intro: [
       'Toi, tu as la tête de quelqu’un qui va mourir avec les poches pleines. C’est du gâchis.',
-      'Cercle vert, portail du Gardien ou pierre de retour : peu importe comment, mais remonte. Deux fois, et je te fais un cadeau.',
+      'Téléporteur ou téléporteur portatif : peu importe comment, mais remonte. Deux fois, et je te fais un cadeau.',
     ],
     outro: ['Deux fois ! Tu pourrais presque devenir un client régulier.', 'Tiens. Deux pierres. Ne les perds pas, elles sont hors de prix.'],
     obj: { type: 'extract', count: 2 },

@@ -17,7 +17,7 @@ export const ACTIONS = [
   { id: 'skill4', label: 'Compétence 4', def: 'Digit4' },
   { id: 'potion', label: 'Boire une potion', def: 'KeyQ' },
   { id: 'interact', label: 'Interagir / Ramasser', def: 'KeyE' },
-  { id: 'stone', label: 'Pierre de retour', def: 'KeyR' },
+  { id: 'stone', label: 'Téléporteur portatif', def: 'KeyR' },
   { id: 'inventory', label: 'Inventaire', def: 'KeyI' },
   { id: 'talents', label: 'Arbre de talents', def: 'KeyN' },
   { id: 'journal', label: 'Journal de quêtes', def: 'KeyJ' },

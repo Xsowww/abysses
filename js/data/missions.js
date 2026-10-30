@@ -109,6 +109,13 @@ export function makeMissionQuest(pd) {
     intro, outro: [pick(['C’est fait, donc. Bien.', 'Tu es revenu. Peu en reviennent.', 'Les Abysses te laissent passer… pour l’instant.'])] };
 }
 
+// Mission secondaire d'un étage : 3 étages sur 4, un défi au hasard (jamais deux fois de suite le même).
+export function sideMissionFor(depth, last) {
+  if (Math.random() < 0.25) return null;
+  const ok = MISSION_ORDER.filter((t) => MISSIONS[t].minDepth <= depth && t !== last);
+  return ok.length ? { type: pick(ok), depth } : null;
+}
+
 export function augureBonus(list) {
   return (list || []).reduce((a, k) => a + (AUGURES[k] ? AUGURES[k].bonus : 0), 0);
 }

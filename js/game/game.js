@@ -19,9 +19,9 @@ import { QUESTS, NPCS, questDef, allQuests } from '../data/quests.js';
 import { dirFromAngle } from './sprites.js';
 import { SETS, setsForDepth, equippedSetCounts, SET_PIECE_COST } from '../data/sets.js';
 import { refillContracts, activeContracts, MAX_ACTIVE } from '../data/contracts.js';
-import { makeMissionQuest, augureBonus, AUGURES, MISSIONS } from '../data/missions.js';
+import { augureBonus, AUGURES, MISSIONS, sideMissionFor } from '../data/missions.js';
 import { randomUnique } from '../data/uniques.js';
-import { setupMission, updateMission, missionOnKill, missionInteract, missionReward } from './missions.js';
+import { setupMission, updateMission, missionOnKill, missionInteract, finishFloorMission } from './missions.js';
 import { LORE, LORE_BY_ID, guardianFor, EPILOGUE_ACT1 } from '../data/story.js';
 
 export const DUNGEON_NAME = 'La Crypte Oubliée';
@@ -143,7 +143,9 @@ export class Game {
     this.snapCamera();
     if (this.pd.shopDirty || !this.pd.shop) this.refreshShop();
     for (const it of Inv.allItems(this.pd)) if (it.set) rescaleSetItem(it, this.pd.level);
-    if (!this.pd.mquest && (this.pd.stats.runs || 0) > 0) this.newMissionQuest();
+    if (this.pd.mquest) { delete this.pd.quests[this.pd.mquest.id]; this.pd.mquest = null; } // ancien système
+    // anciennes sauvegardes : les profondeurs déjà atteintes ouvrent leurs téléporteurs
+    if (!this.pd.waypoints) { this.pd.waypoints = []; for (let d = 3; d <= (this.pd.maxDepth || 1); d += 3) this.pd.waypoints.push(d); }
     if (this.cameFromRun) { this.pd.boardNew = Math.min(3, (this.pd.boardNew || 0) + 1); this.cameFromRun = false; }
     refillContracts(this.pd);
     this.syncQuests();
@@ -156,11 +158,20 @@ export class Game {
     this.save();
   }
 
+  // Une expédition = une descente continue, étage après étage, sans remonter.
+  // opts.continueRun : on vient de l'étage précédent (même expédition).
   enterDungeon(depth, opts = {}) {
     const d = generateDungeon(depth);
     const s = this.baseScene('dungeon');
     s.depth = depth;
-    s.augures = new Set((opts.augures || []).filter((k) => AUGURES[k]));
+    const cont = !!(opts.continueRun && this.run && this.pd.inRun);
+    if (!cont) {
+      this.run = { start: depth, floors: 0, kills: 0, xp: 0, items: 0, sceaux: 0, startTime: this.time, augures: (opts.augures || []).filter((k) => AUGURES[k]) };
+      this.pd.runGold = 0;
+      this.pd.stats.runs++;
+    }
+    this.run.floors++;
+    s.augures = new Set(this.run.augures);
     s.bonus = augureBonus([...s.augures]);
     this.player.carrying = null;
     this.pd.deepest = Math.max(this.pd.deepest || 1, depth);
@@ -171,7 +182,7 @@ export class Game {
     s.props = d.props;
     s.wallDecor = d.wallDecor;
     s.bossRoom = d.bossRoom;
-    s.runStats = { kills: 0, xp: 0, items: 0, startTime: this.time };
+    s.runStats = this.run;
     const lvl = enemyLevel(depth);
     s.level = lvl;
     const hate = s.augures.has('hate'), horde = s.augures.has('horde'), chair = s.augures.has('chair');
@@ -187,33 +198,35 @@ export class Game {
     boss.guardian = guardianFor(depth);
     s.enemies.push(boss);
     s.boss = boss;
-    for (const e of d.extractions) s.interactables.push({ type: 'extract', x: e.x, y: e.y, r: 22, label: 'Cercle d’extraction' });
+    // Pas de cercle d'extraction : on remonte par un téléporteur (un étage sur trois) ou un téléporteur portatif
+    if (depth % 3 === 0) {
+      const tp = { x: d.start.x + 70, y: d.start.y };
+      if (d.map.collides(tp.x, tp.y, 16)) { tp.x = d.start.x - 70; }
+      if (d.map.collides(tp.x, tp.y, 16)) { tp.x = d.start.x; tp.y = d.start.y + 60; }
+      s.interactables.push({ type: 'teleporter', x: tp.x, y: tp.y, r: 22, label: (this.pd.waypoints || []).includes(depth) ? 'Téléporteur' : 'Téléporteur éteint', active: (this.pd.waypoints || []).includes(depth) });
+    }
     for (const ins of d.inscriptions || []) s.interactables.push({ type: 'inscription', x: ins.x, y: ins.y, r: 14, label: 'Inscription', text: ins.text });
     for (const c of d.chests) s.interactables.push({ type: 'chest', x: c.x, y: c.y, r: 14, label: c.rich ? 'Coffre orné' : 'Coffre', rich: c.rich, opened: false });
     this.scene = s;
-    // La mission de descente est celle confiée par un habitant (quête de mission acceptée)
-    const mq = this.pd.mquest, mst = mq && this.pd.quests[mq.id];
-    const offer = opts.mission ? opts.mission
-      : mq && mst && mst.status === 'active' && MISSIONS[mq.mtype].minDepth <= depth ? { type: mq.mtype, who: mq.who, qname: mq.name } : null;
+    // Mission secondaire de l'étage (facultative) : un défi au hasard, sur la plupart des étages
+    const offer = opts.mission || sideMissionFor(depth, this.run.lastSide);
+    if (offer) this.run.lastSide = offer.type;
     setupMission(this, d, offer);
     this.setupBossGate(d);
-    if (offer) {
-      const title = offer.qname || MISSIONS[offer.type].name;
-      setTimeout(() => { if (this.scene === s) this.ui.banner(title, 'gold'); }, 4300);
-    }
+    if (offer) setTimeout(() => { if (this.scene === s) this.ui.banner('Secondaire : ' + MISSIONS[offer.type].name, 'gold'); }, 4300);
     this.fx.clear();
     const p = this.player;
     p.resetCombat();
     p.x = d.start.x;
     p.y = d.start.y;
     p.recalc();
-    p.hp = p.maxHp;
+    if (cont) { p.hp = Math.min(p.maxHp, Math.max(1, opts.hp || p.hp) + p.maxHp * 0.2); } // le passage revigore un peu
+    else p.hp = p.maxHp;
     p.stamina = p.maxStamina;
     this.renderer.buildCache(s);
     this.snapCamera();
     this.pd.inRun = true;
-    this.pd.runGold = 0;
-    this.pd.stats.runs++;
+    this.pd.maxDepth = Math.max(this.pd.maxDepth || 1, depth);
     this.questEvent('depth', { depth });
     this.save();
     this.ui.onSceneChange();
@@ -881,11 +894,9 @@ export class Game {
     const unlocked = s.depth + 1 > pd.maxDepth;
     pd.maxDepth = Math.max(pd.maxDepth, s.depth + 1);
     this.questEvent('boss', { depth: s.depth });
-    s.interactables.push({ type: 'exitPortal', x: b.x, y: b.y, r: 26, label: 'Portail de retour (village)' });
+    s.interactables.push({ type: 'descendPortal', x: b.x, y: b.y, r: 26, label: `Descendre · profondeur ${s.depth + 1}` });
     setTimeout(() => {
       this.ui.banner('Gardien abattu', 'gold');
-      this.ui.toast('Un portail de retour s’est ouvert.', 'good', 5);
-      if (unlocked) this.ui.toast(`Profondeur ${s.depth + 1} débloquée`, 'good', 5);
       sfx('portal');
     }, 1200);
   }
@@ -1059,6 +1070,18 @@ export class Game {
       case 'exitPortal':
         this.extract('Portail du boss');
         break;
+      case 'descendPortal':
+        this.descend();
+        break;
+      case 'teleporter':
+        if (!o.active) {
+          o.active = true; o.label = 'Téléporteur';
+          this.pd.waypoints = [...new Set([...(this.pd.waypoints || []), this.scene.depth])].sort((a, b) => a - b);
+          this.fx.pillar(o.x, o.y, '#7ac8ff'); sfx('portal');
+          this.ui.banner('Téléporteur activé', 'gold');
+          this.save();
+        } else this.startChannel(3, 'Le téléporteur s’éveille…', () => this.extract('Téléporteur'));
+        break;
       case 'inscription':
         o.read = true;
         this.ui.inscription(o.text);
@@ -1148,10 +1171,10 @@ export class Game {
   useStone() {
     if (this.scene.type !== 'dungeon') { this.ui.toast('Inutile ici.', 'info', 2); return; }
     if (this.player.channel) return;
-    if (Inv.countConsumable(this.pd, 'pierre') <= 0) { this.ui.toast('Aucune pierre de retour !', 'bad', 1.5); sfx('error'); return; }
+    if (Inv.countConsumable(this.pd, 'pierre') <= 0) { this.ui.toast('Aucun téléporteur portatif', 'bad', 1.5); sfx('error'); return; }
     this.startChannel(5, 'La pierre murmure le chemin du retour…', () => {
       Inv.consume(this.pd, 'pierre');
-      this.extract('Pierre de retour');
+      this.extract('Téléporteur portatif');
     });
   }
 
@@ -1164,6 +1187,17 @@ export class Game {
     Inv.mergeStacks(pd.pocket);
   }
 
+  // Passer à l'étage suivant (même expédition)
+  descend() {
+    const s = this.scene, p = this.player;
+    if (p.dead) return;
+    finishFloorMission(this, true);
+    sfx('portal');
+    this.ui.flash();
+    const hp = p.hp;
+    this.enterDungeon(s.depth + 1, { continueRun: true, hp });
+  }
+
   extract(reason) {
     const pd = this.pd;
     const s = this.scene;
@@ -1174,21 +1208,13 @@ export class Game {
     pd.gold += gold;
     pd.runGold = 0;
     const found = [...pd.inventory, ...pd.pocket].filter((it) => it && it.found).map((it) => ({ name: itemName(it), color: itemColor(it), qty: it.qty }));
-    // Mission : payée seulement maintenant, si elle est accomplie
-    const MR = missionReward(this, reason === 'Portail du boss');
-    let missionLine = null;
-    if (MR && !MR.failed) {
-      pd.sceaux = (pd.sceaux || 0) + MR.sceaux;
-      pd.gold += MR.gold;
-      for (const m of MR.mats) if (!Inv.addItem(pd, makeConsumable(m.id, m.qty))) Inv.addTo(pd.stash, makeConsumable(m.id, m.qty));
-      if (MR.item && !Inv.addItem(pd, MR.item)) Inv.addTo(pd.stash, MR.item);
-      pd.stats.missions = (pd.stats.missions || 0) + 1;
-      this.questEvent('mission', { mtype: MR.type });
-      this.addXp(MR.xp);
-      missionLine = `Mission « ${MR.name} » accomplie : +${MR.sceaux} Sceaux de Valdrenne, +${MR.gold} or, +${MR.xp} XP${MR.mats.length ? ', ' + MR.mats.map((m) => `${m.qty} × ${CONSUMABLES[m.id].name}`).join(', ') : ''}${MR.item ? ', ' + MR.item.name : ''}`;
-      found.push(...MR.mats.map((m) => ({ name: CONSUMABLES[m.id].name, color: CONSUMABLES[m.id].color, qty: m.qty })));
-      if (MR.item) found.push({ name: MR.item.name, color: itemColor(MR.item) });
-    } else if (MR && MR.failed) missionLine = `Mission « ${MR.name} » non accomplie.`;
+    // Mission secondaire en cours (reliquaire, survivant) : comptée si on remonte avec
+    finishFloorMission(this, false);
+    const run = this.run || { sceaux: 0, start: s.depth, floors: 1 };
+    pd.sceaux = (pd.sceaux || 0) + (run.sceaux || 0);
+    pd.gold += pd.runGold; // or gagné par les missions après le décompte
+    pd.runGold = 0;
+    const missionLine = `Profondeur ${run.start} → ${s.depth} · ${run.floors} étage(s)${run.sceaux ? ` · +${run.sceaux} Sceaux` : ''}`;
     this.player.carrying = null;
     this.clearFoundFlags();
     pd.inRun = false;
@@ -1201,14 +1227,14 @@ export class Game {
     this.ui.showSummary({
       success: true,
       title: 'Vous avez survécu',
-      subtitle: `${reason} · ${DUNGEON_NAME}, profondeur ${s.depth}`,
+      subtitle: `${reason} · profondeur ${s.depth}`,
       kills: s.runStats.kills,
       xp: s.runStats.xp,
       gold,
       kept: found,
       lost: [],
       mission: missionLine,
-    }, () => { this.running = true; this.enterVillage(); });
+    }, () => { this.running = true; this.run = null; this.enterVillage(); });
   }
 
   // Retire le butin non sécurisé. Renvoie la liste des objets perdus.
@@ -1245,14 +1271,16 @@ export class Game {
     playMusic(null);
     const s = this.scene;
     const pen = this.applyDeathPenalty();
-    const mis = s.mission ? `Mission « ${s.mission.def.name} » perdue${p.carrying ? ' — le reliquaire retourne aux Abysses' : ''}.` : null;
+    const run = this.run || { start: s.depth, floors: 1, sceaux: 0 };
+    const mis = `Profondeur ${run.start} → ${s.depth} · ${run.floors} étage(s)${run.sceaux ? ` · ${run.sceaux} Sceaux perdus` : ''}`;
+    run.sceaux = 0;
     p.carrying = null;
     setTimeout(() => {
       this.running = false;
       this.ui.showSummary({
         success: false,
         title: 'Vous avez péri',
-        subtitle: `${DUNGEON_NAME}, profondeur ${s.depth}`,
+        subtitle: `Profondeur ${s.depth}`,
         kills: s.runStats.kills,
         xp: s.runStats.xp,
         gold: 0,
@@ -1260,7 +1288,7 @@ export class Game {
         kept: pen.kept,
         lost: pen.lost,
         mission: mis,
-      }, () => { this.ui.dying(false); this.running = true; this.enterVillage(); });
+      }, () => { this.ui.dying(false); this.running = true; this.run = null; this.enterVillage(); });
     }, 2200);
   }
 
@@ -1498,11 +1526,7 @@ export class Game {
     this.ui.toast(`Quête rendue : ${q.name} (+${R.gold || 0} or)`, 'good', 3);
     if (R.xp) this.addXp(R.xp, this.player.x, this.player.y);
     sfx('quest');
-    if (q.mission) {
-      delete pd.quests[id];
-      pd.mquest = null;
-      this.newMissionQuest();
-    }
+    if (q.mission) { delete pd.quests[id]; pd.mquest = null; }
     if (q.contract) {
       pd.stats.contracts = (pd.stats.contracts || 0) + 1;
       delete pd.quests[id];
@@ -1516,16 +1540,6 @@ export class Game {
       this.save();
       setTimeout(() => { this.ui.close(); sfx('bell'); this.ui.showStory(EPILOGUE_ACT1, null, 'Acte I — La Cloche Noire'); }, 600);
     }
-  }
-
-  // Nouvelle mission de descente, confiée par un habitant
-  newMissionQuest() {
-    const pd = this.pd;
-    const q = makeMissionQuest(pd);
-    if (!q) return;
-    pd.mquest = q;
-    pd.missionsSeen = [...new Set([...(pd.missionsSeen || []), q.mtype])];
-    pd.lastMission = q.mtype;
   }
 
   // Prochaine étape de l'histoire principale (pour guider le joueur).

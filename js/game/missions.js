@@ -144,7 +144,7 @@ export function missionStatus(g) {
   const M = m.def;
   let line;
   if (m.failed) line = 'Échouée';
-  else if (m.done) line = 'Accomplie — remontez';
+  else if (m.done) line = 'Accomplie';
   else switch (m.type) {
     case 'chasse': line = `Abattre ${m.label}`; break;
     case 'sauvetage': line = m.survivor.following ? `Escorter ${m.survivor.name} (${Math.ceil(m.survivor.hp)} PV)` : `Trouver ${m.survivor.name}`; break;
@@ -165,9 +165,35 @@ function complete(g, msg) {
   if (m.done || m.failed) return;
   m.done = true;
   sfx('quest');
-  g.ui.banner('Mission accomplie', 'gold');
-  g.ui.toast(msg || 'Mission accomplie. Remontez vivant pour toucher la récompense.', 'good', 5);
+  g.ui.banner('Secondaire accomplie', 'gold');
+  if (msg) g.ui.toast(msg, 'good', 4);
+  payMission(g);
   g.ui.refreshTracker();
+}
+
+// Récompense versée tout de suite : Sceaux (perdus si l'on meurt avant de remonter), or ramassé, XP, butin au sol.
+function payMission(g) {
+  const s = g.scene, m = s.mission, p = g.player, pd = g.pd;
+  if (!m || m.paid) return;
+  m.paid = true;
+  const R = missionReward(g);
+  if (!R || R.failed) return;
+  if (g.run) g.run.sceaux = (g.run.sceaux || 0) + R.sceaux;
+  pd.runGold = (pd.runGold || 0) + R.gold;
+  pd.stats.missions = (pd.stats.missions || 0) + 1;
+  g.questEvent('mission', { mtype: R.type });
+  g.addXp(R.xp, p.x, p.y);
+  for (const mt of R.mats) g.dropItem(p.x, p.y, makeConsumable(mt.id, mt.qty));
+  if (R.item) g.dropItem(p.x, p.y, R.item);
+  g.fx.text(p.x, p.y - 44, `+${R.sceaux} Sceaux`, '#e0ae6a', 15, { bold: true });
+}
+
+// En quittant l'étage (portail ou téléporteur) : le reliquaire et le survivant comptent s'ils sont avec vous.
+export function finishFloorMission(g) {
+  const s = g.scene, m = s && s.mission, p = g.player;
+  if (!m || m.done || m.failed) return;
+  if (m.type === 'reliquaire' && p.carrying === 'reliquaire') complete(g, 'Le reliquaire est sauf.');
+  else if (m.type === 'sauvetage' && m.survivor.following && dist(m.survivor.x, m.survivor.y, p.x, p.y) < 260) complete(g, `${m.survivor.name} est sauf.`);
 }
 
 function fail(g, msg) {
@@ -182,7 +208,7 @@ function fail(g, msg) {
 export function missionOnKill(g, e) {
   const m = g.scene.mission;
   if (!m || m.done || m.failed) return;
-  if (m.type === 'chasse' && e === m.target) complete(g, `${m.label} est tombé. Remontez vivant.`);
+  if (m.type === 'chasse' && e === m.target) complete(g, `${m.label} est tombé.`);
   if (m.type === 'gardien' && e.boss) complete(g, 'Le Gardien est tombé à temps.');
   if (m.type === 'nids' && e.type === 'nid') {
     m.progress = m.nests.filter((b) => b.dead).length;
@@ -192,7 +218,7 @@ export function missionOnKill(g, e) {
   if (m.type === 'cloches' && e.type === 'cloche') {
     m.progress = m.bells.filter((b) => b.dead).length;
     sfx('bell', { x: e.x, y: e.y, vol: 0.8 });
-    if (m.progress >= m.total) complete(g, 'Les cloches se taisent. Remontez vivant.');
+    if (m.progress >= m.total) complete(g, 'Les cloches se taisent.');
     else g.ui.toast(`Cloche détruite (${m.progress} / ${m.total}).`, 'good', 2);
   }
 }
@@ -227,7 +253,7 @@ export function missionInteract(g, o) {
         s.map.reveal(o.x, o.y, 30);
         sfx('portal', { x: o.x, y: o.y });
         g.fx.pillar(o.x, o.y, '#e0a050');
-        if (m.progress >= m.total) complete(g, 'Les quatre feux brûlent de nouveau. Remontez vivant.');
+        if (m.progress >= m.total) complete(g, 'Les quatre feux brûlent de nouveau.');
         else g.ui.toast(`Brasero rallumé (${m.progress} / ${m.total}).`, 'good', 2);
       });
       return true;
@@ -351,7 +377,7 @@ export function updateMission(g, dt) {
       sfx('alert');
     }
     if (z.t >= z.dur) {
-      complete(g, 'Le sceau tient. Remontez vivant.');
+      complete(g, 'Le sceau tient.');
       g.dropItem(z.x, z.y, g.loot({ ilvl: s.level + 2, rarityBonus: 2, minRarity: 2 }));
       g.dropItem(z.x, z.y, makeConsumable('bronze', randInt(1, 3)));
     }
@@ -360,11 +386,9 @@ export function updateMission(g, dt) {
 }
 
 // Vérifications à l'extraction : renvoie la récompense (ou null).
-export function missionReward(g, viaBoss) {
+export function missionReward(g) {
   const s = g.scene, m = s.mission, p = g.player, pd = g.pd;
   if (!m) return null;
-  if (m.type === 'reliquaire' && p.carrying === 'reliquaire') m.done = true;
-  if (m.type === 'sauvetage' && m.survivor.following && !m.failed && dist(m.survivor.x, m.survivor.y, p.x, p.y) < 260) m.done = true;
   if (!m.done || m.failed) return { failed: true, name: m.def.name };
   const bonus = 1 + (s.bonus || 0) / 100;
   const D = s.depth;
@@ -425,10 +449,11 @@ export function missionTarget(g) {
   if (!m || m.failed) return gateTarget(g);
   if (m.type === 'gardien' && !m.done) { const gt = gateTarget(g); if (gt) return gt; }
   const exitT = () => {
-    const ex = nearest(s.interactables.filter((o) => o.type === 'extract' || o.type === 'exitPortal'));
-    return ex ? { x: ex.x, y: ex.y, label: 'Sortie' } : null;
+    const ex = nearest(s.interactables.filter((o) => o.type === 'teleporter' || o.type === 'descendPortal'));
+    return ex ? { x: ex.x, y: ex.y, label: ex.type === 'teleporter' ? 'Téléporteur' : 'Descente' } : gateTarget(g);
   };
-  if (m.done || p.carrying || (m.type === 'sauvetage' && m.survivor.following)) return exitT();
+  if (m.done) return gateTarget(g) || exitT();
+  if (p.carrying || (m.type === 'sauvetage' && m.survivor.following)) return exitT();
   switch (m.type) {
     case 'chasse': return m.target && !m.target.dead ? { x: m.target.x, y: m.target.y - 20, label: m.label } : null;
     case 'sauvetage': return { x: m.survivor.x, y: m.survivor.y - 20, label: m.survivor.name };
