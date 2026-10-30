@@ -299,7 +299,7 @@ export class Player {
 
     // Roulade
     const rollCost = ROLL_COST * (1 - this.stats.rollCost / 100);
-    if (input.wasPressed('roll') && this.carrying) { g.ui.toast('Le reliquaire est trop lourd pour rouler.', 'bad', 1); }
+    if (input.wasPressed('roll') && this.carrying) { /* trop lourd pour rouler */ }
     else if (input.wasPressed('roll') && (this.spec === 'berserker' || this.spec === 'ombrelame') && !this.guarding && this.useStamina(rollCost)) {
       const a = ml ? Math.atan2(my, mx) : this.aim;
       if (this.spec === 'berserker') this.leap(a); else this.shadowStep(a);

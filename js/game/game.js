@@ -200,9 +200,8 @@ export class Game {
     s.boss = boss;
     // Pas de cercle d'extraction : on remonte par un téléporteur (un étage sur trois) ou un téléporteur portatif
     if (depth % 3 === 0) {
-      const tp = { x: d.start.x + 70, y: d.start.y };
-      if (d.map.collides(tp.x, tp.y, 16)) { tp.x = d.start.x - 70; }
-      if (d.map.collides(tp.x, tp.y, 16)) { tp.x = d.start.x; tp.y = d.start.y + 60; }
+      let tp = { x: d.start.x, y: d.start.y - 80 };
+      for (const c of [[0, -80], [90, 0], [-90, 0], [0, 80], [60, -60], [-60, -60]]) { const q = { x: d.start.x + c[0], y: d.start.y + c[1] }; if (!d.map.collides(q.x, q.y, 24)) { tp = q; break; } }
       s.interactables.push({ type: 'teleporter', x: tp.x, y: tp.y, r: 22, label: (this.pd.waypoints || []).includes(depth) ? 'Téléporteur' : 'Téléporteur éteint', active: (this.pd.waypoints || []).includes(depth) });
     }
     for (const ins of d.inscriptions || []) s.interactables.push({ type: 'inscription', x: ins.x, y: ins.y, r: 14, label: 'Inscription', text: ins.text });
@@ -301,6 +300,7 @@ export class Game {
       this.updateZones(dt);
       if (this.scene.allies && this.scene.allies.length) this.updateAllies(dt);
       if (this.scene.gate) this.updateGate(dt);
+      for (const o of this.scene.interactables) if (o.type === 'teleporter' && !o.active && dist(o.x, o.y, this.player.x, this.player.y) < 90) this.wakeTeleporter(o);
       if (this.scene.beams && this.scene.beams.length) { for (const b of this.scene.beams) b.t -= dt; this.scene.beams = this.scene.beams.filter((b) => b.t > 0); }
       for (let i = s.enemies.length - 1; i >= 0; i--) {
         const e = s.enemies[i];
@@ -1074,13 +1074,8 @@ export class Game {
         this.descend();
         break;
       case 'teleporter':
-        if (!o.active) {
-          o.active = true; o.label = 'Téléporteur';
-          this.pd.waypoints = [...new Set([...(this.pd.waypoints || []), this.scene.depth])].sort((a, b) => a - b);
-          this.fx.pillar(o.x, o.y, '#7ac8ff'); sfx('portal');
-          this.ui.banner('Téléporteur activé', 'gold');
-          this.save();
-        } else this.startChannel(3, 'Le téléporteur s’éveille…', () => this.extract('Téléporteur'));
+        if (!o.active) this.wakeTeleporter(o);
+        else this.startChannel(3, '…', () => this.extract('Téléporteur'));
         break;
       case 'inscription':
         o.read = true;
@@ -1185,6 +1180,17 @@ export class Game {
     for (const k in pd.equipment) if (pd.equipment[k]) delete pd.equipment[k].found;
     Inv.mergeStacks(pd.inventory);
     Inv.mergeStacks(pd.pocket);
+  }
+
+  // Un téléporteur s'éveille quand on passe à côté ; on pourra repartir de là depuis le hub
+  wakeTeleporter(o) {
+    if (o.active) return;
+    o.active = true; o.label = 'Téléporteur';
+    this.pd.waypoints = [...new Set([...(this.pd.waypoints || []), this.scene.depth])].sort((a, b) => a - b);
+    this.fx.pillar(o.x, o.y, '#7ac8ff'); this.fx.ring(o.x, o.y + 10, '#7ac8ff', 60, 0.6);
+    sfx('portal');
+    this.ui.banner('Téléporteur', 'gold');
+    this.save();
   }
 
   // Passer à l'étage suivant (même expédition)
@@ -1507,7 +1513,7 @@ export class Game {
     if (!st || st.status !== 'ready') return;
     const R = q.reward;
     const needSlots = (R.item || R.set || R.setAny ? 1 : 0) + (R.consumable ? 1 : 0);
-    if (Inv.freeCount(pd.inventory) < needSlots) { this.ui.toast('Libérez de la place dans votre inventaire.', 'bad', 2); sfx('error'); return; }
+    if (Inv.freeCount(pd.inventory) < needSlots) { this.ui.toast('Inventaire plein.', 'bad', 2); sfx('error'); return; }
     if (q.obj.type === 'bring' && !Inv.takeAll(pd, q.obj.id, q.obj.count)) { this.ui.toast('Il vous manque des objets.', 'bad', 2); sfx('error'); return; }
     st.status = 'done';
     pd.gold += R.gold || 0;
@@ -1591,8 +1597,8 @@ export class Game {
 
   upgradeItem(item) {
     const pd = this.pd;
-    if (!this.forgeUnlocked()) { this.ui.toast('Brann doit d’abord étudier le fer de Valdrenne.', 'bad', 3); sfx('error'); return; }
-    if (!this.canUpgrade(item)) { this.ui.toast('Il vous manque de l’or ou des matériaux.', 'bad', 2); sfx('error'); return; }
+    if (!this.forgeUnlocked()) { this.ui.toast('Verrouillé', 'bad', 2); sfx('error'); return; }
+    if (!this.canUpgrade(item)) { this.ui.toast('Insuffisant', 'bad', 2); sfx('error'); return; }
     const c = this.upgradeCost(item);
     pd.gold -= c.gold;
     for (const k in c) if (k !== 'gold') Inv.takeAll(pd, k, c[k]);

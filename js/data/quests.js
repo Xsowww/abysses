@@ -23,7 +23,7 @@ export const NPCS = {
   odile: {
     name: 'Odile', title: 'Marchande', color: '#4a3f26', hood: '#3a2a1c', shop: 'general',
     greet: [
-      'Fioles, pierres de retour, poches bien cousues… tout ce qu’il faut pour revenir vivant.',
+      'Fioles, poches bien cousues… tout ce qu’il faut pour revenir vivant.',
       'Je rachète ce que tu trouves en bas. Sans poser de questions. Surtout sans poser de questions.',
     ],
   },
@@ -208,7 +208,7 @@ export const QUESTS = [
     desc: 'Un aventurier mort n’achète rien. Réussir 2 extractions.',
     intro: [
       'Toi, tu as la tête de quelqu’un qui va mourir avec les poches pleines. C’est du gâchis.',
-      'Téléporteur ou téléporteur portatif : peu importe comment, mais remonte. Deux fois, et je te fais un cadeau.',
+      'Peu importe comment, mais remonte. Deux fois, et je te fais un cadeau.',
     ],
     outro: ['Deux fois ! Tu pourrais presque devenir un client régulier.', 'Tiens. Deux pierres. Ne les perds pas, elles sont hors de prix.'],
     obj: { type: 'extract', count: 2 },
@@ -216,7 +216,7 @@ export const QUESTS = [
   },
   {
     id: 'q_poche', giver: 'odile', name: 'Doublure de contrebande', req: 'q_extract',
-    desc: 'Atteindre la profondeur 2 et revenir voir Odile, qui coudra une meilleure poche.',
+    desc: 'Atteindre la profondeur 2.',
     intro: ['Une petite bourse, c’est pour les enfants. Descends à la deuxième profondeur et reviens.', 'Si tu en reviens, je te coudrai une doublure digne d’un vrai contrebandier.'],
     outro: ['Te voilà. Tiens, essaie ça. Deux emplacements, cousus au fil d’argent. Rien n’en sortira, même si toi tu restes en bas.'],
     obj: { type: 'depth', depth: 2, count: 1 },
@@ -232,7 +232,7 @@ export const QUESTS = [
   },
   {
     id: 'q_elites', giver: 'brann', name: 'Champions déchus', req: 'q_archers',
-    desc: 'Certains monstres portent une aura dorée : ce sont des champions de Valdrenne. En abattre 4.',
+    desc: 'Abattre 4 champions de Valdrenne.',
     intro: ['Certains de ces morts brillent d’une lueur dorée. Des champions de Valdrenne, avec du bon métal sur le dos.', 'Abats-en quatre. Ce qu’ils portent vaut plus que tout ce que je forge.'],
     outro: ['Quatre champions… Je retire ce que j’ai dit sur toi. Enfin, une partie.'],
     obj: { type: 'elite', count: 4 },
@@ -257,7 +257,7 @@ export const QUESTS = [
   // ---------------- Frère Anselme (chapelle) ----------------
   {
     id: 'a_cierges', giver: 'anselme', name: 'Lumière pour les morts', req: 'm_arrivee',
-    desc: 'Rapporter 3 Cierges des morts trouvés dans la Crypte. Une relique laissée dans le sac est perdue si vous mourez : utilisez la poche sécurisée.',
+    desc: 'Rapporter 3 Cierges des morts trouvés dans la Crypte.',
     intro: [
       'Là-dessous, chaque tombe avait son cierge. Ils sont éteints depuis trois siècles.',
       'Rapporte-m’en trois. Je les rallumerai ici, pour ceux qui n’ont personne.',
@@ -311,7 +311,7 @@ export const QUESTS = [
   // ---------------- Mira (antiquaire) ----------------
   {
     id: 'mi_paire', giver: 'mira', name: 'Les pièces vont par paires', req: 'q_boss1',
-    desc: 'Porter en même temps 2 pièces d’un même ensemble (couleur verte). Les ensembles se trouvent sur les élites, les Gardiens et dans les coffres.',
+    desc: 'Porter 2 pièces d’un même ensemble.',
     intro: [
       'Tu vois ce vert sur certaines pièces ? Ce sont des tenues entières de Valdrenne, éparpillées.',
       'Une pièce seule est médiocre. Deux pièces du même ensemble… elles se reconnaissent. Trois, elles chantent. Toutes, elles font de toi autre chose.',
@@ -331,7 +331,7 @@ export const QUESTS = [
   },
   {
     id: 'mi_complet', giver: 'mira', name: 'La tenue complète', req: 'mi_trois',
-    desc: 'Porter un ensemble complet (4 ou 5 pièces selon l’ensemble).',
+    desc: 'Porter un ensemble complet.',
     intro: ['Une tenue complète. Je n’en ai vu qu’une, une fois, sur un mort qui souriait encore.', 'Fais-le. Pour moi. Pour qu’au moins une fois, Valdrenne soit entière.'],
     outro: ['…', 'Tu ressembles à un portrait que j’ai vu, enfant. Garde-la. Ne la perds jamais.'],
     obj: { type: 'setpieces', count: 99, full: true },
@@ -340,7 +340,7 @@ export const QUESTS = [
   // ---------------- Brann (forge) ----------------
   {
     id: 'b_fer', giver: 'brann', name: 'Le fer de Valdrenne', req: 'm_arrivee',
-    desc: 'Rapporter 10 Fers de Valdrenne. Brann pourra alors renforcer votre équipement.',
+    desc: 'Rapporter 10 Fers de Valdrenne.',
     intro: ['Le fer de là-dessous ne rouille pas. Je veux comprendre pourquoi.', 'Rapporte-m’en dix. En échange, je t’apprends ce que la forge peut faire pour toi : renforcer ce que tu portes, +1, +2, et plus si tu as de quoi.'],
     outro: ['Bon métal. Très bon métal.', 'À partir de maintenant, apporte-moi ce que tu veux renforcer. Il me faudra du fer, de l’or… et plus tard, des choses plus rares.'],
     obj: { type: 'bring', id: 'fer', count: 10, minDepth: 1 },

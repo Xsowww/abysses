@@ -238,7 +238,7 @@ export function missionInteract(g, o) {
       g.startChannel(3, 'Vous descellez le reliquaire…', () => {
         s.interactables.splice(s.interactables.indexOf(o), 1);
         p.carrying = 'reliquaire';
-        g.ui.toast('Reliquaire en main. Remontez.', 'good', 5);
+        g.ui.toast('Reliquaire', 'good', 3);
         sfx('chest');
         m.step = 1;
       });
@@ -286,7 +286,6 @@ export function missionInteract(g, o) {
       if (m.seal.active || m.done) return true;
       m.seal.active = true;
       s.interactables.splice(s.interactables.indexOf(o), 1);
-      g.ui.toast('Tenez le cercle pendant 60 secondes !', 'good', 3);
       sfx('bossRoar');
       return true;
   }
@@ -360,8 +359,6 @@ export function updateMission(g, dt) {
     const z = m.seal;
     const inside = dist(p.x, p.y, z.x, z.y) < z.r;
     if (inside) z.t += dt;
-    else if (!z.warnT || z.warnT <= 0) { g.ui.toast('Revenez dans le cercle : le temps est suspendu.', 'bad', 1.5); z.warnT = 2; }
-    if (z.warnT > 0) z.warnT -= dt;
     z.waveT -= dt;
     if (z.waveT <= 0) {
       z.waveT = 11;
@@ -446,13 +443,12 @@ export function missionTarget(g) {
     return o ? { npc: true, x: o.x, y: o.y - 52, label: st && st.status === 'active' ? 'Portail' : o.label } : null;
   }
   const m = s.mission;
-  if (!m || m.failed) return gateTarget(g);
-  if (m.type === 'gardien' && !m.done) { const gt = gateTarget(g); if (gt) return gt; }
+  if (!m || m.failed) return null;
   const exitT = () => {
     const ex = nearest(s.interactables.filter((o) => o.type === 'teleporter' || o.type === 'descendPortal'));
-    return ex ? { x: ex.x, y: ex.y, label: ex.type === 'teleporter' ? 'Téléporteur' : 'Descente' } : gateTarget(g);
+    return ex ? { x: ex.x, y: ex.y, label: ex.type === 'teleporter' ? 'Téléporteur' : 'Descente' } : null;
   };
-  if (m.done) return gateTarget(g) || exitT();
+  if (m.done) return null;
   if (p.carrying || (m.type === 'sauvetage' && m.survivor.following)) return exitT();
   switch (m.type) {
     case 'chasse': return m.target && !m.target.dead ? { x: m.target.x, y: m.target.y - 20, label: m.label } : null;

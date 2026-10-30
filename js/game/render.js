@@ -998,10 +998,11 @@ export class Renderer {
     for (const b of s.braziers) lights.push(b.lamp ? { x: b.x, y: b.y, r: 170 * flick(b.x), a: 0.85, c: 'warm', g: 0.2 } : { x: b.x, y: b.y, r: (b.camp ? 270 : 230) * flick(b.y), a: 0.9, c: 'warm', g: 0.22 });
     for (const o of s.interactables) {
       if (o.type === 'extract') lights.push({ x: o.x, y: o.y, r: 200, a: 0.8, c: 'green', g: 0.3 });
-      else if (o.type === 'portal') lights.push({ x: o.x, y: o.y, r: 220, a: 0.8, c: 'purple', g: 0.35 });
+      else if (o.type === 'portal') lights.push({ x: o.x, y: o.y, r: 360, a: 0.9, c: 'purple', g: 0.4 });
       else if (o.type === 'exitPortal') lights.push({ x: o.x, y: o.y, r: 240, a: 0.9, c: 'blue', g: 0.35 });
       else if (o.type === 'descendPortal') lights.push({ x: o.x, y: o.y, r: 240, a: 0.9, c: 'purple', g: 0.35 });
-      else if (o.type === 'teleporter') lights.push({ x: o.x, y: o.y - 10, r: o.active ? 200 : 110, a: o.active ? 0.85 : 0.5, c: o.active ? 'blue' : 'warm', g: 0.25 });
+      else if (o.type === 'teleporter') lights.push({ x: o.x, y: o.y - 30, r: o.active ? 300 : 220, a: 0.9, c: o.active ? 'blue' : 'warm', g: 0.3 });
+      else if (o.type === 'chest' && !o.opened) lights.push({ x: o.x, y: o.y, r: o.rich ? 130 : 100, a: 0.6, c: 'warm', g: 0.2 });
       else if (o.type === 'npc') lights.push({ x: o.x, y: o.y, r: 110, a: 0.5, c: 'warm', g: 0 });
     }
     for (const pr of s.projectiles) lights.push(pr.magic ? { x: pr.x, y: pr.y, r: pr.orb ? 120 : 80, a: 0.75, c: pr.fire ? 'warm' : pr.bone ? 'green' : 'blue', g: 0.25 } : { x: pr.x, y: pr.y, r: 60, a: 0.5, c: 'white', g: 0.15 });
@@ -1212,22 +1213,47 @@ export class Renderer {
       this.drawChestShape(ctx, x, y, false, '#2e2218', '#6e5a3c');
     } else if (o.type === 'chest') {
       if (o.openT !== undefined) o.openT = Math.min(1, o.openT + 1 / 30);
-      this.drawChestShape(ctx, x, y, o.opened, o.rich ? '#241c22' : '#2e2218', o.rich ? '#a8884a' : '#5e4c34', o.openT);
+      if (!o.opened) {
+        // halo + étincelles : on doit les voir de loin
+        const pulse = 0.5 + 0.5 * Math.sin(time * 3 + x);
+        const col = o.rich ? '255,200,90' : '230,170,90';
+        ctx.fillStyle = `rgba(${col},${0.16 + 0.12 * pulse})`; ctx.beginPath(); ctx.ellipse(x, y + 6, 30, 12, 0, 0, TAU); ctx.fill();
+        ctx.strokeStyle = `rgba(${col},${0.35 + 0.25 * pulse})`; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.ellipse(x, y + 6, 24, 9, 0, 0, TAU); ctx.stroke();
+        for (let k = 0; k < 3; k++) { const t = (time * 0.7 + k / 3 + x * 0.01) % 1; ctx.fillStyle = `rgba(${col},${1 - t})`; ctx.fillRect(x - 12 + ((k * 11 + Math.floor(x)) % 24), y - 8 - t * 26, 2, 2); }
+      }
+      if (hasTiles()) {
+        ctx.save(); ctx.translate(x, y + 6); ctx.scale(1.35, 1.35); if (o.opened) ctx.globalAlpha = 0.55;
+        drawT(ctx, o.rich ? 'chest2' : 'chest', -16, -26);
+        ctx.restore();
+        if (o.opened) { ctx.fillStyle = 'rgba(10,8,6,0.8)'; ctx.fillRect(x - 15, y - 16, 30, 6); }
+      } else this.drawChestShape(ctx, x, y, o.opened, o.rich ? '#241c22' : '#2e2218', o.rich ? '#a8884a' : '#5e4c34', o.openT);
     } else if (o.type === 'teleporter') {
-      // stèle de téléportation : runes éteintes, ou bleues une fois activée
+      // téléporteur : grand obélisque sur un cercle de runes (braise éteinte, puis bleu une fois éveillé)
+      const on = o.active, pulse = 0.5 + 0.5 * Math.sin(time * 3);
+      const col = on ? '120,200,255' : '220,150,80';
       ctx.save(); ctx.translate(x, y);
-      ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.beginPath(); ctx.ellipse(0, 10, 24, 8, 0, 0, TAU); ctx.fill();
-      ctx.strokeStyle = o.active ? `rgba(120,200,255,${0.5 + 0.3 * Math.sin(time * 3)})` : 'rgba(110,100,90,0.5)'; ctx.lineWidth = 2;
-      ctx.beginPath(); ctx.ellipse(0, 8, 26, 10, 0, 0, TAU); ctx.stroke();
-      ctx.fillStyle = '#2e2a28'; ctx.fillRect(-9, -34, 18, 44); ctx.fillStyle = '#4a4440'; ctx.fillRect(-9, -34, 18, 3); ctx.fillRect(-11, 6, 22, 5);
-      ctx.fillStyle = o.active ? `rgba(150,215,255,${0.7 + 0.3 * Math.sin(time * 4)})` : '#1a1816';
-      for (let k = 0; k < 4; k++) ctx.fillRect(-3, -28 + k * 8, 6, 3);
-      if (o.active) { ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = 'rgba(120,190,255,0.15)'; ctx.fillRect(-12, -38, 24, 50); ctx.globalCompositeOperation = 'source-over'; }
+      ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.beginPath(); ctx.ellipse(0, 10, 46, 17, 0, 0, TAU); ctx.fill();
+      ctx.strokeStyle = `rgba(${col},${(on ? 0.55 : 0.3) + 0.3 * pulse})`; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.ellipse(0, 10, 42, 15, 0, 0, TAU); ctx.stroke();
+      ctx.beginPath(); ctx.ellipse(0, 10, 32, 11, 0, 0, TAU); ctx.stroke();
+      for (let k = 0; k < 8; k++) { const a = k * TAU / 8 + time * (on ? 0.6 : 0.15); ctx.fillStyle = `rgba(${col},${0.5 + 0.4 * pulse})`; ctx.fillRect(Math.cos(a) * 37 - 2, 10 + Math.sin(a) * 13 - 2, 4, 4); }
+      if (hasTiles()) { ctx.save(); ctx.scale(1.6, 1.6); drawT(ctx, 'obelisk', -16, -58); ctx.restore(); }
+      else { ctx.fillStyle = '#5a5650'; ctx.fillRect(-10, -80, 20, 90); }
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = `rgba(${col},${(on ? 0.35 : 0.15) + 0.15 * pulse})`;
+      for (let k = 0; k < 4; k++) ctx.fillRect(-3, -70 + k * 14, 6, 6);
+      if (on) { ctx.fillStyle = `rgba(${col},${0.08 + 0.06 * pulse})`; ctx.fillRect(-14, -150, 28, 160); }
+      ctx.globalCompositeOperation = 'source-over';
       ctx.restore();
     } else if (o.type === 'portal' || o.type === 'exitPortal' || o.type === 'descendPortal') {
       const abyss = o.type !== 'exitPortal';
       ctx.save();
       ctx.translate(x, y);
+      if (o.type === 'portal') {
+        // grand portail du hub : deux obélisques et un gouffre plus large
+        if (hasTiles()) for (const sx of [-70, 70]) { ctx.save(); ctx.translate(sx, 0); ctx.scale(1.4, 1.4); drawT(ctx, 'obelisk', -16, -52); ctx.restore(); }
+        ctx.scale(1.8, 1.8);
+      }
       // gouffre
       const grd = ctx.createRadialGradient(0, 0, 2, 0, 0, 30);
       grd.addColorStop(0, '#000');

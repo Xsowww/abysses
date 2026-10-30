@@ -22,7 +22,7 @@ export const MISSIONS = {
   },
   reliquaire: {
     name: 'Le reliquaire', icon: 'wall', minDepth: 1, sceaux: 3,
-    desc: 'Rapportez le reliquaire. Lourd : pas de roulade.',
+    desc: 'Rapportez le reliquaire.',
     steps: ['Récupérer le reliquaire', 'Le rapporter à la surface'],
   },
   balises: {

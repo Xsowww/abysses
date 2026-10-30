@@ -247,7 +247,7 @@ export class UI {
     if (item.kind === 'consumable') {
       const C = CONSUMABLES[item.id];
       h += `<div class="tt-sub">${C.material ? 'Matériau de forge' : C.relic ? 'Relique de quête' : 'Consommable'}${item.qty > 1 ? ' · ' + item.qty + ' exemplaires' : ''}</div><div class="tt-desc">${C.desc}</div>`;
-      if ((C.material || C.relic) && item.found && pd.inRun && !(opts.ref && opts.ref.startsWith('pocket'))) h += '<div class="tt-warn">Non sécurisé : perdu si vous mourez. Rangez-le dans la poche (Maj + clic).</div>';
+      if ((C.material || C.relic) && item.found && pd.inRun && !(opts.ref && opts.ref.startsWith('pocket'))) h += '<div class="tt-warn">Non sécurisé</div>';
       h += `<div class="tt-val">Prix ${C.price} · revente ${Math.max(1, Math.floor(C.price / 3))} ${icon('gold', 'gold')}</div><div class="tt-lore">${C.lore}</div>`;
       return h;
     }
@@ -389,13 +389,12 @@ export class UI {
       }
       case 'quest-turnin-talk': {
         const q = questDef(this.pd, arg);
-        if (!g.canTurnIn(arg)) { this.toast('Libérez de la place dans votre inventaire.', 'bad', 2); sfx('error'); break; }
+        if (!g.canTurnIn(arg)) { this.toast('Inventaire plein.', 'bad', 2); sfx('error'); break; }
         const after = () => {
           g.turnInQuest(arg);
           // L'histoire s'enchaîne : si l'étape suivante est chez le même personnage, elle commence tout de suite.
           const nx = q.main ? g.nextMainStep() : null;
           if (nx && nx.state === 'available' && nx.q.giver === this.opts.npc && this.panel === 'npc') this.startSeq(nx.q.intro, () => { this.opts.view = nx.q.id; });
-          else if (nx && nx.state === 'available') this.toast(`Histoire : parlez à ${NPCS[nx.q.giver].name}.`, 'good', 5);
         };
         if (q.outro) this.startSeq(q.outro, after);
         else after();
@@ -717,7 +716,6 @@ export class UI {
     }
     if (npcTalk(id, this.pd).length) opts += '<button class="opt" data-action="talk">Parler</button>';
     if (N.shop) opts += `<button class="opt shop" data-action="open-shop" data-arg="${N.shop}">${N.shopLabel || 'Commercer'}</button>`;
-    if (N.portal) opts += '<button class="opt portal" data-action="open-portal">Ouvrir le portail des Abysses</button>';
     opts += '<button class="opt" data-action="close">Prendre congé</button>';
     const html = `<div class="dialog"><div class="npc-line">« ${this.opts.greet} »</div><div class="opts">${opts}</div></div>`;
     return { title: N.name, sub: N.title, html, cls: 'narrow' };
@@ -813,12 +811,11 @@ export class UI {
     let spec = '';
     if (pd.spec) {
       const S = C.specs[pd.spec];
-      spec = `<h3>Voie du ${S.name}</h3>${S.play ? `<ul class="spec-play">${S.play.map((x) => `<li>${x}</li>`).join('')}</ul>` : ''}${this.treeHTML(S)}`;
+      spec = `<h3>Voie du ${S.name}</h3>${this.treeHTML(S)}`;
     } else {
       const can = pd.level >= SPEC_LEVEL;
       spec = `<h3>Spécialisation</h3><p class="hint" style="margin-top:-4px">''</p>
         <div class="spec-cards">${Object.entries(C.specs).map(([id, S]) => `<div class="spec-card ${can ? 'st-avail' : 'locked st-locked'}" style="--c:${S.color}"><div class="spec-name">${S.name}</div>
-          ${S.play ? `<ul class="spec-play">${S.play.map((x) => `<li>${x}</li>`).join('')}</ul>` : ''}
           ${can ? `<button class="btn main small" data-action="spec" data-arg="${id}">Embrasser cette voie</button>` : `<div class="dim">${icon('lock')} Niveau ${SPEC_LEVEL}</div>`}</div>`).join('')}</div>`;
     }
     const bar = pd.skillBar.map((s, i) => `<div class="sb-slot ${s ? 'st-max' : 'st-off'}" data-skill="${s || ''}"><span class="key">${input.label('skill' + (i + 1))}</span>${s ? icon(SKILLS[s].icon) : ''}<div class="sb-name">${s ? SKILLS[s].name : '—'}</div></div>`).join('');
@@ -849,7 +846,7 @@ export class UI {
     const pots = Inv.countConsumable(pd, 'potion'), stones = Inv.countConsumable(pd, 'pierre');
     const html = `<div class="portal-layout"><div class="col">
       <h3>Descente</h3>
-      <div class="mis-card st-avail"><div class="mc-name">Record : profondeur ${pd.maxDepth || 1}</div><div class="mc-desc">Retour : téléporteur (1 étage sur 3) ou téléporteur portatif.</div></div>
+      <div class="mis-card st-avail"><div class="mc-name">Record : profondeur ${pd.maxDepth || 1}</div></div>
       <div class="depths" style="margin-top:10px">${rows}</div></div>
       <div class="col"><h3>Augures <span class="dim"><b class="glow">+${bonus} %</b></span></h3>
       <div class="aug-list">${augs}</div>
@@ -861,7 +858,7 @@ export class UI {
   // ================= MENUS =================
   panel_pause() {
     const html = `<div class="menu"><button class="mi main" data-action="resume">Reprendre</button><button class="mi" data-action="options">Touches et options</button><button class="mi" data-action="quit">Sauvegarder et quitter</button>
-      ${this.pd && this.pd.inRun ? '<p class="hint" style="text-align:center">Quitter maintenant = mourir.</p>' : ''}</div>`;
+      ${this.pd && this.pd.inRun ? '' : ''}</div>`;
     return { title: 'Pause', html, cls: 'narrow', footer: '<span><kbd>Échap</kbd>Reprendre</span>' };
   }
 
@@ -993,7 +990,7 @@ export class UI {
     this.summaryOpen = true;
     this.summaryCb = cb;
     const list = (arr) => arr.map((x) => `<li style="color:${x.color}">${escapeHtml(x.name)}${x.qty > 1 ? ' ×' + x.qty : ''}</li>`).join('');
-    let body = `<div class="sum-stats"><div><b>${d.kills}</b><span>créatures abattues</span></div><div><b>${d.xp}</b><span>expérience (conservée)</span></div>`;
+    let body = `<div class="sum-stats"><div><b>${d.kills}</b><span>créatures abattues</span></div><div><b>${d.xp}</b><span>expérience</span></div>`;
     body += d.success ? `<div><b>${fmt(d.gold)}</b><span>or rapporté</span></div>` : `<div><b class="bad">${fmt(d.lostGold || 0)}</b><span>or perdu</span></div>`;
     body += '</div>';
     if (d.mission) body += `<p class="sum-mission ${d.success && !/non accomplie/.test(d.mission) ? 'ok' : 'bad'}">${escapeHtml(d.mission)}</p>`;
@@ -1001,7 +998,7 @@ export class UI {
     else {
       body += `<h3>Sauvé par la poche</h3>${d.kept.length ? `<ul class="loot">${list(d.kept)}</ul>` : '<p class="dim">Rien.</p>'}`;
       body += `<h3>Abandonné aux Abysses</h3>${d.lost.length ? `<ul class="loot lost">${list(d.lost)}</ul>` : '<p class="dim">Rien.</p>'}`;
-      body += '<p class="hint" style="text-align:center">Votre équipement porté vous a suivi.</p>';
+      body += '<p class="hint" style="text-align:center"></p>';
     }
     this.el.screen.classList.add('overlay');
     this.el.screen.innerHTML = `<div class="screen summary ${d.success ? 'win' : 'lose'}"><div class="sum-band"><h1>${d.title}</h1><div class="sum-sub">${d.subtitle}</div></div>
@@ -1192,9 +1189,8 @@ export class UI {
     all.sort((a, b) => (b.mission ? 2 : b.main ? 1 : 0) - (a.mission ? 2 : a.main ? 1 : 0) || (pd.quests[b.id].status === 'ready') - (pd.quests[a.id].status === 'ready'));
     const qs = all.slice(0, 4);
     const nx = this.game.nextMainStep && this.game.nextMainStep();
-    let hint = nx && nx.state === 'available' ? `<div class="tr-q ready"><b>◆ Histoire</b><div>Parlez à ${NPCS[nx.q.giver].name}</div></div>` : '';
+    let hint = '';
     const G = this.game.scene && this.game.scene.gate;
-    if (G && !G.open) hint = `<div class="tr-q ${G.key || G.hasKey ? 'ready' : ''}"><b>◇ Grille du Gardien</b><div>${G.hasKey ? 'Clé en main' : G.key ? 'Ramassez la clé' : `Ennemis restants : ${this.game.gateRemaining()}`}</div></div>` + hint;
     if (ms) hint = `<div class="tr-q mission ${ms.done ? 'ready' : ''} ${ms.failed ? 'failed' : ''}"><b>⚔ ${ms.name}</b><div>${ms.line}</div></div>` + hint;
     const sc = this.game.scene;
     if (sc && sc.type === 'dungeon') {
@@ -1274,7 +1270,7 @@ export class UI {
     if (o && !p.dead && !this.panel) {
       const verb = o.type === 'npc' ? 'Parler à' : o.type === 'chest' || o.type === 'stash' ? 'Ouvrir' : o.type === 'extract' ? 'Remonter par le' : o.type === 'inscription' ? 'Lire' : 'Franchir le';
       const lbl = o.type === 'extract' ? 'cercle d’extraction' : o.type === 'portal' || o.type === 'exitPortal' ? 'portail' : o.type === 'npc' ? o.label : o.type === 'inscription' ? 'l’inscription' : o.label.toLowerCase();
-      const txt = o.type === 'teleporter' ? `<kbd>${input.label('interact')}</kbd> ${o.active ? 'Remonter au village' : 'Activer le téléporteur'}`
+      const txt = o.type === 'teleporter' ? `<kbd>${input.label('interact')}</kbd> Téléporteur`
         : o.type === 'descendPortal' ? `<kbd>${input.label('interact')}</kbd> ${o.label}`
         : `<kbd>${input.label('interact')}</kbd> ${verb} ${lbl}`;
       if (h.prompt._last !== txt) { h.prompt.innerHTML = txt; h.prompt._last = txt; }
