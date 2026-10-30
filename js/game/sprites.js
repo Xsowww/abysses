@@ -17,6 +17,16 @@ export async function loadSprites() {
       im.src = `assets/sprites/${name}.png`;
     })));
     SPR.ready = true;
+    // Serviteur du Nécromancien : squelette teinté de vert spectral (copie de l'atlas, faite une fois)
+    const sq = SPR.img.squelette;
+    if (sq) {
+      const c = document.createElement('canvas'); c.width = sq.width; c.height = sq.height;
+      const x = c.getContext('2d');
+      x.drawImage(sq, 0, 0);
+      x.globalCompositeOperation = 'source-atop';
+      x.fillStyle = 'rgba(70,200,130,0.45)'; x.fillRect(0, 0, c.width, c.height);
+      SPR.img.serviteur = c; SPR.meta.serviteur = SPR.meta.squelette;
+    }
   } catch (e) {
     SPR.ready = false;
   }

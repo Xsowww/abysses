@@ -166,6 +166,12 @@
     "url": "https://opengameart.org/content/lpc-helmets"
    },
    {
+    "what": "hat/magic/wizard/base/adult/walk",
+    "authors": "Michael Whitlock (bigbeargames), Tuomo Untinen (reemax), JaidynReiman",
+    "license": "CC-BY-SA 3.0, GPL 2.0, GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-items-and-game-effects"
+   },
+   {
     "what": "head/heads/human/female",
     "authors": "bluecarrot16, Benjamin K. Smith (BenCreating), Stephen Challener (Redshrike)",
     "license": "OGA-BY 3.0, CC-BY-SA 3.0, GPL 3.0",
@@ -262,6 +268,12 @@
     "url": "https://opengameart.org/content/lpc-medieval-fantasy-character-sprites"
    },
    {
+    "what": "torso/jacket/frock/male/walk",
+    "authors": "bluecarrot16",
+    "license": "CC-BY-SA 3.0",
+    "url": "https://opengameart.org/content/lpc-pirates"
+   },
+   {
     "what": "torso/jacket/tabard/male/walk",
     "authors": "bluecarrot16, Johannes Sjölund (wulax)",
     "license": "OGA-BY 3.0, CC-BY-SA 3.0, GPL 3.0",
@@ -286,10 +298,34 @@
     "url": "https://opengameart.org/content/lpc-medieval-weapons"
    },
    {
+    "what": "weapon/magic/diamond/universal/foreground/walk",
+    "authors": "bluecarrot16",
+    "license": "OGA-BY 3.0+, GPL 3.0, CC-BY 4.0",
+    "url": "https://opengameart.org/content/lpc-more-weapons"
+   },
+   {
     "what": "weapon/magic/gnarled/universal/foreground/walk",
     "authors": "bluecarrot16",
     "license": "OGA-BY 3.0+, GPL 3.0, CC-BY 4.0",
     "url": "https://opengameart.org/content/lpc-more-weapons"
+   },
+   {
+    "what": "weapon/magic/loop/universal/foreground/walk",
+    "authors": "bluecarrot16",
+    "license": "OGA-BY 3.0+, GPL 3.0, CC-BY 4.0",
+    "url": "https://opengameart.org/content/lpc-more-weapons"
+   },
+   {
+    "what": "weapon/magic/simple/foreground/walk",
+    "authors": "bluecarrot16, Dr. Jamgo",
+    "license": "CC0",
+    "url": "https://opengameart.org/content/lpc-simple-staff"
+   },
+   {
+    "what": "weapon/magic/wand/male/slash",
+    "authors": "Matthew Krohn (makrohn)",
+    "license": "CC-BY-SA 3.0, GPL 3.0, OGA-BY 3.0",
+    "url": "https://opengameart.org/content/lpc-wands"
    },
    {
     "what": "weapon/polearm/spear/foreground/walk",
@@ -386,13 +422,13 @@
   "title": "Icônes d’objets",
   "items": [
    {
-    "what": "Icônes d'objets — Idylwild's Armory (armures, boucliers, bagues, amulettes)",
+    "what": "Icônes d'objets — Idylwild's Armory (armures, robe, boucliers, bagues, amulettes)",
     "authors": "Idylwild",
     "license": "CC0",
     "url": "https://opengameart.org/content/idylwilds-armory"
    },
    {
-    "what": "Icônes d'objets — Idylwild's Arsenal (épées, haches, masses, marteaux, arcs, arbalètes)",
+    "what": "Icônes d'objets — Idylwild's Arsenal (épées, haches, masses, marteaux, arcs, arbalètes, bâtons, baguettes)",
     "authors": "Idylwild",
     "license": "CC0",
     "url": "https://opengameart.org/content/idylwilds-arsenal"
@@ -410,13 +446,13 @@
     "url": "https://opengameart.org/content/idylwilds-inventory"
    },
    {
-    "what": "Icônes d'objets — Idylwild's Arcanum (fioles, pierres runiques, gemmes, rouleaux, crâne)",
+    "what": "Icônes d'objets — Idylwild's Arcanum (fioles, pierres runiques, gemmes, rouleaux, grimoires, crâne)",
     "authors": "Idylwild",
     "license": "CC0",
     "url": "https://opengameart.org/content/idylwilds-arcanum"
    },
    {
-    "what": "Icônes d'objets — Dungeon Crawl Stone Soup 32x32 tiles (espadons, marteaux, tas d'or, clé, crâne)",
+    "what": "Icônes d'objets — Dungeon Crawl Stone Soup 32x32 tiles (espadons, marteaux, bâtons, sceptres, baguettes, livres, robes, chapeaux, tas d'or, clé, crâne)",
     "authors": "Dungeon Crawl Stone Soup tile artists (Chris Hamons, mainteneur ; soumis par MedicineStorm) — crawl-tiles / RLTiles",
     "license": "CC0",
     "url": "https://opengameart.org/content/dungeon-crawl-32x32-tiles"

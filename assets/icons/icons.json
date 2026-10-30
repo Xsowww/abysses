@@ -804,6 +804,194 @@
   "skull_candle": [
    256,
    384
+  ],
+  "staff1": [
+   288,
+   384
+  ],
+  "staff2": [
+   320,
+   384
+  ],
+  "dc_staff_2": [
+   352,
+   384
+  ],
+  "staff3": [
+   384,
+   384
+  ],
+  "dc_staff_4": [
+   416,
+   384
+  ],
+  "dc_staff_7": [
+   448,
+   384
+  ],
+  "dc_staff_8": [
+   480,
+   384
+  ],
+  "dc_staff_3": [
+   0,
+   416
+  ],
+  "dc_rod_1": [
+   32,
+   416
+  ],
+  "dc_rod_0": [
+   64,
+   416
+  ],
+  "dc_rod_4": [
+   96,
+   416
+  ],
+  "dc_rod_5": [
+   128,
+   416
+  ],
+  "dc_rod_6": [
+   160,
+   416
+  ],
+  "dc_rod_7": [
+   192,
+   416
+  ],
+  "dc_sceptre_asmodeus": [
+   224,
+   416
+  ],
+  "dc_sceptre_asmodeus_2": [
+   256,
+   416
+  ],
+  "dc_wand_wood": [
+   288,
+   416
+  ],
+  "wand1": [
+   320,
+   416
+  ],
+  "dc_wand_iron": [
+   352,
+   416
+  ],
+  "dc_wand_bone": [
+   384,
+   416
+  ],
+  "wand2": [
+   416,
+   416
+  ],
+  "dc_wand_silver": [
+   448,
+   416
+  ],
+  "dc_wand_gold": [
+   480,
+   416
+  ],
+  "dc_wand_star": [
+   0,
+   448
+  ],
+  "grimoire_closed": [
+   32,
+   448
+  ],
+  "dc_book_leather": [
+   64,
+   448
+  ],
+  "dc_book_brown": [
+   96,
+   448
+  ],
+  "grimoire_open": [
+   128,
+   448
+  ],
+  "dc_book_gray": [
+   160,
+   448
+  ],
+  "dc_book_purple": [
+   192,
+   448
+  ],
+  "dc_book_dead": [
+   224,
+   448
+  ],
+  "dc_book_gold": [
+   256,
+   448
+  ],
+  "cloth_robe": [
+   288,
+   448
+  ],
+  "cloth_robe_sombre": [
+   320,
+   448
+  ],
+  "dc_robe_1_new": [
+   352,
+   448
+  ],
+  "dc_robe_2_new": [
+   384,
+   448
+  ],
+  "dc_robe_3": [
+   416,
+   448
+  ],
+  "dc_robe_ego_2": [
+   448,
+   448
+  ],
+  "dc_robe_ego_1": [
+   480,
+   448
+  ],
+  "dc_robe_art_2": [
+   0,
+   480
+  ],
+  "dc_cap_1": [
+   32,
+   480
+  ],
+  "dc_wizard_hat_1": [
+   64,
+   480
+  ],
+  "dc_hat_1": [
+   96,
+   480
+  ],
+  "dc_wizard_hat_2": [
+   128,
+   480
+  ],
+  "dc_hat_2": [
+   160,
+   480
+  ],
+  "dc_cornuthaum": [
+   192,
+   480
+  ],
+  "dc_hat_3": [
+   224,
+   480
   ]
  },
  "map": {
@@ -1071,6 +1259,65 @@
   "skull": [
    "skull_candle",
    "dc_skull"
+  ],
+  "weapon:baton": [
+   "staff1",
+   "staff2",
+   "dc_staff_2",
+   "staff3",
+   "dc_staff_4",
+   "dc_staff_7",
+   "dc_staff_8",
+   "dc_staff_3"
+  ],
+  "weapon:sceptre": [
+   "dc_rod_1",
+   "dc_rod_0",
+   "dc_rod_4",
+   "dc_rod_5",
+   "dc_rod_6",
+   "dc_rod_7",
+   "dc_sceptre_asmodeus",
+   "dc_sceptre_asmodeus_2"
+  ],
+  "weapon:baguette": [
+   "dc_wand_wood",
+   "wand1",
+   "dc_wand_iron",
+   "dc_wand_bone",
+   "wand2",
+   "dc_wand_silver",
+   "dc_wand_gold",
+   "dc_wand_star"
+  ],
+  "offhand:tome": [
+   "grimoire_closed",
+   "dc_book_leather",
+   "dc_book_brown",
+   "grimoire_open",
+   "dc_book_gray",
+   "dc_book_purple",
+   "dc_book_dead",
+   "dc_book_gold"
+  ],
+  "chest:Robe": [
+   "cloth_robe",
+   "cloth_robe_sombre",
+   "dc_robe_1_new",
+   "dc_robe_2_new",
+   "dc_robe_3",
+   "dc_robe_ego_2",
+   "dc_robe_ego_1",
+   "dc_robe_art_2"
+  ],
+  "head:Chapeau": [
+   "dc_cap_1",
+   "dc_wizard_hat_1",
+   "dc_hat_1",
+   "dc_wizard_hat_2",
+   "dc_hat_2",
+   "dc_cornuthaum",
+   "dc_hat_3"
   ]
  }
 }

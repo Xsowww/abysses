@@ -24,6 +24,7 @@ export const RARITIES = [
   { id: 3, name: 'Épique', color: '#a57bc7', affixes: 3, mult: 1.4, value: 15 },
   { id: 4, name: 'Légendaire', color: '#d4893a', affixes: 4, mult: 1.6, value: 40 },
   { id: 5, name: 'Ensemble', color: '#5fb39b', affixes: 2, mult: 1.25, value: 10 },
+  { id: 6, name: 'Unique', color: '#e8643c', affixes: 3, mult: 1.6, value: 50 },
 ];
 
 // ranged : l'arme tire des projectiles (portée = distance max du projectile).
@@ -36,6 +37,10 @@ export const WEAPONS = {
   arccourt: { name: 'Arc court', cls: 'rodeur', hands: 1, dmg: 0.8, cd: 0.36, range: 480, ranged: true, projSpeed: 700, kb: 60 },
   arc: { name: 'Arc long', cls: 'rodeur', hands: 1, dmg: 1.05, cd: 0.52, range: 620, ranged: true, projSpeed: 820, kb: 80 },
   arbalete: { name: 'Arbalète', cls: 'rodeur', hands: 1, dmg: 1.6, cd: 0.88, range: 560, ranged: true, projSpeed: 950, kb: 160, pierce: 1 },
+  // Mage : projectiles magiques (magic) ; le sceptre explose à l'impact (splash)
+  baguette: { name: 'Baguette', cls: 'mage', hands: 1, dmg: 0.72, cd: 0.32, range: 430, ranged: true, magic: true, projSpeed: 600, kb: 40 },
+  baton: { name: 'Bâton', cls: 'mage', hands: 2, dmg: 1.0, cd: 0.52, range: 520, ranged: true, magic: true, projSpeed: 540, kb: 70 },
+  sceptre: { name: 'Sceptre', cls: 'mage', hands: 1, dmg: 1.4, cd: 0.82, range: 470, ranged: true, magic: true, projSpeed: 470, kb: 110, splash: 46 },
 };
 export const FISTS = { name: 'Poings', hands: 1, dmg: 1, cd: 0.4, range: 42, arc: 90, kb: 60 };
 
@@ -43,11 +48,12 @@ export const FISTS = { name: 'Poings', hands: 1, dmg: 1, cd: 0.4, range: 42, arc
 export const OFFHANDS = {
   shield: { cls: 'guerrier', names: ['Bouclier', 'Écu', 'Pavois', 'Rondache'], label: 'Bouclier' },
   quiver: { cls: 'rodeur', names: ['Carquois', 'Étui à flèches', 'Carquois de chasse'], label: 'Carquois' },
+  tome: { cls: 'mage', names: ['Grimoire', 'Codex', 'Orbe'], label: 'Grimoire' },
 };
 
 const ARMOR_BASES = {
-  head: { names: ['Casque', 'Heaume', 'Camail', 'Capuche'], armor: [2, 1.0] },
-  chest: { names: ['Plastron', 'Haubert', 'Brigandine', 'Pourpoint'], armor: [4, 1.8] },
+  head: { names: ['Casque', 'Heaume', 'Camail', 'Capuche', 'Chapeau'], armor: [2, 1.0] },
+  chest: { names: ['Plastron', 'Haubert', 'Brigandine', 'Pourpoint', 'Robe'], armor: [4, 1.8] },
   legs: { names: ['Jambières', 'Grèves', 'Cuissards'], armor: [3, 1.4] },
   feet: { names: ['Bottes', 'Solerets', 'Bottines'], armor: [1.5, 0.8] },
   hands: { names: ['Gants', 'Gantelets', 'Mitaines'], armor: [1.5, 0.8] },
@@ -58,6 +64,7 @@ const ARMOR_BASES = {
 // Matériaux invariables (pas d'accord au féminin / pluriel).
 const MATERIALS = ['en fer', 'en acier', 'en acier trempé', 'en acier noir', 'en mithril', 'en orichalque', 'des Abysses'];
 const WOOD_MATERIALS = ['en frêne', 'en if', 'en bois de fer', 'en ébène', 'en os de wyrm', 'en bois spectral', 'des Abysses'];
+const CLOTH_MATERIALS = ['en lin', 'en laine', 'en soie', 'en velours', 'en soie d’ombre', 'en tissu astral', 'des Abysses'];
 const JEWEL_MATERIALS = ['en cuivre', 'en argent', 'en or', 'en onyx', 'en saphir', 'en rubis', 'des Abysses'];
 
 export const POCKETS = [
@@ -87,6 +94,7 @@ const SLOT_AFFIXES = {
   weapon: ['dmgPct', 'crit', 'critDmg', 'atkSpd', 'lifesteal', 'hp'],
   offhand: ['hp', 'armor', 'stamina', 'staRegen', 'hpRegen', 'cdr'],
   quiver: ['dmgPct', 'crit', 'critDmg', 'atkSpd', 'staRegen', 'cdr'],
+  tome: ['dmgPct', 'cdr', 'stamina', 'staRegen', 'crit', 'hp'],
   head: ['hp', 'armor', 'crit', 'cdr', 'hpRegen'],
   chest: ['hp', 'armor', 'stamina', 'hpRegen', 'dmgPct'],
   legs: ['hp', 'armor', 'stamina', 'staRegen', 'moveSpd'],
@@ -150,6 +158,8 @@ const LORE = {
   ],
   shield: ['Cabossé, fendu, mais toujours debout. Comme son ancien porteur, un temps.', 'Les marques de griffes ne mentent pas.'],
   quiver: ['Quelques plumes noires collent encore au cuir.', 'Il sent la résine et la peur.'],
+  tome: ['Les pages se tournent seules quand on dort.', 'L’encre est encore humide. Elle ne sèche jamais.'],
+  magic: ['Le bois vibre doucement, comme une corde qu’on vient de pincer.', 'Il était à quelqu’un. Il cherche encore sa main.'],
   armor: [
     'Une armure trouvée sur un mort. Elle ne l’a pas sauvé.',
     'Le métal est froid, même près du feu.',
@@ -167,8 +177,8 @@ const LORE = {
 export function itemLore(item) {
   if (item.kind === 'consumable') return CONSUMABLES[item.id].lore;
   let list = LORE.armor;
-  if (item.slot === 'weapon') list = WEAPONS[item.base] && WEAPONS[item.base].ranged ? LORE.ranged : LORE.weapon;
-  else if (item.slot === 'offhand') list = offhandType(item) === 'quiver' ? LORE.quiver : LORE.shield;
+  if (item.slot === 'weapon') list = WEAPONS[item.base] && WEAPONS[item.base].magic ? LORE.magic : WEAPONS[item.base] && WEAPONS[item.base].ranged ? LORE.ranged : LORE.weapon;
+  else if (item.slot === 'offhand') list = LORE[offhandType(item)] || LORE.shield;
   else if (item.slot === 'amulet' || item.slot === 'ring') list = LORE.jewel;
   else if (item.slot === 'pocket') list = LORE.pocket;
   let h = 0;
@@ -208,7 +218,7 @@ const RANDOM_SLOTS = [
   { w: 2, v: 'pocket' },
 ];
 
-const CLASS_IDS = ['guerrier', 'rodeur'];
+const CLASS_IDS = ['guerrier', 'rodeur', 'mage'];
 
 // cls : classe visée pour les armes / mains gauches (sinon, une classe au hasard).
 export function generateItem({ ilvl = 1, rarity = null, slot = null, rarityBonus = 0, minRarity = 0, weaponType = null, cls = null, offType = null } = {}) {
@@ -240,13 +250,18 @@ export function generateItem({ ilvl = 1, rarity = null, slot = null, rarityBonus
     item.dmg = Math.max(3, Math.round((5 + ilvl * 1.7) * W.dmg * R.mult * rand(0.9, 1.1)));
     baseName = W.name;
     if (W.ranged) mats = WOOD_MATERIALS;
+    if (W.magic && wt === 'baguette') mats = ['en saule', 'en if', 'en os', 'en ébène', 'en cristal', 'en bois spectral', 'des Abysses'];
   } else if (slot === 'offhand') {
-    const ot = offType || (forCls === 'rodeur' ? 'quiver' : 'shield');
+    const ot = offType || (forCls === 'rodeur' ? 'quiver' : forCls === 'mage' ? 'tome' : 'shield');
     item.offType = ot;
     baseName = pick(OFFHANDS[ot].names);
     if (ot === 'shield') {
       item.armor = Math.max(1, Math.round((3 + ilvl * 1.5) * R.mult * rand(0.9, 1.1)));
       item.block = Math.round(rand(8, 14) + rarity * 2);
+    } else if (ot === 'tome') {
+      item.dmgBonus = Math.round((4 + ilvl * 0.35) * R.mult);
+      affixPool = SLOT_AFFIXES.tome;
+      mats = ['écorné', 'relié de cuir', 'cerclé de fer', 'd’ébène', 'd’os gravé', 'd’ombre', 'des Abysses'];
     } else {
       item.dmgBonus = Math.round((4 + ilvl * 0.35) * R.mult);
       affixPool = SLOT_AFFIXES.quiver;
@@ -257,6 +272,7 @@ export function generateItem({ ilvl = 1, rarity = null, slot = null, rarityBonus
     baseName = pick(B.names);
     if (B.armor) item.armor = Math.max(1, Math.round((B.armor[0] + ilvl * B.armor[1] * 0.8) * R.mult * rand(0.9, 1.1)));
     if (slot === 'amulet' || slot === 'ring') mats = JEWEL_MATERIALS;
+    if (baseName === 'Robe' || baseName === 'Chapeau') { mats = CLOTH_MATERIALS; if (item.armor) item.armor = Math.max(1, Math.round(item.armor * 0.7)); }
   }
   item.name = `${baseName} ${mats[tier]}`;
 
@@ -297,10 +313,17 @@ export function buyPrice(item) {
   return item.value * 6;
 }
 
+const EXTRA_LABELS = {
+  hpPct: ['% de PV max', true], dr: ['% de dégâts subis en moins', true], thorns: ['% de dégâts renvoyés', true], killHeal: ['% de PV par ennemi abattu', true],
+  rollCost: ['% de coût de roulade en moins', true], rollHeal: ['% de PV par roulade', true], execute: ['% de dégâts aux ennemis affaiblis', true],
+  eliteDmg: ['% de dégâts aux élites et Gardiens', true], goldFind: ['% d’or ramassé', true], poison: ['% de dégâts en poison', true],
+  pierce: ['ennemi(s) transpercé(s)', false], block: ['% de blocage', true], armorPct: ['% d’armure', true],
+};
 export function affixText(a) {
-  const A = AFFIXES[a.k];
-  if (A.pct) return `+${a.v}${A.label}`;
-  return `+${a.v} ${A.label}`;
+  const A = AFFIXES[a.k] || (EXTRA_LABELS[a.k] && { label: EXTRA_LABELS[a.k][0], pct: EXTRA_LABELS[a.k][1] }) || { label: a.k };
+  const sign = a.v < 0 ? '' : '+';
+  if (A.pct) return `${sign}${a.v}${A.label}`;
+  return `${sign}${a.v} ${A.label}`;
 }
 
 export function isTwoHanded(item) {
@@ -316,6 +339,21 @@ export function slotLabel(item) {
 // Équipement de départ selon la classe.
 export function starterKit(cls) {
   const pocket = generateItem({ rarity: 0, slot: 'pocket' });
+  if (cls === 'mage') {
+    const staff = generateItem({ ilvl: 1, rarity: 0, slot: 'weapon', weaponType: 'baton', cls });
+    staff.name = 'Bâton noueux';
+    staff.dmg = 8;
+    const tome = generateItem({ ilvl: 1, rarity: 0, slot: 'offhand', cls });
+    tome.name = 'Grimoire écorné';
+    tome.dmgBonus = 4;
+    const chest = generateItem({ ilvl: 1, rarity: 0, slot: 'chest' });
+    chest.name = 'Robe élimée';
+    chest.armor = 2;
+    const head = generateItem({ ilvl: 1, rarity: 0, slot: 'head' });
+    head.name = 'Chapeau de pèlerin';
+    head.armor = 1;
+    return { weapon: staff, offhand: tome, chest, head, pocket };
+  }
   if (cls === 'rodeur') {
     const bow = generateItem({ ilvl: 1, rarity: 0, slot: 'weapon', weaponType: 'arccourt', cls });
     bow.name = 'Arc de chasse fendu';

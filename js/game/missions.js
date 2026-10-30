@@ -88,6 +88,45 @@ export function setupMission(g, d, offer) {
       }
       break;
     }
+    case 'ossements': {
+      const pool = [...rooms.slice(1)];
+      m.total = Math.min(5, pool.length);
+      for (let i = 0; i < m.total; i++) {
+        const r = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
+        const p = floorIn(map, r, 1);
+        s.interactables.push({ type: 'relicbone', x: p.x, y: p.y, r: 16, label: 'Ossement sacré', mission: true });
+      }
+      break;
+    }
+    case 'nids': {
+      const pool = [...mid];
+      m.nests = [];
+      for (let i = 0; i < 3 && pool.length; i++) {
+        const r = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
+        const p = floorIn(map, r, 2);
+        const n = new Enemy('nid', p.x, p.y, s.level, false);
+        n.spawnCd = rand(2, 5);
+        s.enemies.push(n); m.nests.push(n);
+        for (let k = 0; k < 3; k++) { const q = floorIn(map, r, 1); s.enemies.push(new Enemy('rat', q.x, q.y, s.level, false)); }
+      }
+      m.total = m.nests.length;
+      break;
+    }
+    case 'gardien': {
+      m.timer = 210 + s.depth * 30;
+      m.total = 1;
+      break;
+    }
+    case 'pillage': {
+      const pool = [...far.length >= 3 ? far : rooms];
+      m.total = Math.min(3, pool.length);
+      for (let i = 0; i < m.total; i++) {
+        const r = pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
+        const p = floorIn(map, r, 2);
+        s.interactables.push({ type: 'coffer', x: p.x, y: p.y, r: 18, label: 'Coffre scellé', mission: true });
+      }
+      break;
+    }
     case 'siege': {
       const r = mid[Math.floor(mid.length / 2)] || rooms[0];
       const p = { x: (r.x + r.w / 2) * TILE, y: (r.y + r.h / 2) * TILE };
@@ -112,6 +151,10 @@ export function missionStatus(g) {
     case 'cloches': line = `Cloches détruites : ${m.progress} / ${m.total}`; break;
     case 'reliquaire': line = g.player.carrying ? 'Rapporter le reliquaire' : 'Trouver le reliquaire'; break;
     case 'balises': line = `Braseros rallumés : ${m.progress} / ${m.total}`; break;
+    case 'ossements': line = `Ossements : ${m.progress} / ${m.total}`; break;
+    case 'nids': line = `Nids détruits : ${m.progress} / ${m.total}`; break;
+    case 'gardien': line = `Le Gardien · ${Math.floor(m.timer / 60)}:${String(Math.floor(m.timer % 60)).padStart(2, '0')}`; break;
+    case 'pillage': line = `Coffres : ${m.progress} / ${m.total}`; break;
     case 'siege': line = m.seal.active ? `Tenir le cercle : ${Math.ceil(m.seal.dur - m.seal.t)} s` : 'Trouver et activer le sceau'; break;
   }
   return { name: M.name, line, done: m.done, failed: m.failed };
@@ -140,6 +183,12 @@ export function missionOnKill(g, e) {
   const m = g.scene.mission;
   if (!m || m.done || m.failed) return;
   if (m.type === 'chasse' && e === m.target) complete(g, `${m.label} est tombé. Remontez vivant.`);
+  if (m.type === 'gardien' && e.boss) complete(g, 'Le Gardien est tombé à temps.');
+  if (m.type === 'nids' && e.type === 'nid') {
+    m.progress = m.nests.filter((b) => b.dead).length;
+    if (m.progress >= m.total) complete(g, 'Les nids brûlent.');
+    else g.ui.toast(`Nid détruit (${m.progress} / ${m.total}).`, 'good', 2);
+  }
   if (m.type === 'cloches' && e.type === 'cloche') {
     m.progress = m.bells.filter((b) => b.dead).length;
     sfx('bell', { x: e.x, y: e.y, vol: 0.8 });
@@ -182,6 +231,31 @@ export function missionInteract(g, o) {
         else g.ui.toast(`Brasero rallumé (${m.progress} / ${m.total}).`, 'good', 2);
       });
       return true;
+    case 'relicbone': {
+      s.interactables.splice(s.interactables.indexOf(o), 1);
+      m.progress++;
+      sfx('page');
+      g.fx.pillar(o.x, o.y, '#e0d8b0');
+      // les morts n'aiment pas qu'on touche à leurs saints
+      for (let i = 0; i < 1 + Math.floor(s.depth / 2); i++) { const a = rand(0, 6.28); g.spawnEnemy(chance(0.5) ? 'squelette' : 'rat', o.x + Math.cos(a) * 90, o.y + Math.sin(a) * 90, s.level, false, true); }
+      if (m.progress >= m.total) complete(g, 'Les cinq ossements sont réunis.');
+      else g.ui.toast(`Ossement (${m.progress} / ${m.total}).`, 'good', 2);
+      return true;
+    }
+    case 'coffer':
+      g.startChannel(2, 'Vous forcez le sceau…', () => {
+        s.interactables.splice(s.interactables.indexOf(o), 1);
+        m.progress++;
+        sfx('chest');
+        g.dropItem(o.x, o.y, g.loot({ ilvl: s.level + 1, rarityBonus: 2, minRarity: 1 }));
+        g.dropGold(o.x, o.y, Math.round(40 * s.depth * (1 + (s.bonus || 0) / 100)));
+        // embuscade
+        const n = 3 + s.depth;
+        for (let i = 0; i < n; i++) { const a = (i / n) * 6.28; g.spawnEnemy(weightedPick(enemyPool(s.depth)), o.x + Math.cos(a) * 120, o.y + Math.sin(a) * 120, s.level, i === 0, true); }
+        g.ui.banner('Embuscade', 'blood');
+        if (m.progress >= m.total) complete(g, 'Les trois coffres sont ouverts.');
+      });
+      return true;
     case 'seal':
       if (m.seal.active || m.done) return true;
       m.seal.active = true;
@@ -213,6 +287,26 @@ export function updateMission(g, dt) {
         }
       }
     }
+  }
+  // Nids : ils pondent des goules quand on approche
+  if (m.type === 'nids' && !m.done) {
+    for (const n of m.nests) {
+      if (n.dead) continue;
+      n.spawnCd -= dt;
+      if (n.spawnCd <= 0) {
+        n.spawnCd = rand(5, 7);
+        n.ringT = 1;
+        if (dist(n.x, n.y, p.x, p.y) < 520 && s.enemies.length < 140) {
+          for (let k = 0; k < 2; k++) { const a = rand(0, 6.28); g.spawnEnemy('rat', n.x + Math.cos(a) * 34, n.y + Math.sin(a) * 34, s.level, false, true); }
+          sfx('ghoul', { x: n.x, y: n.y, vol: 0.5 });
+        }
+      }
+    }
+  }
+  // Cierge : le temps presse
+  if (m.type === 'gardien' && !m.done) {
+    m.timer -= dt;
+    if (m.timer <= 0) { m.timer = 0; fail(g, 'Le cierge s’est éteint.'); }
   }
   // Survivant : suit le joueur, souffre au contact des monstres
   if (m.type === 'sauvetage' && m.survivor.following && !m.done) {
@@ -321,6 +415,10 @@ export function missionTarget(g) {
     case 'cloches': { const b = nearest(m.bells.filter((e) => !e.dead)); return b ? { x: b.x, y: b.y - 24, label: 'Cloche' } : null; }
     case 'reliquaire': { const o = s.interactables.find((i) => i.type === 'reliquary'); return o ? { x: o.x, y: o.y - 16, label: 'Reliquaire' } : null; }
     case 'balises': { const o = nearest(s.interactables.filter((i) => i.type === 'beacon' && !i.lit)); return o ? { x: o.x, y: o.y - 16, label: 'Brasero' } : null; }
+    case 'ossements': { const o = nearest(s.interactables.filter((i) => i.type === 'relicbone')); return o ? { x: o.x, y: o.y - 14, label: 'Ossement' } : null; }
+    case 'nids': { const b = nearest(m.nests.filter((e) => !e.dead)); return b ? { x: b.x, y: b.y - 20, label: 'Nid' } : null; }
+    case 'gardien': return s.boss && !s.boss.dead ? { x: s.boss.x, y: s.boss.y - 30, label: 'Gardien' } : null;
+    case 'pillage': { const o = nearest(s.interactables.filter((i) => i.type === 'coffer')); return o ? { x: o.x, y: o.y - 16, label: 'Coffre' } : null; }
     case 'siege': return m.seal.active ? null : { x: m.seal.x, y: m.seal.y, label: 'Sceau' };
   }
   return null;

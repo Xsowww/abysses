@@ -796,3 +796,9 @@ input[type=range] { accent-color: #b9803f; }
 .bb-bar { box-sizing: content-box; height: 18px; }
 .bb-fill, .bb-trail { top: 0; bottom: 0; }
 body:has(#boss-bar:not(.hidden)) #subtitle { bottom: 200px; }
+.vbar.res.r-heat .fill { background: #c0582a; }
+.vbar.res.r-heat.ready .fill { background: #ff8a3a; }
+.vbar.res.r-bone .fill { background: #5a8a6a; }
+.vbar.res.r-bone.ready .fill { background: #8ac09a; }
+.tt-uniq { margin-top: 6px; color: #e8643c; }
+.slot.r6 { box-shadow: inset 0 0 0 2px rgba(232, 100, 60, 0.55), inset 0 0 14px rgba(232, 100, 60, 0.25); }

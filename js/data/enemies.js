@@ -22,6 +22,10 @@ export const ENEMIES = {
     name: 'Cloche des Sonneurs', r: 18, hp: 91, dmg: 0, speed: 0, xp: 25, gold: [4, 9],
     color: '#6b5a3a', ai: 'static', aggro: 0, weight: 0,
   },
+  nid: {
+    name: 'Nid de goules', r: 18, hp: 110, dmg: 0, speed: 0, xp: 25, gold: [4, 9],
+    color: '#5a2a24', ai: 'static', aggro: 0, weight: 0,
+  },
   gardien: {
     name: "Le Gardien d'Os", r: 34, hp: 546, dmg: 28, speed: 84, xp: 160, gold: [60, 90],
     color: '#e6dcc3', ai: 'boss', aggro: 483, boss: true, weight: 50,
@@ -49,4 +53,21 @@ export function scaleFor(level) {
     dmg: 1 + 0.24 * (level - 1),
     xp: 1 + 0.22 * (level - 1),
   };
+}
+
+// Pouvoirs des champions (élites) : un au hasard, deux à partir de la profondeur 3.
+export const ELITE_MODS = {
+  enrage: { name: 'Enragé' },        // plus rapide, frappe plus souvent
+  vampire: { name: 'Vampirique' },   // se soigne en blessant
+  givre: { name: 'Glacial' },        // ses coups ralentissent
+  instable: { name: 'Instable' },    // explose en mourant
+  cuirasse: { name: 'Cuirassé' },    // -40 % de dégâts subis
+  invocateur: { name: 'Invocateur' }, // appelle des goules
+};
+export function rollEliteMods(depth) {
+  const keys = Object.keys(ELITE_MODS);
+  const n = depth >= 3 ? 2 : 1;
+  const out = [];
+  while (out.length < n) { const k = keys[Math.floor(Math.random() * keys.length)]; if (!out.includes(k)) out.push(k); }
+  return out;
 }

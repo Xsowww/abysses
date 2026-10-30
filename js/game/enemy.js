@@ -1,5 +1,5 @@
 // Monstres et boss : IA basée sur des attaques "annoncées" (zones rouges) qu'il faut esquiver.
-import { ENEMIES, scaleFor } from '../data/enemies.js';
+import { ENEMIES, scaleFor, ELITE_MODS, rollEliteMods } from '../data/enemies.js';
 import { rand, TAU, dist, angleDiff, chance, weightedPick } from '../core/util.js';
 import { sfx } from '../core/audio.js';
 import { hasSprite, drawSprite, dirFromAngle, walkFrame } from './sprites.js';
@@ -23,6 +23,10 @@ export class Enemy {
     this.dmg = D.dmg * sc.dmg * (elite ? 1.35 : 1);
     this.speed = D.speed * (elite ? 1.08 : 1);
     this.xp = Math.round(D.xp * sc.xp * (elite ? 3 : 1));
+    // Pouvoirs de champion
+    this.mods = elite && !D.boss && D.ai !== 'static' ? rollEliteMods(Math.ceil(level / 3)) : [];
+    if (this.mods.includes('enrage')) { this.speed *= 1.35; this.cdMul = 0.7; }
+    this.summonT = 4;
     this.state = 'idle';
     this.t = 0;
     this.cd = rand(0.4, 1.4);
@@ -44,6 +48,8 @@ export class Enemy {
   }
 
   get name() { return (this.elite ? 'Élite · ' : '') + this.def.name; }
+  get modLabel() { return this.mods.map((k) => ELITE_MODS[k].name).join(' · '); }
+  hasMod(k) { return this.mods.length > 0 && this.mods.includes(k); }
 
   alert(g) {
     if (this.state !== 'idle' || this.def.ai === 'static') return;
@@ -104,8 +110,16 @@ export class Enemy {
     const p = g.player;
     const map = g.scene.map;
     this.flash = Math.max(0, this.flash - dt * 5);
-    this.cd -= dt;
+    this.cd -= dt * (this.cdMul ? 1 / this.cdMul : 1);
     this.hitCooldown -= dt;
+    if (this.hasMod('invocateur') && this.state !== 'idle') {
+      this.summonT -= dt;
+      if (this.summonT <= 0) {
+        this.summonT = 7;
+        for (let i = 0; i < 2; i++) { const a = rand(0, TAU); g.spawnEnemy('rat', this.x + Math.cos(a) * 40, this.y + Math.sin(a) * 40, this.level, false, true); }
+        sfx('alert', { x: this.x, y: this.y, vol: 0.4 });
+      }
+    }
     if (this.slow) { this.slow.t -= dt; if (this.slow.t <= 0) this.slow = null; }
 
     if (this.kbx || this.kby) {
@@ -120,7 +134,7 @@ export class Enemy {
       this.poison.tick -= dt;
       if (this.poison.tick <= 0) {
         this.poison.tick = 0.5;
-        g.damageEnemy(this, { amount: Math.max(1, Math.round(this.poison.dps * 0.5)), crit: false, dot: true }, 0, 0);
+        g.damageEnemy(this, { amount: Math.max(1, Math.round(this.poison.dps * 0.5)), crit: false, dot: true, fire: this.poison.fire }, 0, 0);
         if (this.dead) return;
       }
       if (this.poison.t <= 0) this.poison = null;
@@ -426,8 +440,27 @@ export class Enemy {
     }
   }
 
+  // Nid de goules : amas de chair et d'os qui palpite
+  drawNest(ctx, time) {
+    if (this.dead && !(this.deadT > 0)) return;
+    const x = Math.round(this.x), y = Math.round(this.y);
+    const pulse = 1 + 0.06 * Math.sin(time * 4 + x) + (this.ringT > 0 ? 0.12 * this.ringT : 0);
+    ctx.save();
+    if (this.dead) ctx.globalAlpha = Math.max(0, this.deadT / (this.deathMax || 0.7));
+    ctx.fillStyle = 'rgba(0,0,0,0.45)'; ctx.beginPath(); ctx.ellipse(x, y + 8, 24, 8, 0, 0, TAU); ctx.fill();
+    ctx.translate(x, y); ctx.scale(pulse, pulse);
+    ctx.fillStyle = this.flash > 0 ? '#f3ead8' : '#4a1e1a'; ctx.beginPath(); ctx.ellipse(0, 0, 20, 13, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = this.flash > 0 ? '#fff' : '#7a2e26'; ctx.beginPath(); ctx.ellipse(-4, -4, 12, 7, 0, 0, TAU); ctx.fill();
+    ctx.fillStyle = '#d8d0b8';
+    for (let i = 0; i < 6; i++) { const a = i * 1.05; ctx.fillRect(Math.cos(a) * 16 - 1, Math.sin(a) * 9 - 3, 2, 6); }
+    ctx.fillStyle = `rgba(200,60,40,${0.5 + 0.3 * Math.sin(time * 5)})`;
+    ctx.beginPath(); ctx.arc(2, -2, 3, 0, TAU); ctx.fill();
+    ctx.restore();
+  }
+
   draw(ctx, time) {
     if (this.type === 'cloche') { this.drawBell(ctx, time); return; }
+    if (this.type === 'nid') { this.drawNest(ctx, time); return; }
     const sprName = SPRITE_OF[this.type];
     if (hasSprite(sprName)) {
       const sc = this.boss ? 1.7 : this.elite ? 1.14 : 1;
@@ -437,7 +470,7 @@ export class Enemy {
         ctx.beginPath(); ctx.ellipse(this.x, this.y, 18 * sc, 7 * sc, 0, 0, Math.PI * 2); ctx.stroke();
       }
       if (!this.dead && this.poison) {
-        ctx.fillStyle = 'rgba(110,150,60,0.25)';
+        ctx.fillStyle = this.poison.fire ? 'rgba(230,110,40,0.3)' : 'rgba(110,150,60,0.25)';
         ctx.beginPath(); ctx.ellipse(this.x, this.y, 16 * sc, 6 * sc, 0, 0, Math.PI * 2); ctx.fill();
       }
       const st = this.spriteState(time);
@@ -485,7 +518,7 @@ export class Enemy {
       ctx.setLineDash([]);
     }
     if (this.poison) {
-      ctx.fillStyle = 'rgba(110,150,60,0.25)';
+      ctx.fillStyle = this.poison.fire ? 'rgba(230,110,40,0.3)' : 'rgba(110,150,60,0.25)';
       ctx.beginPath(); ctx.arc(0, 0, r + 3, 0, TAU); ctx.fill();
     }
     ctx.rotate(this.angle + (this.state === 'chase' && !this.dead ? Math.sin(this.walkT) * 0.08 : 0));
@@ -630,7 +663,7 @@ export class Enemy {
 
   // Yeux lumineux, dessinés par-dessus l'obscurité.
   drawEyes(ctx) {
-    if (this.dead || this.type === 'rat' || this.type === 'cloche' || this.spawnT > 0) return;
+    if (this.dead || this.type === 'rat' || this.def.ai === 'static' || this.spawnT > 0) return;
     if (hasSprite(SPRITE_OF[this.type])) {
       const dir = dirFromAngle(this.angle);
       if (dir === 0) return; // de dos

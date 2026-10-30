@@ -30,7 +30,7 @@ export class Effects {
         drag: opts.drag ?? 3, glow: !!opts.glow, grav: opts.grav || 0,
       });
     }
-    if (this.particles.length > 900) this.particles.splice(0, this.particles.length - 900);
+    if (this.particles.length > 600) this.particles.splice(0, this.particles.length - 600);
   }
 
   text(x, y, str, color = '#fff', size = 16, opts = {}) {

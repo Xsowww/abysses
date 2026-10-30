@@ -39,9 +39,15 @@ export class Player {
   resource() {
     if (this.spec === 'berserker') return { v: this.rage, max: 100, label: 'Rage', cls: 'rage' };
     if (this.spec === 'tireur') return { v: this.charge * 100, max: 100, label: 'Tension', cls: 'charge' };
+    if (this.spec === 'pyromancien') return { v: this.heat, max: 100, label: this.overheat ? 'Surchauffe' : 'Chaleur', cls: this.overheat ? 'rage' : 'heat' };
+    if (this.spec === 'necromancien') { const n = this.game.allyCount(); return { v: n, max: this.maxThralls(), label: `Serviteurs ${n}`, cls: 'bone' }; }
     return null;
   }
   get cls() { return CLASSES[this.pd.cls]; }
+  // Talent ultime / rang acquis ?
+  hasUniq(id) { return !!(this.uniqs && this.uniqs.has(id)); }
+  has(id) { return (this.pd.talents[id] || 0) > 0; }
+  maxThralls() { return this.has('n_legion') ? 5 : 3; }
 
   resetCombat() {
     this.invuln = 0;
@@ -62,6 +68,7 @@ export class Player {
     this.specialHeld = 0;
     this.charge = 0; this.charging = false;     // Tireur d'élite
     this.marked = null;
+    this.heat = 0; this.heatIdle = 0; this.overheat = false; // Pyromancien
     this.flash = 0;
     this.kbx = 0;
     this.kby = 0;
@@ -98,7 +105,7 @@ export class Player {
     const pd = this.pd;
     // Les pièces d'ensemble portées suivent le niveau du personnage
     for (const k in pd.equipment) if (pd.equipment[k] && pd.equipment[k].set) rescaleSetItem(pd.equipment[k], pd.level);
-    const s = { hp: 0, hpPct: 0, armor: 0, armorPct: 0, dmgPct: 0, crit: 5, critDmg: 50, atkSpd: 0, moveSpd: 0, stamina: 0, staRegen: 0, lifesteal: 0, cdr: 0, hpRegen: 0, block: 0, thorns: 0, execute: 0, pierce: 0, poison: 0, rollCost: 0, killHeal: 0, rollHeal: 0, eliteDmg: 0, goldFind: 0 };
+    const s = { hp: 0, hpPct: 0, armor: 0, armorPct: 0, dmgPct: 0, crit: 5, critDmg: 50, atkSpd: 0, moveSpd: 0, stamina: 0, staRegen: 0, lifesteal: 0, cdr: 0, hpRegen: 0, block: 0, thorns: 0, execute: 0, pierce: 0, poison: 0, rollCost: 0, killHeal: 0, rollHeal: 0, eliteDmg: 0, goldFind: 0, dr: 0 };
     // Bonus d'ensembles (palier le plus haut atteint)
     for (const [k, v] of Object.entries(activeSetStats(pd.equipment))) s[k] = (s[k] || 0) + v;
     for (const slot in pd.equipment) {
@@ -132,7 +139,9 @@ export class Player {
     s.block = Math.min(s.block, 60);
     s.moveSpd = Math.min(s.moveSpd, 50);
     s.rollCost = Math.min(s.rollCost, 60);
+    s.dr = Math.min(s.dr, 40);
     this.stats = s;
+    this.uniqs = new Set(Object.values(pd.equipment).filter((it) => it && it.uniq).map((it) => it.uniq));
     if (this.maxHp > oldMax && oldMax > 0) this.hp += this.maxHp - oldMax;
     this.hp = Math.min(this.hp, this.maxHp);
     this.stamina = Math.min(this.stamina, this.maxStamina);
@@ -147,7 +156,9 @@ export class Player {
       if (b.id === 'murdefer') { m.dr += 60; m.thorns += 30; m.staMult *= 2; }
       if (b.id === 'oeil') { m.crit = 100; m.atkSpd += 30; }
       if (b.id === 'voile') { m.dmgPct += 50; }
+      if (b.id === 'manashield') { m.dr += 45; }
     }
+    if (this.spec === 'pyromancien') { m.dmgPct += this.heat * 0.4 + (this.overheat && this.has('p_brasier') ? 30 : 0); }
     if (this.spec === 'berserker' && this.rage > 0) {
       m.dmgPct += this.rage * 0.3; m.atkSpd += this.rage * 0.2; m.lifesteal += this.rage * 0.04;
     }
@@ -163,10 +174,10 @@ export class Player {
     if (target && target.hp / target.maxHp < 0.3 && this.stats.execute) d *= 1 + this.stats.execute / 100;
     if (target && (target.elite || target.boss) && this.stats.eliteDmg) d *= 1 + this.stats.eliteDmg / 100;
     let forceCrit = false;
-    if (this.hasBuff('riposte') && !this.dotHit) { d *= 2.5; forceCrit = true; this.buffs = this.buffs.filter((b) => b.id !== 'riposte'); }
+    if (this.hasBuff('riposte') && !this.dotHit) { d *= this.has('g_bastion') ? 3.5 : 2.5; forceCrit = true; this.buffs = this.buffs.filter((b) => b.id !== 'riposte'); }
     if (this.spec === 'ombrelame' && target && !this.dotHit) {
       const fromBehind = Math.abs(angleDiff(target.angle, Math.atan2(this.y - target.y, this.x - target.x))) > 1.75;
-      if (fromBehind || target.state === 'idle' || this.hasBuff('embuscade')) { d *= 1.8; forceCrit = true; this.lastBackstab = true; }
+      if (fromBehind || target.state === 'idle' || this.hasBuff('embuscade')) { d *= this.has('o_assassin') ? 2.4 : 1.8; forceCrit = true; this.lastBackstab = true; }
       else this.lastBackstab = false;
       if (this.hasBuff('embuscade')) this.buffs = this.buffs.filter((b) => b.id !== 'embuscade');
     }
@@ -179,6 +190,7 @@ export class Player {
   cdMult() { return 1 - this.stats.cdr / 100; }
 
   useStamina(n) {
+    if (this.overheat) return true; // Surchauffe : sorts gratuits
     if (this.stamina < n) {
       if (this.lowStaWarn <= 0) { this.game.fx.text(this.x, this.y - 30, 'Endurance', '#b9a46a', 13); this.lowStaWarn = 0.8; }
       return false;
@@ -206,7 +218,8 @@ export class Player {
     for (let i = this.buffs.length - 1; i >= 0; i--) { this.buffs[i].t -= dt; if (this.buffs[i].t <= 0) this.buffs.splice(i, 1); }
 
     // Rage : retombe si l'on ne se bat plus
-    if (this.spec === 'berserker') { this.rageIdle += dt; if (this.rageIdle > 2.5) this.rage = Math.max(0, this.rage - 12 * dt); }
+    if (this.spec === 'berserker') { this.rageIdle += dt; if (this.rageIdle > 2.5) this.rage = Math.max(0, this.rage - (this.has('b_furie') ? 6 : 12) * dt); }
+    if (this.spec === 'pyromancien') this.updateHeat(dt);
     const m = this.mods();
     this.staDelay -= dt;
     if (this.staDelay <= 0) this.stamina = Math.min(this.maxStamina, this.stamina + 34 * (1 + this.stats.staRegen / 100) * m.staMult * dt);
@@ -244,6 +257,7 @@ export class Player {
     let speed = this.cls.speed * (1 + this.stats.moveSpd / 100);
     if (this.carrying) speed *= 0.75;
     if (this.guarding) speed *= 0.45;
+    if (this.chill > 0) { this.chill -= dt; speed *= 0.6; }
     if (this.charging) speed *= 0.55;
     if (this.whirl) { speed *= 0.7; this.updateWhirl(dt); }
     if (this.attackCd > 0 && !this.whirl) speed *= this.weapon().ranged ? 0.75 : 0.82;
@@ -330,7 +344,7 @@ export class Player {
     if (spec === 'tireur' && w.ranged && inDungeon) {
       if (input.isDown('attack') && this.attackCd <= 0) {
         if (!this.charging) { this.charging = true; this.charge = 0; }
-        this.charge = Math.min(1, this.charge + dt * this.attackSpeedMult() / 0.9);
+        this.charge = Math.min(1, this.charge + dt * this.attackSpeedMult() / (this.has('t_traque') ? 0.58 : 0.9));
         // pose : la corde reste tendue tant que l'on maintient
         this.atk = { anim: 'attack', from: 1 / 13, to: 8 / 13, t: this.charge * 0.399, dur: 0.4, hold: true };
         if (this.charge >= 1 && !this.chargeFull) { this.chargeFull = true; sfx('ui'); g.fx.ring(this.x, this.y, '#e0ae6a', 30, 0.25); }
@@ -357,7 +371,8 @@ export class Player {
         } else this.attackCd = 0.15;
       } else if (this.useStamina(w.ranged ? ATTACK_COST * 0.6 : ATTACK_COST)) {
         this.attackCd = w.cd / this.attackSpeedMult();
-        if (w.ranged) this.shoot(this.aim, 1, { pierce: (w.pierce || 0) + this.stats.pierce });
+        if (w.magic) this.castBolt(1, {});
+        else if (w.ranged) this.shoot(this.aim, 1, { pierce: (w.pierce || 0) + this.stats.pierce });
         else this.doSwing(this.aim, w.range, w.arc, 1, w.kb, false);
         if (this.channel) g.cancelChannel('Attaque');
       } else this.attackCd = 0.15;
@@ -374,7 +389,23 @@ export class Player {
         this.attackCd = Math.max(this.attackCd, 0.5);
         this.doSwing(this.aim, w.range * 1.5, 360, 1.5 + 1.5 * k, w.kb * 2.4, true);
         g.fx.ring(this.x, this.y, '#c0352b', w.range * 1.5, 0.35);
+        if (this.has('b_furie')) this.heal(this.maxHp * 0.15);
         g.fx.shake(8); sfx('bossRoar');
+      } else if (this.pd.cls === 'mage') {
+        if (spec === 'necromancien' && g.allyCount() < this.maxThralls()) {
+          // Nécromancien : lever un mort près du curseur
+          if (this.useStamina(sp.stamina)) {
+            this.specialCd = 2.5 * this.cdMult();
+            const mw = g.mouseWorld();
+            const d = Math.min(dist(this.x, this.y, mw.x, mw.y), 160);
+            g.spawnThrall(this.x + Math.cos(this.aim) * d, this.y + Math.sin(this.aim) * d, 20);
+            this.atk = { anim: 'attack', from: 0, to: 0.999, t: 0, dur: 0.45 };
+          }
+        } else if (this.useStamina(sp.stamina)) {
+          this.specialCd = sp.cd * this.cdMult();
+          this.attackCd = Math.max(this.attackCd, 0.4);
+          this.castBolt(2, { orb: true, splash: 80, heat: 15 });
+        }
       } else if (spec === 'ombrelame') {
         if (this.useStamina(16)) {
           this.specialCd = 1.4 * this.cdMult();
@@ -397,6 +428,40 @@ export class Player {
     }
   }
 
+  // Mage : trait magique (selon la voie : explosif et brûlant, ou éclat d'os perçant)
+  castBolt(mult, o = {}) {
+    const w = this.weapon(), spec = this.spec;
+    const opt = { magic: true, orb: !!o.orb, splash: o.splash || w.splash || 0, pierce: 0, speed: o.orb ? 0.85 : 1, heavy: !!o.orb };
+    if (spec === 'pyromancien') { opt.fire = true; opt.splash = Math.max(opt.splash, 42); opt.poison = 25; this.addHeat(o.heat || 6); }
+    else if (spec === 'necromancien') { opt.bone = true; opt.pierce = (o.orb ? 99 : 1) + this.stats.pierce; }
+    this.shoot(this.aim, mult, opt);
+    this.atk = { anim: 'attack', from: 0.25, to: 0.999, t: 0, dur: o.orb ? 0.42 : 0.28 };
+  }
+
+  addHeat(n) {
+    this.heatIdle = 0;
+    if (this.overheat) return;
+    this.heat = Math.min(100, this.heat + n);
+    if (this.heat >= 100) {
+      this.overheat = true;
+      this.game.fx.ring(this.x, this.y, '#ff7a2a', 90, 0.4);
+      this.game.fx.text(this.x, this.y - 34, 'Surchauffe', '#ff8a3a', 16, { bold: true });
+      sfx('bossRoar');
+    }
+  }
+
+  updateHeat(dt) {
+    this.heatIdle += dt;
+    if (this.overheat) {
+      // on brûle, mais les sorts sont gratuits ; la chaleur retombe lentement
+      const burn = this.maxHp * (this.has('p_brasier') ? 0.012 : 0.025) * dt;
+      this.hp = Math.max(1, this.hp - burn);
+      this.heat -= 9 * dt;
+      if (Math.random() < dt * 10) this.game.fx.burst(this.x, this.y - 8, '#ff7a2a', 1, 40, 0.5, 3, { grav: -80 });
+      if (this.heat <= 35) { this.overheat = false; this.heat = 35; }
+    } else if (this.heatIdle > 1.2) this.heat = Math.max(0, this.heat - 14 * dt);
+  }
+
   shoot(ang, mult, o = {}) {
     const g = this.game;
     this.atk = { anim: 'attack', from: 8 / 13, to: 0.999, t: 0, dur: o.heavy ? 0.4 : 0.24 }; // fractions de l'animation
@@ -407,10 +472,11 @@ export class Player {
       vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp,
       r: o.heavy ? 6 : 4, team: 'player', mult, kb: w.kb * (o.heavy ? 2 : 1),
       pierce: o.pierce || 0, hit: new Set(), life: (w.range || 500) / sp * (o.heavy ? 1.3 : 1),
-      color: o.heavy ? '#e0c890' : o.dagger ? '#9fb0a0' : '#d6cdb8', kind: o.heavy ? 'heavyArrow' : 'arrow', heavy: !!o.heavy, full: !!o.full, poison: o.poison || 0,
+      color: o.heavy ? '#e0c890' : o.dagger ? '#9fb0a0' : '#d6cdb8', kind: o.magic ? 'bolt' : o.heavy ? 'heavyArrow' : 'arrow', heavy: !!o.heavy, full: !!o.full, poison: o.poison || 0,
+      magic: !!o.magic, orb: !!o.orb, splash: o.splash || 0, fire: !!o.fire, bone: !!o.bone,
     });
     this.bowDraw = 0;
-    sfx(o.heavy ? 'heavy' : 'arrow');
+    sfx(o.magic ? (o.orb ? 'heavy' : 'cast') : o.heavy ? 'heavy' : 'arrow', o.magic && !o.orb ? { vol: 0.5 } : undefined);
   }
 
   doSwing(ang, range, arc, mult, kb, heavy) {
@@ -576,6 +642,83 @@ export class Player {
         g.fx.ring(this.x, this.y, '#b8964a', 70);
         sfx('cast');
         break;
+      case 'seisme': {
+        const n = g.meleeFromPlayer(this.x, this.y, 0, 125, 360, 1.8, 200, 1.5);
+        g.fx.ring(this.x, this.y, '#b89a6a', 125, 0.4);
+        g.fx.burst(this.x, this.y + 8, '#6a5a48', 30, 220, 0.7, 5, { drag: 3 });
+        g.fx.shake(10); if (n) g.hitstop(0.08);
+        this.atk = { anim: 'heavy', from: 0.3, to: 0.999, t: 0, dur: 0.4 };
+        sfx('heavy');
+        break;
+      }
+      case 'tirexplosif':
+        this.shoot(this.aim, 2.5, { pierce: 0, heavy: true, splash: 90, speed: 1.1, explosive: true });
+        this.attackCd = Math.max(this.attackCd, 0.4);
+        break;
+      case 'clignement': {
+        const mw = g.mouseWorld();
+        const ox = this.x, oy = this.y, map = g.scene.map;
+        const maxD = Math.min(180, dist(ox, oy, mw.x, mw.y));
+        let d = 0;
+        for (let k = 8; k <= maxD; k += 8) { if (map.collides(ox + Math.cos(this.aim) * k, oy + Math.sin(this.aim) * k, this.r - 2)) break; d = k; }
+        g.fx.burst(ox, oy, '#7a9aff', 18, 120, 0.5, 4);
+        this.x = ox + Math.cos(this.aim) * d; this.y = oy + Math.sin(this.aim) * d;
+        this.ghosts.push({ x: ox, y: oy, a: this.angle, t: 0.3 });
+        g.fx.burst(this.x, this.y, '#b0c4ff', 14, 100, 0.5, 4);
+        this.invuln = Math.max(this.invuln, 0.3);
+        sfx('cast');
+        break;
+      }
+      case 'nova': {
+        g.meleeFromPlayer(this.x, this.y, 0, 140, 360, 1.2, 160, 0);
+        for (const e of g.scene.enemies) if (!e.dead && dist(this.x, this.y, e.x, e.y) < 140 + e.r) e.slow = { t: 3, amt: 0.5 };
+        g.fx.ring(this.x, this.y, '#9ad0ff', 140, 0.45);
+        g.fx.burst(this.x, this.y, '#cfe8ff', 40, 260, 0.6, 3, { drag: 4 });
+        this.atk = { anim: 'attack', from: 0.3, to: 0.999, t: 0, dur: 0.35 };
+        sfx('cast'); g.fx.shake(4);
+        break;
+      }
+      case 'chaine': {
+        const mw = g.mouseWorld();
+        const hit = new Set();
+        const pts = [{ x: this.x, y: this.y - 10 }];
+        let from = mw, best = null;
+        for (let j = 0; j < 5; j++) {
+          best = null; let bd = j === 0 ? 260 : 210;
+          for (const e of g.scene.enemies) {
+            if (e.dead || hit.has(e)) continue;
+            const dd = dist(from.x, from.y, e.x, e.y);
+            if (dd < bd && (j > 0 || dist(this.x, this.y, e.x, e.y) < 420)) { bd = dd; best = e; }
+          }
+          if (!best) break;
+          hit.add(best); pts.push({ x: best.x, y: best.y - 8 });
+          g.damageEnemy(best, this.rollDamage(1.4, best), Math.atan2(best.y - from.y, best.x - from.x), 40);
+          best.stun = Math.max(best.stun || 0, best.boss ? 0 : 0.3);
+          from = best;
+        }
+        if (pts.length > 1) g.scene.beams = (g.scene.beams || []).concat([{ pts, t: 0.28, max: 0.28 }]);
+        else { this.skillCd.chaine = 0.5; this.stamina += SKILLS.chaine.stamina; }
+        this.atk = { anim: 'attack', from: 0.3, to: 0.999, t: 0, dur: 0.3 };
+        sfx('crit');
+        break;
+      }
+      case 'bouclier':
+        this.buffs.push({ id: 'manashield', t: 6, max: 6 });
+        g.fx.ring(this.x, this.y, '#8ab0ff', 60);
+        sfx('block');
+        break;
+      case 'meteore': {
+        const mw = g.mouseWorld();
+        const d = Math.min(dist(this.x, this.y, mw.x, mw.y), 420);
+        g.scene.zones.push({ kind: 'meteor', x: this.x + Math.cos(this.aim) * d, y: this.y + Math.sin(this.aim) * d, r: 90, t: -0.9, dur: 0.01, tick: 0, interval: 9, mult: 3.8 });
+        this.addHeat(20);
+        sfx('cast');
+        break;
+      }
+      case 'armee':
+        for (let i = 0; i < 3; i++) { const a = this.aim + (i - 1) * 1.2; g.spawnThrall(this.x + Math.cos(a) * 50, this.y + Math.sin(a) * 50, 15, true); }
+        sfx('bossRoar');
+        break;
       case 'voile':
         this.buffs.push({ id: 'voile', t: 4, max: 4 });
         for (const e of g.scene.enemies) if (!e.dead && !e.boss) e.cancelAttack();
@@ -624,7 +767,7 @@ export class Player {
     const blink = this.invuln > 0 && !this.roll && !this.dash && Math.floor(time * 20) % 2 === 0;
     // Auras de buffs (sobres)
     for (const b of this.buffs) {
-      const col = { cri: '201,164,90', dechainement: '168,64,44', murdefer: '127,154,184', oeil: '184,150,74', voile: '90,106,122' }[b.id] || '200,200,200';
+      const col = { cri: '201,164,90', dechainement: '168,64,44', murdefer: '127,154,184', oeil: '184,150,74', voile: '90,106,122', manashield: '130,170,255' }[b.id] || '200,200,200';
       ctx.strokeStyle = `rgba(${col},${0.25 + 0.15 * Math.sin(time * 6)})`;
       ctx.lineWidth = 2;
       ctx.beginPath();

@@ -14,6 +14,7 @@ import {
 } from '../data/items.js';
 import { CLASSES, SKILLS, SPEC_LEVEL, xpForLevel } from '../data/classes.js';
 import { QUESTS, NPCS, questDef, allQuests } from '../data/quests.js';
+import { UNIQUES } from '../data/uniques.js';
 import { MISSIONS, AUGURES, augureBonus, MISSION_ORDER as MISSION_ORDER_UI } from '../data/missions.js';
 import { missionStatus } from '../game/missions.js';
 import { SETS, SET_STAT_LABEL, setBonusText, equippedSetCounts, SET_PIECE_COST } from '../data/sets.js';
@@ -272,16 +273,17 @@ export class UI {
     if (item.affixes && item.affixes.length) h += `<div class="tt-aff">${item.affixes.map((a) => `<div>${affixText(a)}</div>`).join('')}</div>`;
     if (item.up) h += `<div class="tt-ok">Renforcé à la forge : +${item.up} (+${item.up * 12} % des statistiques de base)</div>`;
     if (item.set) h += this.setTipHTML(item);
+    if (item.uniq && UNIQUES[item.uniq] && UNIQUES[item.uniq].power) h += `<div class="tt-uniq">◆ ${UNIQUES[item.uniq].power}</div>`;
     const ic = itemClass(item);
-    if (ic && ic !== pd.cls) h += `<div class="tt-warn">Réservé à la classe ${CLASSES[ic].name}. Peut être vendu.</div>`;
-    if (isTwoHanded(item)) h += '<div class="dim">Empêche l’usage de la main gauche.</div>';
-    if (opts.ref && opts.ref.startsWith('inv') && item.found && pd.inRun) h += '<div class="tt-warn">Non sécurisé : perdu si vous mourez. Rangez-le dans la poche ou équipez-le.</div>';
-    if (opts.ref && opts.ref.startsWith('pocket')) h += '<div class="tt-ok">Sécurisé dans votre poche.</div>';
-    if (opts.ref && opts.ref.startsWith('equip')) h += '<div class="tt-ok">Porté : jamais perdu.</div>';
+    if (ic && ic !== pd.cls) h += `<div class="tt-warn">Réservé : ${CLASSES[ic].name}</div>`;
+    if (isTwoHanded(item)) h += '<div class="dim">Deux mains</div>';
+    if (opts.ref && opts.ref.startsWith('inv') && item.found && pd.inRun) h += '<div class="tt-warn">Non sécurisé</div>';
+    if (opts.ref && opts.ref.startsWith('pocket')) h += '<div class="tt-ok">Sécurisé</div>';
+    if (opts.ref && opts.ref.startsWith('equip')) h += '<div class="tt-ok">Porté</div>';
     if (opts.ref && opts.ref.startsWith('shop')) h += `<div class="tt-val">Prix : <b style="color:var(--bone)">${fmt(buyPrice(item))}</b> ${icon('gold', 'gold')}</div>`;
     else h += `<div class="tt-val">Revente : ${fmt(sellValue(item))} ${icon('gold', 'gold')}</div>`;
     if (cmp) h += `<div class="tt-cmp">Porté : <span style="color:${itemColor(cmp)}">${escapeHtml(cmp.name)}</span></div>`;
-    h += `<div class="tt-lore">${itemLore(item)}</div>`;
+    h += `<div class="tt-lore">${item.uniq && UNIQUES[item.uniq] ? UNIQUES[item.uniq].lore : itemLore(item)}</div>`;
     return h;
   }
 
@@ -474,8 +476,9 @@ export class UI {
     return `<div class="paperdoll">${EQUIP_ORDER.map((s) => {
       const it = pd.equipment[s];
       const blocked = s === 'offhand' && isTwoHanded(pd.equipment.weapon);
-      const phIcon = s === 'weapon' ? (pd.cls === 'rodeur' ? 'arc' : 'epee') : s === 'offhand' ? (pd.cls === 'rodeur' ? 'quiver' : 'offhand') : s;
-      const label = s === 'offhand' ? (pd.cls === 'rodeur' ? 'Carquois' : 'Bouclier') : SLOTS[s].label;
+      const PH = { rodeur: ['arc', 'quiver', 'Carquois'], mage: ['baton', 'tome', 'Grimoire'], guerrier: ['epee', 'offhand', 'Bouclier'] }[pd.cls] || ['epee', 'offhand', 'Bouclier'];
+      const phIcon = s === 'weapon' ? PH[0] : s === 'offhand' ? PH[1] : s;
+      const label = s === 'offhand' ? PH[2] : SLOTS[s].label;
       return `<div class="eq-cell eq-${s}" style="grid-area:${s}">${this.cell(it, 'equip:' + s, it ? '' : `<span class="ph-icon">${icon(phIcon)}</span>`)}<div class="eq-label">${blocked ? 'deux mains' : label}</div></div>`;
     }).join('')}</div>`;
   }
@@ -989,7 +992,7 @@ export class UI {
           drawSprite(g, id, 180, 275, sel ? { anim: 'walk', frame: walkFrame(id, 'walk', t * 9), dir: 2, scale: 4 } : { anim: 'walk', frame: 0, dir: 2, scale: 4, squashY: 1 + 0.01 * Math.sin(t * 2) });
           continue;
         }
-        const kit = this._kits || (this._kits = { guerrier: starterKit('guerrier'), rodeur: starterKit('rodeur') });
+        const kit = this._kits || (this._kits = { guerrier: starterKit('guerrier'), rodeur: starterKit('rodeur'), mage: starterKit('mage') });
         drawHero(g, 180, 185, { cls: id, angle: Math.PI / 2 + Math.sin(t * 0.6) * 0.25, time: t, eq: kit[id], scale: 4.2, bowDraw: id === 'rodeur' ? (Math.sin(t * 1.4) + 1) / 2 : 0 });
       }
       requestAnimationFrame(draw);
@@ -1255,7 +1258,7 @@ export class UI {
     }
 
     if (g.scene.mission) { this._misT = (this._misT || 0) - dt; if (this._misT <= 0) { this._misT = 0.5; this.refreshTracker(); } }
-    const iconFor = { cri: 'shout', dechainement: 'rage', murdefer: 'wall', oeil: 'eye', voile: 'veil', riposte: 'special', embuscade: 'veil' };
+    const iconFor = { cri: 'shout', dechainement: 'rage', murdefer: 'wall', oeil: 'eye', voile: 'veil', riposte: 'special', embuscade: 'veil', manashield: 'mshield' };
     const bHtml = p.buffs.map((b) => `<div class="buff b-${b.id}">${icon(iconFor[b.id] || 'special')}<span>${Math.ceil(b.t)}</span></div>`).join('');
     if (h.buffs._last !== bHtml) { h.buffs.innerHTML = bHtml; h.buffs._last = bHtml; }
 

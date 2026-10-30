@@ -2,7 +2,7 @@
 import { TILE, T } from './world.js';
 import { hash2, TAU, clamp, dist } from '../core/util.js';
 import { itemColor, itemName } from '../data/items.js';
-import { hasSprite, drawSprite, dirFromAngle, walkFrame } from './sprites.js';
+import { hasSprite, drawSprite, dirFromAngle, walkFrame, animFrames } from './sprites.js';
 import { hasTiles, drawT, drawProp, tileMeta } from './tiles.js';
 import { missionTarget } from './missions.js';
 
@@ -481,14 +481,38 @@ export class Renderer {
       ctx.strokeStyle = 'rgba(224,174,106,0.8)'; ctx.lineWidth = 4;
       ctx.beginPath(); ctx.arc(z.x, z.y, z.r - 6, -Math.PI / 2, -Math.PI / 2 + TAU * Math.min(1, z.t / z.dur)); ctx.stroke();
     }
+    for (const a of s.allies || []) if (inView(a.x, a.y)) ents.push(a.ent || (a.ent = { get x() { return a.x; }, get y() { return a.y; }, draw: (c, t) => {
+      c.fillStyle = `rgba(90,160,120,${0.18 + 0.08 * Math.sin(t * 4 + a.x)})`;
+      c.beginPath(); c.ellipse(a.x, a.y + 6, 15, 6, 0, 0, TAU); c.fill();
+      const atk = a.atkT > 0;
+      drawSprite(c, 'serviteur', a.x, a.y + 7, { anim: atk ? 'attack' : 'walk', frame: atk ? (1 - a.atkT / 0.3) * (animFrames('serviteur', 'attack') || 6) : a.moving ? walkFrame('serviteur', 'walk', a.walkT) : 0, dir: a.dir, alpha: a.spawnT > 0 ? 1 - a.spawnT / 0.6 : Math.min(1, a.t / 1.5) * 0.92, squashY: a.spawnT > 0 ? 1 - a.spawnT : 1 });
+    } }));
     for (const w of s.wanderers || []) if (inView(w.x, w.y)) ents.push(w.ent || (w.ent = { get x() { return w.x; }, get y() { return w.y; }, draw: (c, t) => drawSprite(c, w.sprite, w.x, w.y + 7, { anim: 'walk', frame: w.moving ? walkFrame(w.sprite, 'walk', w.walkT) : 0, dir: w.dir }) }));
     ents.sort((a, b) => a.y - b.y);
     for (const e of ents) e.draw(ctx, time);
 
     // Projectiles
-    for (const p of s.projectiles) this.drawProjectile(ctx, p);
+    for (const p of s.projectiles) if (inView(p.x, p.y, 40)) this.drawProjectile(ctx, p);
     // Pluie de flèches
     for (const z of s.zones) this.drawZone(ctx, z, time);
+    // Éclairs en chaîne
+    if (s.beams && s.beams.length) {
+      ctx.save(); ctx.globalCompositeOperation = 'lighter';
+      for (const b of s.beams) {
+        const k = b.t / b.max;
+        for (const [w, col] of [[5, `rgba(90,130,255,${0.35 * k})`], [2, `rgba(220,235,255,${k})`]]) {
+          ctx.strokeStyle = col; ctx.lineWidth = w; ctx.beginPath();
+          for (let i = 0; i < b.pts.length - 1; i++) {
+            const A = b.pts[i], B = b.pts[i + 1];
+            ctx.moveTo(A.x, A.y);
+            for (let j = 1; j < 5; j++) { const f = j / 5; ctx.lineTo(A.x + (B.x - A.x) * f + (hash2(i * 7 + j, Math.floor(time * 30)) - 0.5) * 18, A.y + (B.y - A.y) * f + (hash2(j, i * 13 + Math.floor(time * 30)) - 0.5) * 18); }
+            ctx.lineTo(B.x, B.y);
+          }
+          ctx.stroke();
+        }
+      }
+      ctx.restore();
+    }
 
     fx.drawParticles(ctx);
 
@@ -570,6 +594,14 @@ export class Renderer {
     }
     // Inscriptions au sol (lisibles même dans le noir)
     for (const o of s.interactables) if (o.type === 'inscription' && inView(o.x, o.y)) this.drawInscription(ctx, o, time);
+    // Pouvoirs des champions
+    ctx.font = "600 11px 'Pixelify Sans', sans-serif"; ctx.textAlign = 'center';
+    for (const e of s.enemies) {
+      if (!e.elite || e.dead || !e.mods || !e.mods.length || !inView(e.x, e.y) || e === (s.mission && s.mission.target)) continue;
+      const lb = e.modLabel;
+      ctx.fillStyle = 'rgba(0,0,0,0.75)'; ctx.fillText(lb, e.x + 1, e.y - e.r - 27);
+      ctx.fillStyle = '#d8a860'; ctx.fillText(lb, e.x, e.y - e.r - 28);
+    }
     // Champion de mission et survivant : nom et vie
     const ms = s.mission;
     if (ms && ms.target && !ms.target.dead && inView(ms.target.x, ms.target.y)) {
@@ -795,7 +827,17 @@ export class Renderer {
     ctx.save();
     ctx.translate(p.x, p.y);
     ctx.rotate(Math.atan2(p.vy, p.vx));
-    if (p.team === 'player') {
+    if (p.team === 'player' && p.magic) {
+      // trait magique : noyau clair, halo coloré, traînée
+      const col = p.fire ? [255, 130, 50] : p.bone ? [200, 220, 180] : [130, 165, 255];
+      const R = p.orb ? 8 : 4.5;
+      ctx.globalCompositeOperation = 'lighter';
+      for (let i = 4; i >= 1; i--) { ctx.fillStyle = `rgba(${col[0]},${col[1]},${col[2]},${0.12 * (5 - i) / 4})`; ctx.beginPath(); ctx.arc(-i * R * 1.3, 0, R * (1 - i * 0.12), 0, TAU); ctx.fill(); }
+      ctx.fillStyle = `rgba(${col[0]},${col[1]},${col[2]},0.45)`; ctx.beginPath(); ctx.arc(0, 0, R * 1.8, 0, TAU); ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+      if (p.bone) { ctx.fillStyle = '#e6eed8'; ctx.beginPath(); ctx.moveTo(R * 1.6, 0); ctx.lineTo(-R, -R * 0.6); ctx.lineTo(-R * 0.6, 0); ctx.lineTo(-R, R * 0.6); ctx.fill(); }
+      else { ctx.fillStyle = '#fff6e8'; ctx.beginPath(); ctx.arc(0, 0, R * 0.8, 0, TAU); ctx.fill(); }
+    } else if (p.team === 'player') {
       const len = p.heavy ? 26 : 18;
       ctx.strokeStyle = 'rgba(220,210,190,0.18)';
       ctx.lineWidth = p.heavy ? 6 : 3;
@@ -842,6 +884,23 @@ export class Renderer {
   }
 
   drawZone(ctx, z, time) {
+    if (z.kind === 'meteor') {
+      if (z.t >= 0) return;
+      const k = 1 + z.t / 0.9; // 0 → 1
+      ctx.save();
+      ctx.strokeStyle = `rgba(255,120,40,${0.4 + 0.4 * k})`; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(z.x, z.y, z.r, 0, TAU); ctx.stroke();
+      ctx.fillStyle = `rgba(255,100,30,${0.12 + 0.15 * k})`;
+      ctx.beginPath(); ctx.arc(z.x, z.y, z.r * k, 0, TAU); ctx.fill();
+      // le rocher tombe
+      const fy = z.y - (1 - k) * 420, fx = z.x - (1 - k) * 160;
+      ctx.globalCompositeOperation = 'lighter';
+      ctx.fillStyle = 'rgba(255,140,60,0.5)'; ctx.beginPath(); ctx.arc(fx, fy, 16, 0, TAU); ctx.fill();
+      ctx.globalCompositeOperation = 'source-over';
+      ctx.fillStyle = '#3a2a22'; ctx.beginPath(); ctx.arc(fx, fy, 9, 0, TAU); ctx.fill();
+      ctx.restore();
+      return;
+    }
     if (z.kind !== 'rain') return;
     const k = z.t < 0 ? 0 : Math.min(1, z.t / z.dur);
     ctx.save();
@@ -889,7 +948,8 @@ export class Renderer {
       else if (o.type === 'exitPortal') lights.push({ x: o.x, y: o.y, r: 240, a: 0.9, c: 'blue', g: 0.35 });
       else if (o.type === 'npc') lights.push({ x: o.x, y: o.y, r: 110, a: 0.5, c: 'warm', g: 0 });
     }
-    for (const pr of s.projectiles) lights.push({ x: pr.x, y: pr.y, r: 60, a: 0.5, c: 'white', g: 0.15 });
+    for (const pr of s.projectiles) lights.push(pr.magic ? { x: pr.x, y: pr.y, r: pr.orb ? 120 : 80, a: 0.75, c: pr.fire ? 'warm' : pr.bone ? 'green' : 'blue', g: 0.25 } : { x: pr.x, y: pr.y, r: 60, a: 0.5, c: 'white', g: 0.15 });
+    for (const z of s.zones) if (z.kind === 'meteor') lights.push({ x: z.x, y: z.y, r: z.t < 0 ? 140 : 220, a: 0.8, c: 'warm', g: 0.3 });
     for (const d of s.drops) if (d.item && d.item.kind === 'lore') lights.push({ x: d.x, y: d.y, r: 80, a: 0.6, c: 'warm', g: 0.25 });
     for (const o of s.interactables) if (o.type === 'inscription') lights.push({ x: o.x, y: o.y, r: 50, a: 0.35, c: 'warm', g: 0.15 });
     for (const d of s.drops) if (d.item && d.item.kind === 'equip' && d.item.rarity >= 2) lights.push({ x: d.x, y: d.y, r: 70, a: 0.5, c: 'white', g: 0 });
@@ -1045,6 +1105,18 @@ export class Renderer {
       ctx.strokeStyle = `rgba(110,170,200,${0.5 + 0.3 * Math.sin(time * 2)})`; ctx.lineWidth = 2;
       ctx.beginPath(); ctx.arc(x, y, 20, 0, TAU); ctx.stroke();
       ctx.beginPath(); for (let i = 0; i < 5; i++) { const a = -Math.PI / 2 + i * TAU * 2 / 5; ctx[i ? 'lineTo' : 'moveTo'](x + Math.cos(a) * 18, y + Math.sin(a) * 18); } ctx.closePath(); ctx.stroke();
+      return;
+    }
+    if (o.type === 'relicbone') {
+      ctx.fillStyle = `rgba(230,220,180,${0.18 + 0.12 * Math.sin(time * 3 + x)})`; ctx.beginPath(); ctx.ellipse(x, y + 4, 18, 7, 0, 0, TAU); ctx.fill();
+      ctx.fillStyle = '#e6dcc0'; ctx.fillRect(x - 8, y - 3, 16, 3); ctx.fillRect(x - 10, y - 5, 4, 7); ctx.fillRect(x + 6, y - 5, 4, 7);
+      ctx.fillStyle = '#a89878'; ctx.fillRect(x - 8, y, 16, 1);
+      return;
+    }
+    if (o.type === 'coffer') {
+      ctx.fillStyle = `rgba(200,60,40,${0.15 + 0.1 * Math.sin(time * 3)})`; ctx.beginPath(); ctx.ellipse(x, y + 6, 26, 10, 0, 0, TAU); ctx.fill();
+      this.drawChestShape(ctx, x, y, false, '#2a1a1a', '#8a3a2a', 0);
+      ctx.strokeStyle = 'rgba(200,70,50,0.7)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x - 10, y - 12); ctx.lineTo(x + 10, y + 2); ctx.moveTo(x + 10, y - 12); ctx.lineTo(x - 10, y + 2); ctx.stroke();
       return;
     }
     if (o.type === 'survivor') return; // dessiné avec les personnages

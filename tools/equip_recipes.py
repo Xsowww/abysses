@@ -14,7 +14,7 @@ for m in M:
 for c in C:
     add('hood_' + c, 'hat', 'Hood', c); add('leather_' + c, 'armour', 'Leather', c)
     add('pants_' + c, 'legs', 'Pants', c); add('boots_' + c, 'shoes', 'Basic_Boots', c)
-    add('rimboots_' + c, 'shoes', 'Rimmed_Boots', c); add('gloves_' + c, 'gloves', 'Gloves', c)
+    add('rimboots_' + c, 'shoes', 'Rimmed_Boots', c); add('gloves_' + c, 'gloves', 'Gloves', 'cloth.' + c)  # gants recolorés : « matériau.couleur »
 for t in TAB: add('tabard_' + t, 'jacket', 'Tabard', t)
 for w in W: add('recurve_' + w, 'weapon', 'Recurve', w); add('great_' + w, 'weapon', 'Great', w)
 for k, v in [('waraxe', 'Waraxe_waraxe'), ('mace', 'Mace_mace'), ('flail', 'Flail_flail'), ('longsword', 'Longsword_longsword'), ('crossbow', 'Crossbow_crossbow')]:
@@ -24,6 +24,13 @@ for k, n, v in [('kite_gray', 'Kite', 'kite gray'), ('kite_graygray', 'Kite', 'k
                 ('round_brown', 'Round_Shield', 'brown'), ('round_black', 'Round_Shield', 'black'), ('round_silver', 'Round_Shield', 'silver'), ('round_gold', 'Round_Shield', 'gold')]:
     add(k, 'shield', n, v)
 add('quiver', 'quiver', 'Quiver', 'quiver')
+add('dagger', 'weapon', 'Dagger', 'dagger')
+# Mage : bâtons (du plus grossier au plus précieux), baguette, robe (redingote longue) et chapeau pointu
+for k, n, v in [('staff_simple', 'Simple_staff', 'simple'), ('staff_gnarled', 'Gnarled_staff', 'dark'),
+                ('staff_loop', 'Loop_staff', 'silver'), ('staff_crystal', 'Diamond_staff', 'gold'), ('wand', 'Wand', 'wand')]:
+    add(k, 'weapon', n, v)
+for c in ['black', 'brown', 'navy', 'purple', 'red']:
+    add('robe_' + c, 'jacket', 'Frock_coat', c); add('wizhat_' + c, 'hat', 'Wizard_Hat_Base', c)
 for k, n, v in [('cape_tattered_maroon', 'Tattered', 'maroon'), ('cape_solid_forest', 'Solid', 'forest'), ('cape_tattered_black', 'Tattered', 'black'), ('cape_solid_black', 'Solid', 'black')]:
     add(k, 'cape', n, v)
 add('hair', 'hair', 'Bangsshort', 'dark brown')
@@ -32,14 +39,17 @@ add('shoes', 'shoes', 'Basic_Shoes', 'brown')
 # répartition : une pièce par type et par recette
 bytype = {}
 for k, (t, n, v) in items.items(): bytype.setdefault(t, []).append(k)
-n = max(len(v) for v in bytype.values())
+# gants à part des gantelets (« arms ») : dans les dernières recettes
+START = {'gloves': 20}
+n = max(len(v) + START.get(t, 0) for t, v in bytype.items())
 recipes, contents = {}, {}
 for i in range(n):
     parts = ['sex=male', 'body=Body_Color_light', 'head=Human_Male_light']
     keys = []
     for t, lst in bytype.items():
-        if i < len(lst):
-            k = lst[i]; typ, nm, var = items[k]
+        j = i - START.get(t, 0)
+        if 0 <= j < len(lst):
+            k = lst[j]; typ, nm, var = items[k]
             parts.append(f'{typ}={nm}_{var}'); keys.append(k)
     recipes[f'r{i:02d}'] = '&'.join(parts); contents[f'r{i:02d}'] = keys
 json.dump(recipes, open('recipes.json', 'w'), indent=1)

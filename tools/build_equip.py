@@ -10,13 +10,13 @@ Chaque animation : { fs, frames, dirs, subs: [{ y, z }] } — une pièce peut av
 (ex. cape devant / derrière), chacun avec sa profondeur z.
 Les pièces non-armes ne gardent que les animations de base (les grandes attaques sont recomposées en jeu).
 """
-import csv, io, json, os, re, sys, zipfile
+import csv, io, json, math, os, re, sys, zipfile
 from PIL import Image
 
 DL, ITEMS, OUT = sys.argv[1], sys.argv[2], sys.argv[3]
 spec = json.load(open(ITEMS, encoding='utf-8'))
 items, contents = spec['items'], spec['contents']
-STANDARD = ['walk', 'hurt', 'slash', 'thrust', 'shoot', '1h_backslash']
+STANDARD = ['walk', 'hurt', 'slash', 'thrust', 'shoot', '1h_backslash', 'spellcast']
 TYPE_Z = {'legs': 20, 'shoes': 15, 'arms': 60}
 CUSTOM = ['slash_oversize', 'slash_reverse_oversize', 'thrust_oversize', 'slash_128', 'backslash_128']
 
@@ -33,6 +33,80 @@ def frames_used(im, fs):
         if im.crop((i * fs, 0, (i + 1) * fs, im.size[1])).getbbox():
             last = i + 1
     return last
+
+
+
+# --- Incantation des bâtons -------------------------------------------------------------
+# Seul le « Simple staff » du générateur a l'animation spellcast. Pour les autres bâtons, on la
+# recompose : le bâton de la marche (image 0 de chaque direction) suit le mouvement rigide
+# (rotation autour du talon + translation) que fait le bâton simple entre sa marche et son
+# incantation ; chaque pixel prend le calque (devant / derrière) du point du bâton simple le
+# plus proche le long de l'axe.
+SPELL_REF = 'staff_simple'
+
+
+def _staff_pts(ims, x0, y0, fs):
+    out = []
+    for li, im in enumerate(ims):
+        px = im.load()
+        for y in range(fs):
+            for x in range(fs):
+                if x0 + x < im.size[0] and px[x0 + x, y0 + y][3]:
+                    out.append((x, y, li))
+    return out
+
+
+def _staff_axis(p):
+    n = len(p)
+    mx = sum(q[0] for q in p) / n
+    my = sum(q[1] for q in p) / n
+    sxx = sum((q[0] - mx) ** 2 for q in p)
+    syy = sum((q[1] - my) ** 2 for q in p)
+    sxy = sum((q[0] - mx) * (q[1] - my) for q in p)
+    a = 0.5 * math.atan2(2 * sxy, sxx - syy)
+    dx, dy = math.cos(a), math.sin(a)
+    if dy > 0:
+        dx, dy = -dx, -dy  # orienté vers le pommeau
+    b = min((q[0] - mx) * dx + (q[1] - my) * dy for q in p)
+    return (mx + b * dx, my + b * dy), math.atan2(dy, dx), (mx, my, dx, dy)
+
+
+def synth_spellcast(ref_walk, ref_cast, tgt_walk, fs=64):
+    """Listes d'images triées par z (derrière, devant). Renvoie la liste pour l'incantation."""
+    W, H = ref_cast[0].size
+    out = [Image.new('RGBA', (W, H)) for _ in ref_cast]
+    dst = [im.load() for im in out]
+    src = [im.load() for im in tgt_walk]
+    for d in range(H // fs):
+        rw = _staff_pts(ref_walk, 0, d * fs, fs)
+        if len(rw) < 4:
+            continue
+        Bw, aw, _ = _staff_axis(rw)
+        for f in range(W // fs):
+            rc = _staff_pts(ref_cast, f * fs, d * fs, fs)
+            if len(rc) < 4:
+                continue
+            Bc, ac, (mx, my, dx, dy) = _staff_axis(rc)
+            c, s = math.cos(ac - aw), math.sin(ac - aw)
+            prof = [((q[0] - mx) * dx + (q[1] - my) * dy, min(q[2], len(out) - 1)) for q in rc]
+            for y in range(fs):
+                for x in range(fs):
+                    vx, vy = x - Bc[0], y - Bc[1]
+                    ix = int(round(Bw[0] + c * vx + s * vy))
+                    iy = int(round(Bw[1] - s * vx + c * vy))
+                    if not (0 <= ix < fs and 0 <= iy < fs):
+                        continue
+                    col = None
+                    for li in range(len(src) - 1, -1, -1):
+                        v = src[li][ix, d * fs + iy]
+                        if v[3]:
+                            col = v
+                            break
+                    if col is None:
+                        continue
+                    t = (x - mx) * dx + (y - my) * dy
+                    dst[min(prof, key=lambda p: abs(p[0] - t))[1]][f * fs + x, d * fs + y] = col
+    return out
 
 
 os.makedirs(OUT, exist_ok=True)
@@ -84,6 +158,22 @@ for rec in sorted(contents):
         with open(cpath, newline='', encoding='utf-8') as f:
             for row in csv.DictReader(f):
                 credits[row['filename'].rsplit('/', 1)[0]] = row
+
+ref = layers.get(SPELL_REF, {})
+if 'walk' in ref and 'spellcast' in ref:
+    rw = [im for _, im in sorted(ref['walk'], key=lambda t: t[0])]
+    rc = sorted(ref['spellcast'], key=lambda t: t[0])
+    for key, anims in layers.items():
+        if key == SPELL_REF or 'spellcast' in anims or 'walk' not in anims:
+            continue
+        if items.get(key, [''])[0] != 'weapon' or not items[key][1].lower().endswith('_staff'):
+            continue
+        tw = [im for _, im in sorted(anims['walk'], key=lambda t: t[0])]
+        if len(tw) != len(rc):
+            continue
+        made = synth_spellcast(rw, [im for _, im in rc], tw)
+        anims['spellcast'] = [(rc[i][0], im) for i, im in enumerate(made)]
+        print('  incantation recomposée :', key)
 
 meta = {}
 for key, anims in sorted(layers.items()):

@@ -29,12 +29,15 @@ const METAL = ['steel', 'steel', 'silver', 'iron', 'silver', 'gold', 'iron']; //
 const CLOTH = ['leather', 'leather', 'brown', 'charcoal', 'charcoal', 'maroon', 'black'];
 const TABARD = ['leather', 'navy', 'forest', 'forest', 'maroon', 'black', 'black'];
 const WOOD = ['light', 'medium', 'medium', 'dark', 'silver', 'gold', 'dark'];
+// Mage : couleur de robe / chapeau selon le palier de tissu (à ajuster selon les calques disponibles)
+const ROBE = ['brown', 'brown', 'black', 'navy', 'purple', 'red', 'black'];
+const STAFF = ['staff_simple', 'staff_simple', 'staff_gnarled', 'staff_gnarled', 'staff_loop', 'staff_crystal', 'staff_crystal'];
 const tierOf = (it) => Math.max(0, Math.min(6, Math.floor(((it.ilvl || 1) - 1) / 4)));
 const baseWord = (it) => (it.name || '').split(' ')[0];
 
 const PIECES = {
-  head: { Casque: (t) => 'nasal_' + METAL[t], Heaume: (t) => 'greathelm_' + METAL[t], Camail: (t) => 'mail_' + METAL[t], Capuche: (t) => 'hood_' + CLOTH[t] },
-  chest: { Plastron: (t) => 'plate_' + METAL[t], Haubert: (t) => 'chain_' + METAL[t], Brigandine: (t) => 'leather_' + CLOTH[t], Pourpoint: (t) => 'tabard_' + TABARD[t] },
+  head: { Casque: (t) => 'nasal_' + METAL[t], Heaume: (t) => 'greathelm_' + METAL[t], Camail: (t) => 'mail_' + METAL[t], Capuche: (t) => 'hood_' + CLOTH[t], Chapeau: (t) => 'wizhat_' + ROBE[t] },
+  chest: { Plastron: (t) => 'plate_' + METAL[t], Haubert: (t) => 'chain_' + METAL[t], Brigandine: (t) => 'leather_' + CLOTH[t], Pourpoint: (t) => 'tabard_' + TABARD[t], Robe: (t) => 'robe_' + ROBE[t] },
   legs: { Jambières: (t) => 'legarm_' + METAL[t], Grèves: (t) => 'legarm_' + METAL[t], Cuissards: (t) => 'pants_' + CLOTH[t] },
   feet: { Bottes: (t) => 'boots_' + CLOTH[t], Solerets: (t) => 'sabatons_' + METAL[t], Bottines: (t) => 'rimboots_' + CLOTH[t] },
   hands: { Gants: (t) => 'gloves_' + CLOTH[t], Gantelets: (t) => 'gauntlets_' + METAL[t], Mitaines: (t) => 'gloves_' + CLOTH[t] },
@@ -48,16 +51,18 @@ const SHIELDS = {
 const WEAPON = {
   epee: (t) => 'arming_' + METAL[t], hache: () => 'waraxe', masse: () => 'mace', espadon: () => 'longsword',
   marteau: () => 'flail', arccourt: (t) => 'recurve_' + WOOD[t], arc: (t) => 'great_' + WOOD[t], arbalete: () => 'crossbow',
+  baton: (t) => STAFF[t], sceptre: (t) => (t < 3 ? 'staff_loop' : 'staff_crystal'), baguette: () => 'wand',
 };
 // Animations d'attaque selon l'arme portée : [normale, lourde]
 const ATTACKS = {
   arming: ['slash_128', 'backslash_128'], longsword: ['slash_oversize', 'slash_reverse_oversize'],
   waraxe: ['slash_oversize', 'slash_oversize'], mace: ['slash_oversize', 'slash_oversize'], flail: ['slash_oversize', 'slash_oversize'],
   recurve: ['shoot', 'shoot'], great: ['shoot', 'shoot'], crossbow: ['thrust', 'thrust'],
+  staff: ['spellcast', 'spellcast'], wand: ['slash', 'slash'],
   dagger: ['slash', 'thrust'],
 };
 // Pose de base pour les calques qui n'ont pas l'animation d'attaque de l'arme
-const FALLBACK = { slash_oversize: 'slash', slash_reverse_oversize: 'slash', slash_128: 'slash', backslash_128: '1h_backslash', thrust_oversize: 'thrust' };
+const FALLBACK = { spellcast: 'thrust', slash_oversize: 'slash', slash_reverse_oversize: 'slash', slash_128: 'slash', backslash_128: '1h_backslash', thrust_oversize: 'thrust' };
 
 // Liste ordonnée des pièces visibles pour une classe et un équipement.
 export function lookFor(cls, eq, spec) {
@@ -71,7 +76,7 @@ export function lookFor(cls, eq, spec) {
   if (!(eq.head && ['Heaume', 'Capuche'].includes(baseWord(eq.head)))) out.push('hair');
   out.push('shirt');
   piece('chest'); piece('legs', 'pants_charcoal'); piece('feet', 'shoes'); piece('hands'); piece('head');
-  out.push(cls === 'rodeur' ? 'cape_solid_forest' : 'cape_tattered_maroon');
+  out.push(cls === 'rodeur' ? 'cape_solid_forest' : cls === 'mage' ? 'cape_solid_black' : 'cape_tattered_maroon');
   const off = eq.offhand;
   if (off && off.offType === 'quiver') out.push('quiver');
   else if (off && off.offType === 'shield') out.push((SHIELDS[baseWord(off)] || SHIELDS.Bouclier)[tierOf(off)]);

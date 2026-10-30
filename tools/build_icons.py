@@ -244,6 +244,26 @@ D('gui/spells/components/skull', 'dc_skull_raw')
 add('dc_skull', _map(icons.pop('dc_skull_raw'), lambda h, s, v: (0.11, 0.18, min(1, v * 1.1)) if v > 0.14 else None))
 M['skull'] = [I(C, 'skull_candle'), 'dc_skull']
 
+# --- mage (ajoutés en fin d'atlas : les positions existantes ne bougent pas) ---
+M['weapon:baton'] = [I(W, 'staff1'), I(W, 'staff2'), D('item/staff/staff_2', 'dc_staff_2'), I(W, 'staff3'),
+                     D('item/staff/staff_4', 'dc_staff_4'), D('item/staff/staff_7', 'dc_staff_7'),
+                     D('item/staff/staff_8', 'dc_staff_8'), D('item/staff/staff_3', 'dc_staff_3')]
+M['weapon:sceptre'] = [D('item/rod/rod_%d_new' % i, 'dc_rod_%d' % i) for i in (1, 0, 4, 5, 6, 7)] + [
+    D('item/weapon/artefact/spwpn_sceptre_of_asmodeus', 'dc_sceptre_asmodeus'),
+    D('item/weapon/artefact/spwpn_scepter_of_asmodeus_2', 'dc_sceptre_asmodeus_2')]
+for k in M['weapon:sceptre']:
+    deshadow(icons[k])
+M['weapon:baguette'] = [D('item/wand/gem_wood_new', 'dc_wand_wood'), I(W, 'wand1'), D('item/wand/gem_iron_new', 'dc_wand_iron'),
+                        D('item/wand/gem_bone_new', 'dc_wand_bone'), I(W, 'wand2'), D('item/wand/gem_silver_new', 'dc_wand_silver'),
+                        D('item/wand/gem_gold_new', 'dc_wand_gold'), D('item/wand/wand_brass', 'dc_wand_star')]
+M['offhand:tome'] = [I(C, 'grimoire_closed'), D('item/book/leather_old', 'dc_book_leather'), D('item/book/dark_brown_new', 'dc_book_brown'),
+                     I(C, 'grimoire_open'), D('item/book/dark_gray_new', 'dc_book_gray'), D('item/book/purple_new', 'dc_book_purple'),
+                     D('item/book/book_of_the_dead_new', 'dc_book_dead'), D('item/book/gold', 'dc_book_gold')]
+M['chest:Robe'] = [I(A, 'cloth_robe'), T('cloth_robe', 'sombre', 'cloth')] + [D('item/armor/torso/' + n, 'dc_' + n) for n in (
+    'robe_1_new', 'robe_2_new', 'robe_3', 'robe_ego_2', 'robe_ego_1', 'robe_art_2')]
+M['head:Chapeau'] = [D('item/armor/headgear/' + n, 'dc_' + n) for n in (
+    'cap_1', 'wizard_hat_1', 'hat_1', 'wizard_hat_2', 'hat_2', 'cornuthaum', 'hat_3')]
+
 # ---------- pack atlas ----------
 keys = list(icons)
 cols = 16

@@ -20,6 +20,7 @@ import { dirFromAngle } from './sprites.js';
 import { SETS, setsForDepth, equippedSetCounts, SET_PIECE_COST } from '../data/sets.js';
 import { refillContracts, activeContracts, MAX_ACTIVE } from '../data/contracts.js';
 import { makeMissionQuest, augureBonus, AUGURES, MISSIONS } from '../data/missions.js';
+import { randomUnique } from '../data/uniques.js';
 import { setupMission, updateMission, missionOnKill, missionInteract, missionReward } from './missions.js';
 import { LORE, LORE_BY_ID, guardianFor, EPILOGUE_ACT1 } from '../data/story.js';
 
@@ -58,7 +59,7 @@ export class Game {
       xp: 0,
       gold: 50,
       runGold: 0,
-      equipment: { head: null, amulet: null, chest: kit.chest, hands: null, legs: null, ring: null, feet: null, weapon: kit.weapon, offhand: kit.offhand, pocket: kit.pocket },
+      equipment: { head: kit.head || null, amulet: null, chest: kit.chest, hands: null, legs: null, ring: null, feet: null, weapon: kit.weapon, offhand: kit.offhand, pocket: kit.pocket },
       inventory: new Array(Inv.INV_SIZE).fill(null),
       pocket: new Array(Inv.POCKET_MAX).fill(null),
       stash: new Array(Inv.STASH_SIZE).fill(null),
@@ -110,7 +111,7 @@ export class Game {
 
   // ---------------- SCÈNES ----------------
   baseScene(type) {
-    return { type, enemies: [], projectiles: [], telegraphs: [], drops: [], traps: [], zones: [], interactables: [], torches: [], braziers: [], decor: [], houses: [], flowTimer: 0, boss: null, bossEngaged: false, depth: 0 };
+    return { type, allies: [], beams: [], enemies: [], projectiles: [], telegraphs: [], drops: [], traps: [], zones: [], interactables: [], torches: [], braziers: [], decor: [], houses: [], flowTimer: 0, boss: null, bossEngaged: false, depth: 0 };
   }
 
   enterVillage() {
@@ -284,6 +285,8 @@ export class Game {
       this.updateProjectiles(dt);
       this.updateTraps(dt);
       this.updateZones(dt);
+      if (this.scene.allies && this.scene.allies.length) this.updateAllies(dt);
+      if (this.scene.beams && this.scene.beams.length) { for (const b of this.scene.beams) b.t -= dt; this.scene.beams = this.scene.beams.filter((b) => b.t > 0); }
       for (let i = s.enemies.length - 1; i >= 0; i--) {
         const e = s.enemies[i];
         if (e.dead && (e.deadT -= dt) < 0) s.enemies.splice(i, 1);
@@ -478,7 +481,8 @@ export class Game {
       if (!dead && map.solidAt(pr.x, pr.y)) {
         dead = true;
         this.fx.burst(pr.x, pr.y, '#8a8070', 4, 60, 0.3, 2);
-        if (pr.team === 'player') this.renderer.stickArrow(this.scene, pr);
+        if (pr.team === 'player' && pr.splash) this.explode(pr, pr.x - pr.vx * 0.02, pr.y - pr.vy * 0.02, null);
+        else if (pr.team === 'player' && !pr.magic) this.renderer.stickArrow(this.scene, pr);
       }
       if (!dead && pr.team === 'enemy' && !p.dead && dist(pr.x, pr.y, p.x, p.y) < pr.r + p.r) {
         if (p.invuln <= 0) { this.hurtPlayer(pr.dmg, pr.owner); dead = true; }
@@ -497,12 +501,67 @@ export class Game {
             if (p.marked === e) { dm.amount = Math.round(dm.amount * 1.5); this.fx.text(e.x, e.y - e.r - 22, 'Marque !', '#e0ae6a', 14); }
             p.marked = e;
           }
-          this.damageEnemy(e, dm, a, e.boss ? pr.kb * 0.15 : pr.kb, pr.poison);
+          this.damageEnemy(e, dm, a, e.boss ? pr.kb * 0.15 : pr.kb, pr.poison, pr.fire);
+          if (pr.splash) this.explode(pr, e.x, e.y, e);
           if (pr.heavy) this.hitstop(0.03);
           if (pr.pierce-- <= 0) { dead = true; break; }
         }
       }
       if (dead) list.splice(i, 1);
+    }
+  }
+
+  // Explosion d'un projectile (sceptre, Pyromancien, orbe, tir explosif) : 60 % autour du point d'impact
+  explode(pr, x, y, skip) {
+    const p = this.player;
+    const R = pr.splash * (this.player.hasUniq('oeilv') ? 1.5 : 1);
+    for (const o of this.scene.enemies) {
+      if (o.dead || o === skip || dist(o.x, o.y, x, y) > R + o.r) continue;
+      this.damageEnemy(o, p.rollDamage(pr.mult * 0.6, o), Math.atan2(o.y - y, o.x - x), pr.kb * 0.6, pr.poison, pr.fire);
+    }
+    const col = pr.fire ? '#ff8a3a' : pr.bone ? '#c8d8b8' : pr.magic ? '#9ab8ff' : '#e0b070';
+    this.fx.ring(x, y, col, R, 0.3);
+    this.fx.burst(x, y, col, pr.orb ? 26 : 12, 180, 0.45, 3, { drag: 3 });
+    if (pr.orb || R > 60) { this.fx.shake(4); sfx('heavy', { x, y }); }
+  }
+
+  // ---- Serviteurs du Nécromancien ----
+  allyCount() { return (this.scene.allies || []).filter((a) => !a.dead).length; }
+  spawnThrall(x, y, life, extra = false) {
+    const s = this.scene;
+    if (s.map.collides(x, y, 10)) { x = this.player.x; y = this.player.y; }
+    const live = s.allies.filter((a) => !a.dead);
+    if (!extra && live.length >= this.player.maxThralls()) live[0].dead = true;
+    s.allies.push({ x, y, r: 12, t: life, cd: 0.5, spawnT: 0.6, walkT: 0, dir: 2, moving: false, atkT: 0 });
+    this.fx.burst(x, y + 6, '#6a9a7a', 16, 90, 0.7, 4, { grav: -40 });
+    this.fx.burst(x, y + 6, '#3a3430', 10, 80, 0.6, 5, { drag: 3 });
+  }
+  updateAllies(dt) {
+    const s = this.scene, p = this.player;
+    const legion = p.has('n_legion');
+    for (let i = s.allies.length - 1; i >= 0; i--) {
+      const a = s.allies[i];
+      a.t -= dt;
+      if (a.dead || a.t <= 0) { this.fx.burst(a.x, a.y, '#6a9a7a', 10, 70, 0.6, 3); s.allies.splice(i, 1); continue; }
+      if (a.spawnT > 0) { a.spawnT -= dt; continue; }
+      a.cd -= dt; a.atkT = Math.max(0, a.atkT - dt);
+      // cible : l'ennemi le plus proche (sinon, suivre le maître)
+      let best = null, bd = 380;
+      for (const e of s.enemies) { if (e.dead || e.spawnT > 0) continue; const d = dist(a.x, a.y, e.x, e.y); if (d < bd) { bd = d; best = e; } }
+      let tx = p.x, ty = p.y, stop = 60;
+      if (best) { tx = best.x; ty = best.y; stop = best.r + 18; }
+      const d = dist(a.x, a.y, tx, ty);
+      a.moving = d > stop;
+      if (a.moving) {
+        const ang = Math.atan2(ty - a.y, tx - a.x);
+        s.map.move(a, Math.cos(ang) * 175 * dt, Math.sin(ang) * 175 * dt);
+        a.walkT += dt * 9;
+        a.dir = Math.abs(Math.cos(ang)) > Math.abs(Math.sin(ang)) ? (Math.cos(ang) > 0 ? 3 : 1) : (Math.sin(ang) > 0 ? 2 : 0);
+      } else if (best && a.cd <= 0) {
+        a.cd = 0.9; a.atkT = 0.3;
+        const ang = Math.atan2(best.y - a.y, best.x - a.x);
+        this.damageEnemy(best, p.rollDamage(legion ? 0.6 : 0.45, best), ang, 60);
+      }
     }
   }
 
@@ -536,9 +595,18 @@ export class Game {
       z.tick -= dt;
       if (z.tick <= 0 && z.t <= z.dur) {
         z.tick = z.interval;
+        const meteor = z.kind === 'meteor';
         for (const e of s.enemies) {
           if (e.dead || dist(e.x, e.y, z.x, z.y) > z.r + e.r) continue;
-          this.damageEnemy(e, this.player.rollDamage(z.mult, e), -Math.PI / 2, 0);
+          this.damageEnemy(e, this.player.rollDamage(z.mult, e), meteor ? Math.atan2(e.y - z.y, e.x - z.x) : -Math.PI / 2, meteor ? 260 : 0, meteor ? 40 : 0, meteor);
+        }
+        if (meteor) {
+          this.fx.ring(z.x, z.y, '#ff8a3a', z.r, 0.5);
+          this.fx.burst(z.x, z.y, '#ff7a2a', 40, 300, 0.7, 5, { drag: 3 });
+          this.fx.burst(z.x, z.y, '#3a3430', 20, 160, 1, 6, { drag: 2, grav: -30 });
+          this.fx.shake(10); this.hitstop(0.05);
+          sfx('heavy', { x: z.x, y: z.y });
+          continue;
         }
         sfx('arrow');
         for (let k = 0; k < 6; k++) this.fx.burst(z.x + rand(-z.r, z.r) * 0.8, z.y + rand(-z.r, z.r) * 0.8, '#6a6050', 2, 40, 0.25, 2);
@@ -566,19 +634,26 @@ export class Game {
     return hits;
   }
 
-  damageEnemy(e, dm, kbAng, kbForce, poisonPct = 0) {
+  damageEnemy(e, dm, kbAng, kbForce, poisonPct = 0, fire = false) {
     if (e.dead) return;
     const p = this.player;
+    if (e.mods && e.mods.length && e.mods.includes('cuirasse') && !dm.dot) dm = { ...dm, amount: Math.max(1, Math.round(dm.amount * 0.6)) };
+    if (!dm.dot && p.hasUniq('treize')) {
+      p.hitN = (p.hitN || 0) + 1;
+      if (p.hitN % 13 === 0) { dm = { ...dm, amount: dm.amount * 5, crit: true }; this.fx.text(e.x, e.y - e.r - 24, 'XIII', '#e8643c', 16, { bold: true }); sfx('bell', { x: e.x, y: e.y, vol: 0.6 }); }
+    }
     e.hp -= dm.amount;
     if (dm.dot) {
-      this.fx.text(e.x, e.y - e.r - 6, String(dm.amount), '#8fae5a', 12, { damage: true });
+      this.fx.text(e.x, e.y - e.r - 6, String(dm.amount), dm.fire ? '#ff9a4a' : '#8fae5a', 12, { damage: true });
       if (e.hp <= 0) this.killEnemy(e);
       return;
     }
     // Ombrelame : chaque coup de dague empoisonne
     let pois = p.stats.poison + poisonPct;
+    if (p.hasUniq('braise')) { pois += 30; fire = true; }
+    if (dm.crit && p.hasUniq('glas') && !e.boss) e.stun = Math.max(e.stun || 0, 1);
     if (p.spec === 'ombrelame') pois += 30;
-    if (pois > 0) e.poison = { dps: (dm.amount * pois / 100) / 3, t: 3, tick: 0.5 };
+    if (pois > 0) e.poison = { dps: (dm.amount * pois / 100) / 3, t: 3, tick: 0.5, fire: fire || p.spec === 'pyromancien' };
     if (p.lastBackstab && p.spec === 'ombrelame') { p.lastBackstab = false; this.fx.text(e.x, e.y - e.r - 22, 'Dans le dos !', '#9fb0a0', 13); }
     p.gainRage(dm.crit ? 7 : 5);
     e.flash = 1;
@@ -602,7 +677,9 @@ export class Game {
     e.deadT = e.boss ? 1.6 : 0.7;
     e.deathMax = e.deadT;
     missionOnKill(this, e);
-    if (e.type === 'cloche') { this.addXp(e.xp, e.x, e.y); this.dropExtras(e.x, e.y, 'elite'); return; }
+    if (this.player.spec === 'necromancien') for (const a of s.allies || []) a.t = Math.min(25, a.t + 2);
+    if (e.type === 'cloche' || e.type === 'nid') { this.addXp(e.xp, e.x, e.y); this.dropExtras(e.x, e.y, 'elite'); return; }
+    if (e.mods && e.mods.includes('instable')) this.addTelegraph({ shape: 'circle', x: e.x, y: e.y, r: 80, dur: 0.9, dmg: e.dmg * 1.4, owner: null, onFire: (gg, t) => { gg.fx.burst(t.x, t.y, '#ff6040', 30, 260, 0.5, 4, { glow: true }); gg.fx.shake(6); sfx('boom'); } });
     this.renderer.addDecal(s, e);
     const debris = e.type === 'acolyte' ? '#3a2850' : e.type === 'rat' ? '#3e2f26' : '#b9b19c';
     this.fx.burst(e.x, e.y, debris, e.boss ? 60 : 14, e.boss ? 300 : 170, e.boss ? 1.2 : 0.8, e.boss ? 5 : 4, { drag: 4 });
@@ -628,6 +705,7 @@ export class Game {
     if (chance(itemChance)) this.dropItem(e.x, e.y, this.loot({ ilvl: il, rarityBonus: e.elite ? 1 : 0 }));
     if (e.elite && chance(0.12)) this.dropItem(e.x, e.y, this.loot({ ilvl: il, rarityBonus: 1 }));
     if (e.elite && chance(0.12)) this.dropLore(e.x, e.y);
+    if (e.elite && chance(0.008 * (1 + (s.bonus || 0) / 100))) this.dropItem(e.x, e.y, randomUnique(this.pd.cls, il));
     if (chance(e.elite ? 0.2 : 0.025)) this.dropItem(e.x, e.y, makeConsumable('potion', 1));
     this.dropExtras(e.x, e.y, e.elite ? 'elite' : 'normal');
   }
@@ -690,6 +768,7 @@ export class Game {
     this.dropItem(b.x, b.y, this.loot({ ilvl: il, rarityBonus: 2, minRarity: 2 }));
     if (chance(0.5)) this.dropItem(b.x, b.y, this.loot({ ilvl: il, rarityBonus: 2 }));
     if (chance(0.15)) this.dropItem(b.x, b.y, this.loot({ ilvl: il, slot: 'pocket', rarity: Math.min(4, randInt(1, 3)) }));
+    if (chance(0.12 + 0.03 * s.depth)) this.dropItem(b.x, b.y, randomUnique(this.pd.cls, il + 1));
     this.dropItem(b.x, b.y, makeConsumable('potion', 1));
     this.dropExtras(b.x, b.y, 'boss');
     pd.bossKills[s.depth] = (pd.bossKills[s.depth] || 0) + 1;
@@ -754,11 +833,15 @@ export class Game {
     }
     const lvl = source ? source.level : this.scene.level || 1;
     const red = Math.min(0.75, p.armor / (p.armor + 40 + 12 * lvl));
-    let dmg = amount * (1 - red) * (1 - m.dr / 100) * (1 + m.dmgTaken / 100);
+    let dmg = amount * (1 - red) * (1 - Math.min(70, m.dr + (p.stats.dr || 0)) / 100) * (1 + m.dmgTaken / 100);
     dmg = Math.max(1, Math.round(dmg));
     p.hp -= dmg;
     p.flash = 1;
     p.invuln = 0.35;
+    if (source && source.mods && source.mods.length) {
+      if (source.mods.includes('vampire') && !source.dead) { source.hp = Math.min(source.maxHp, source.hp + dmg * 2); this.fx.text(source.x, source.y - source.r - 8, '+' + Math.round(dmg * 2), '#c0352b', 12); }
+      if (source.mods.includes('givre')) { p.chill = 2; this.fx.burst(p.x, p.y, '#9ad0ff', 10, 90, 0.4, 3); }
+    }
     p.gainRage(10);
     if (source) {
       const a = Math.atan2(p.y - source.y, p.x - source.x);
@@ -894,6 +977,7 @@ export class Game {
     this.dropGold(o.x, o.y, Math.round(randInt(5, 12) * (1 + (s.depth - 1) * 0.5) * (o.rich ? 2.5 : 1)));
     if (chance(0.25)) this.dropItem(o.x, o.y, makeConsumable('potion', 1));
     if (chance(0.04 + (o.rich ? 0.08 : 0))) this.dropItem(o.x, o.y, this.loot({ slot: 'pocket', rarity: randInt(1, 3) }));
+    if (o.rich && chance(0.03)) this.dropItem(o.x, o.y, randomUnique(this.pd.cls, il));
     this.dropExtras(o.x, o.y, 'chest');
     this.fx.burst(o.x, o.y - 6, '#c9a45a', 20, 140, 0.7, 2.5, { grav: -40 });
     this.fx.ring(o.x, o.y, 'rgba(201,164,90,0.7)', 50, 0.5);

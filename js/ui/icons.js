@@ -34,6 +34,19 @@ const P = {
   rain: '<path d="M5 2l-2 9M10 1l-2 9M15 2l-2 9M20 1l-2 9" stroke="currentColor" stroke-width="1.6" fill="none"/><path d="M2 13l2 3 2-3zM7 12l2 3 2-3zM12 13l2 3 2-3zM17 12l2 3 2-3z"/><ellipse cx="12" cy="21" rx="10" ry="2" opacity=".5"/>',
   eye: '<path fill-rule="evenodd" d="M12 5c5 0 9 4 11 7-2 3-6 7-11 7S3 15 1 12c2-3 6-7 11-7zm0 3a4 4 0 1 0 0 8 4 4 0 0 0 0-8z"/><circle cx="12" cy="12" r="1.8"/>',
   veil: '<path d="M12 2c5 0 8 4 8 9v11l-2.5-2-2.5 2-3-2-3 2-2.5-2L4 22V11c0-5 3-9 8-9z"/><ellipse cx="9" cy="11" rx="1.6" ry="2.2" fill="#000"/><ellipse cx="15" cy="11" rx="1.6" ry="2.2" fill="#000"/>',
+  baton: '<path d="M5 23l-1.6-1.2L17 3.5l1.6 1.2z"/><circle cx="18.5" cy="4" r="3.2"/><path d="M14 2l2 1M21 8l1 2M22 2l-2 1" stroke="currentColor" stroke-width="1.2"/>',
+  sceptre: '<path d="M6 23l-1.6-1.2 10-13.3 1.6 1.2z"/><path d="M17 1l5 5-4 4-5-5z"/><circle cx="17.5" cy="5.5" r="1.4" fill="#000" opacity=".4"/>',
+  baguette: '<path d="M4 21l-1.5-1.5L16 6l1.5 1.5z"/><path d="M19 1l1 3 3 1-3 1-1 3-1-3-3-1 3-1z"/>',
+  tome: '<path d="M4 3h13a3 3 0 0 1 3 3v15H7a3 3 0 0 1-3-3z"/><path d="M7 18h13v3H7a1.5 1.5 0 0 1 0-3z" fill="#000" opacity=".35"/><path d="M12 6l1.2 2.6 2.8.4-2 2 .5 2.8-2.5-1.3-2.5 1.3.5-2.8-2-2 2.8-.4z" fill="#000" opacity=".45"/>',
+  bolt: '<circle cx="15" cy="9" r="6"/><path d="M2 22l8-8M4 17l5-4M7 22l4-6" stroke="currentColor" stroke-width="1.6"/>',
+  blink: '<circle cx="18" cy="6" r="4"/><circle cx="6" cy="18" r="4" opacity=".35"/><path d="M8 16l7-7" stroke="currentColor" stroke-width="1.5" stroke-dasharray="2 2"/>',
+  nova: '<circle cx="12" cy="12" r="3.5"/><path d="M12 1v5M12 18v5M1 12h5M18 12h5M4 4l3.5 3.5M16.5 16.5L20 20M4 20l3.5-3.5M16.5 7.5L20 4" stroke="currentColor" stroke-width="2"/>',
+  chain: '<path d="M14 1L5 13h6l-3 10 11-13h-6l3-9z"/>',
+  mshield: '<path d="M12 1.5l9 3v6.5c0 6-4 10.5-9 12-5-1.5-9-6-9-12V4.5z" opacity=".4"/><path d="M12 5l1.8 4 4.2.4-3.2 2.8 1 4.3L12 14.2l-3.8 2.3 1-4.3L6 9.4l4.2-.4z"/>',
+  meteor: '<circle cx="15" cy="15" r="6"/><path d="M1 1l10 10M5 1l7 7M1 5l7 7" stroke="currentColor" stroke-width="2"/>',
+  skull: '<path d="M12 2a9 9 0 0 0-9 9c0 3 1.5 5 3.5 6v4h11v-4c2-1 3.5-3 3.5-6a9 9 0 0 0-9-9z"/><circle cx="8.5" cy="11" r="2.2" fill="#000"/><circle cx="15.5" cy="11" r="2.2" fill="#000"/><path d="M10 18h1v3h-1zM13 18h1v3h-1z" fill="#000"/>',
+  quake: '<path d="M1 20h22v3H1z"/><path d="M12 2l3 8-3 2 2 6-6-8 3-2z"/><path d="M3 18l3-4M21 18l-3-4" stroke="currentColor" stroke-width="1.6"/>',
+  bomb: '<circle cx="10" cy="14" r="8"/><path d="M15 7l3-3" stroke="currentColor" stroke-width="2"/><path d="M19 1l1 2 2 1-2 1-1 2-1-2-2-1 2-1z"/>',
   lock: '<path d="M7 10V7a5 5 0 0 1 10 0v3h2v12H5V10zm2 0h6V7a3 3 0 0 0-6 0z"/>',
   gold: '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="6" fill="#000" opacity=".25"/>',
 };
@@ -64,7 +77,7 @@ function pixKey(item) {
   if (item.kind === 'consumable') cat = item.id;
   else if (item.kind === 'lore') cat = 'lore';
   else if (item.slot === 'weapon') cat = 'weapon:' + item.base;
-  else if (item.slot === 'offhand') cat = item.offType === 'quiver' ? 'offhand:quiver' : 'offhand:shield';
+  else if (item.slot === 'offhand') cat = 'offhand:' + (item.offType || 'shield');
   else if (item.slot === 'pocket') cat = 'pocket';
   else if (['head', 'chest'].includes(item.slot)) cat = item.slot + ':' + (item.name || '').split(' ')[0];
   else cat = item.slot;
@@ -96,6 +109,6 @@ export function pixIcon(key) {
 export function itemIconName(item) {
   if (item.kind === 'consumable') return item.id;
   if (item.slot === 'weapon') return item.base;
-  if (item.slot === 'offhand') return item.offType === 'quiver' ? 'quiver' : 'offhand';
+  if (item.slot === 'offhand') return item.offType === 'quiver' ? 'quiver' : item.offType === 'tome' ? 'tome' : 'offhand';
   return item.slot;
 }

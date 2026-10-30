@@ -28,6 +28,9 @@ ATTACKS = {
     'acolyte': {'attack': ('standard/spellcast.png', 64), 'thrust': ('standard/thrust.png', 64)},
     'goule': {'attack': ('standard/slash.png', 64)},
     'maelis': {'cast': ('standard/spellcast.png', 64)},
+    # mage : sex=male&body=Body_Color_light&head=Human_Male_light&hair=Bangsshort_dark brown&clothes=Longsleeve_charcoal
+    #        &legs=Pants_black&shoes=Basic_Boots_black&jacket=Frock_coat_purple&hat=Wizard_Hat_Base_purple&weapon=Simple_staff_simple
+    'mage': {'attack': ('standard/spellcast.png', 64)},
 }
 
 
