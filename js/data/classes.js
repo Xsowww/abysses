@@ -79,6 +79,11 @@ export const CLASSES = {
         name: 'Berserker',
         color: '#a8402c',
         desc: 'Offensive pure : vitesse, vol de vie et exécutions. Vous vivez en frappant.',
+        play: [
+          'Jauge de <b>Rage</b> : se remplit quand vous frappez ou êtes touché, se vide si vous restez inactif. Chaque point augmente dégâts, vitesse d’attaque et vol de vie.',
+          'La roulade devient un <b>Bond</b> : vous sautez et l’atterrissage frappe tout autour.',
+          'Spéciale à 50 de rage ou plus : <b>Fureur</b>, un tourbillon à 360° qui consomme toute la rage.',
+        ],
         tierReq: [0, 2, 4],
         talents: [
           { id: 'b_frenesie', name: 'Frénésie', tier: 0, max: 3, desc: (r) => `+${5 * r} % de vitesse d’attaque`, stats: (r) => ({ atkSpd: 5 * r }) },
@@ -92,6 +97,11 @@ export const CLASSES = {
         name: 'Gardien',
         color: '#4f7aa8',
         desc: 'Défense inébranlable : armure, blocage et représailles. Vous tenez la ligne.',
+        play: [
+          'Clic droit <b>maintenu</b> : garde au bouclier. −80 % de dégâts de face et renvoi des coups, mais chaque coup coûte de l’endurance (garde brisée à 0).',
+          'Lever la garde <b>juste avant l’impact</b> : <b>Parade</b> parfaite. Aucun dégât, l’ennemi est sonné et votre coup suivant est une <b>Riposte</b> (×2,5, critique).',
+          'Clic droit <b>tapé</b> : coup de bouclier qui étourdit.',
+        ],
         tierReq: [0, 2, 4],
         talents: [
           { id: 'g_rempart', name: 'Rempart', tier: 0, max: 3, desc: (r) => `+${8 * r} % d’armure`, stats: (r) => ({ armorPct: 8 * r }) },
@@ -133,6 +143,10 @@ export const CLASSES = {
         name: 'Tireur d’élite',
         color: '#b8964a',
         desc: 'Précision absolue : critiques dévastateurs et flèches qui traversent les rangs ennemis.',
+        play: [
+          'Maintenez l’attaque pour <b>bander l’arc</b> (vous ralentissez), relâchez pour tirer : plus la tension est forte, plus la flèche frappe fort.',
+          'Tir à pleine tension : <b>critique assuré</b>, traverse tout et <b>marque</b> la cible. Le tir plein suivant sur une cible marquée inflige +50 %.',
+        ],
         tierReq: [0, 2, 4],
         talents: [
           { id: 't_visee', name: 'Visée parfaite', tier: 0, max: 3, desc: (r) => `+${4 * r} % de chance de critique`, stats: (r) => ({ crit: 4 * r }) },
@@ -146,6 +160,11 @@ export const CLASSES = {
         name: 'Ombrelame',
         color: '#5a6a7a',
         desc: 'Venin et ombres : vos tirs empoisonnent, vous esquivez sans cesse et disparaissez à volonté.',
+        play: [
+          'Vous rangez l’arc : combat rapproché à la <b>dague</b>, chaque coup empoisonne.',
+          'Frapper <b>dans le dos</b> ou un ennemi qui ne vous a pas vu : ×1,8 et critique assuré.',
+          'La roulade devient un <b>Pas de l’ombre</b> : courte téléportation, le coup suivant est une embuscade. La spéciale lance une dague empoisonnée.',
+        ],
         tierReq: [0, 2, 4],
         talents: [
           { id: 'o_venin', name: 'Venin', tier: 0, max: 3, desc: (r) => `Vos tirs empoisonnent : ${25 * r} % des dégâts en plus sur 3 s`, stats: (r) => ({ poison: 25 * r }) },

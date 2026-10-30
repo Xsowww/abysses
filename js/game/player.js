@@ -33,6 +33,14 @@ export class Player {
   }
 
   get pd() { return this.game.pd; }
+  get spec() { return this.pd && this.pd.spec; }
+
+  // Jauge affichée sous l'endurance (rage, tension de l'arc…)
+  resource() {
+    if (this.spec === 'berserker') return { v: this.rage, max: 100, label: 'Rage', cls: 'rage' };
+    if (this.spec === 'tireur') return { v: this.charge * 100, max: 100, label: 'Tension', cls: 'charge' };
+    return null;
+  }
   get cls() { return CLASSES[this.pd.cls]; }
 
   resetCombat() {
@@ -48,6 +56,12 @@ export class Player {
     this.swing = null;
     this.buffs = [];
     this.channel = null;
+    // États propres aux spécialisations
+    this.rage = 0; this.rageIdle = 0;          // Berserker
+    this.guarding = false; this.guardT = 0;     // Gardien
+    this.specialHeld = 0;
+    this.charge = 0; this.charging = false;     // Tireur d'élite
+    this.marked = null;
     this.flash = 0;
     this.kbx = 0;
     this.kby = 0;
@@ -134,6 +148,9 @@ export class Player {
       if (b.id === 'oeil') { m.crit = 100; m.atkSpd += 30; }
       if (b.id === 'voile') { m.dmgPct += 50; }
     }
+    if (this.spec === 'berserker' && this.rage > 0) {
+      m.dmgPct += this.rage * 0.3; m.atkSpd += this.rage * 0.2; m.lifesteal += this.rage * 0.04;
+    }
     return m;
   }
 
@@ -145,7 +162,15 @@ export class Player {
     let d = w.dmg * mult * (1 + (this.stats.dmgPct + m.dmgPct) / 100) * rand(0.9, 1.1);
     if (target && target.hp / target.maxHp < 0.3 && this.stats.execute) d *= 1 + this.stats.execute / 100;
     if (target && (target.elite || target.boss) && this.stats.eliteDmg) d *= 1 + this.stats.eliteDmg / 100;
-    const crit = Math.random() * 100 < Math.max(this.stats.crit, m.crit);
+    let forceCrit = false;
+    if (this.hasBuff('riposte') && !this.dotHit) { d *= 2.5; forceCrit = true; this.buffs = this.buffs.filter((b) => b.id !== 'riposte'); }
+    if (this.spec === 'ombrelame' && target && !this.dotHit) {
+      const fromBehind = Math.abs(angleDiff(target.angle, Math.atan2(this.y - target.y, this.x - target.x))) > 1.75;
+      if (fromBehind || target.state === 'idle' || this.hasBuff('embuscade')) { d *= 1.8; forceCrit = true; this.lastBackstab = true; }
+      else this.lastBackstab = false;
+      if (this.hasBuff('embuscade')) this.buffs = this.buffs.filter((b) => b.id !== 'embuscade');
+    }
+    const crit = forceCrit || Math.random() * 100 < Math.max(this.stats.crit, m.crit);
     if (crit) d *= 1 + this.stats.critDmg / 100;
     return { amount: Math.max(1, Math.round(d)), crit };
   }
@@ -177,8 +202,11 @@ export class Player {
     this.flash = Math.max(0, this.flash - dt * 4);
     this.lowStaWarn -= dt;
     for (const k in this.skillCd) this.skillCd[k] -= dt;
+    if (this.guardBroken > 0) this.guardBroken -= dt;
     for (let i = this.buffs.length - 1; i >= 0; i--) { this.buffs[i].t -= dt; if (this.buffs[i].t <= 0) this.buffs.splice(i, 1); }
 
+    // Rage : retombe si l'on ne se bat plus
+    if (this.spec === 'berserker') { this.rageIdle += dt; if (this.rageIdle > 2.5) this.rage = Math.max(0, this.rage - 12 * dt); }
     const m = this.mods();
     this.staDelay -= dt;
     if (this.staDelay <= 0) this.stamina = Math.min(this.maxStamina, this.stamina + 34 * (1 + this.stats.staRegen / 100) * m.staMult * dt);
@@ -215,6 +243,8 @@ export class Player {
 
     let speed = this.cls.speed * (1 + this.stats.moveSpd / 100);
     if (this.carrying) speed *= 0.75;
+    if (this.guarding) speed *= 0.45;
+    if (this.charging) speed *= 0.55;
     if (this.whirl) { speed *= 0.7; this.updateWhirl(dt); }
     if (this.attackCd > 0 && !this.whirl) speed *= this.weapon().ranged ? 0.75 : 0.82;
     if (this.channel) speed = 0;
@@ -256,7 +286,13 @@ export class Player {
     // Roulade
     const rollCost = ROLL_COST * (1 - this.stats.rollCost / 100);
     if (input.wasPressed('roll') && this.carrying) { g.ui.toast('Le reliquaire est trop lourd pour rouler.', 'bad', 1); }
-    else if (input.wasPressed('roll') && this.useStamina(rollCost)) {
+    else if (input.wasPressed('roll') && (this.spec === 'berserker' || this.spec === 'ombrelame') && !this.guarding && this.useStamina(rollCost)) {
+      const a = ml ? Math.atan2(my, mx) : this.aim;
+      if (this.spec === 'berserker') this.leap(a); else this.shadowStep(a);
+      if (this.channel) g.cancelChannel('Mouvement');
+      return;
+    }
+    else if (input.wasPressed('roll') && !this.guarding && this.useStamina(rollCost)) {
       const a = ml ? Math.atan2(my, mx) : this.aim;
       this.roll = { t: 0, dur: 0.34, dx: Math.cos(a), dy: Math.sin(a) };
       this.invuln = Math.max(this.invuln, 0.28);
@@ -271,9 +307,55 @@ export class Player {
     if (this.whirl) return;
 
     const w = this.weapon();
-    // Attaque de base
-    if (input.isDown('attack') && this.attackCd <= 0 && g.scene.type === 'dungeon') {
-      if (this.useStamina(w.ranged ? ATTACK_COST * 0.6 : ATTACK_COST)) {
+    const inDungeon = g.scene.type === 'dungeon';
+    const spec = this.spec;
+    // ---- Gardien : clic droit maintenu = garde au bouclier ; tapé = coup de bouclier ----
+    if (spec === 'gardien' && inDungeon) {
+      if (input.isDown('special') && this.stamina > 4 && !(this.guardBroken > 0)) {
+        if (!this.guarding) { this.guarding = true; this.guardT = 0; this.specialHeld = 0; sfx('block'); }
+        this.guardT += dt;
+        this.specialHeld += dt;
+        this.staDelay = 0.4;
+      } else if (this.guarding) {
+        this.guarding = false;
+        if (this.specialHeld < 0.18 && this.specialCd <= 0 && this.useStamina(14)) {
+          this.specialCd = 1.2 * this.cdMult();
+          this.doSwing(this.aim, 46, 90, 1.2, 260, true);
+          for (const e of g.scene.enemies) if (!e.dead && !e.boss && dist(this.x, this.y, e.x, e.y) < 60 + e.r) e.stun = Math.max(e.stun, 0.8);
+        }
+        this.specialHeld = 0;
+      }
+    }
+    // ---- Tireur d'élite : maintenir pour bander l'arc, relâcher pour tirer ----
+    if (spec === 'tireur' && w.ranged && inDungeon) {
+      if (input.isDown('attack') && this.attackCd <= 0) {
+        if (!this.charging) { this.charging = true; this.charge = 0; }
+        this.charge = Math.min(1, this.charge + dt * this.attackSpeedMult() / 0.9);
+        // pose : la corde reste tendue tant que l'on maintient
+        this.atk = { anim: 'attack', from: 1 / 13, to: 8 / 13, t: this.charge * 0.399, dur: 0.4, hold: true };
+        if (this.charge >= 1 && !this.chargeFull) { this.chargeFull = true; sfx('ui'); g.fx.ring(this.x, this.y, '#e0ae6a', 30, 0.25); }
+      } else if (this.charging) {
+        this.charging = false;
+        const c = this.charge; this.charge = 0; this.chargeFull = false;
+        if (this.useStamina(ATTACK_COST * (0.6 + c))) {
+          this.attackCd = 0.18;
+          const full = c >= 0.98;
+          this.shoot(this.aim, 0.5 + 1.8 * c, { pierce: full ? 99 : (w.pierce || 0) + this.stats.pierce, heavy: full, speed: 1 + c * 0.4, full });
+          if (full) g.fx.shake(3);
+          if (this.channel) g.cancelChannel('Attaque');
+        }
+      }
+    }
+    // ---- Attaque de base ----
+    else if (input.isDown('attack') && this.attackCd <= 0 && inDungeon && !this.guarding) {
+      if (spec === 'ombrelame') {
+        // Dagues : coups rapides au corps à corps (le dos des ennemis est leur point faible)
+        if (this.useStamina(ATTACK_COST * 0.7)) {
+          this.attackCd = 0.3 / this.attackSpeedMult();
+          this.doSwing(this.aim, 56, 110, 0.75, 70, false);
+          if (this.channel) g.cancelChannel('Attaque');
+        } else this.attackCd = 0.15;
+      } else if (this.useStamina(w.ranged ? ATTACK_COST * 0.6 : ATTACK_COST)) {
         this.attackCd = w.cd / this.attackSpeedMult();
         if (w.ranged) this.shoot(this.aim, 1, { pierce: (w.pierce || 0) + this.stats.pierce });
         else this.doSwing(this.aim, w.range, w.arc, 1, w.kb, false);
@@ -281,10 +363,25 @@ export class Player {
       } else this.attackCd = 0.15;
     }
 
-    // Attaque spéciale de classe
-    if (input.wasPressed('special') && this.specialCd <= 0 && g.scene.type === 'dungeon') {
+    // ---- Attaque spéciale de classe (selon la voie) ----
+    if (spec !== 'gardien' && input.wasPressed('special') && this.specialCd <= 0 && inDungeon) {
       const sp = this.cls.special;
-      if (this.useStamina(sp.stamina)) {
+      if (spec === 'berserker' && this.rage >= 50) {
+        // Fureur : toute la rage part dans un tourbillon d'acier
+        const k = this.rage / 100;
+        this.rage = 0;
+        this.specialCd = sp.cd * this.cdMult();
+        this.attackCd = Math.max(this.attackCd, 0.5);
+        this.doSwing(this.aim, w.range * 1.5, 360, 1.5 + 1.5 * k, w.kb * 2.4, true);
+        g.fx.ring(this.x, this.y, '#c0352b', w.range * 1.5, 0.35);
+        g.fx.shake(8); sfx('bossRoar');
+      } else if (spec === 'ombrelame') {
+        if (this.useStamina(16)) {
+          this.specialCd = 1.4 * this.cdMult();
+          this.attackCd = Math.max(this.attackCd, 0.3);
+          this.shoot(this.aim, 1.6, { pierce: 0, dagger: true, speed: 1.2, poison: 80 });
+        }
+      } else if (this.useStamina(sp.stamina)) {
         this.specialCd = sp.cd * this.cdMult();
         this.attackCd = Math.max(this.attackCd, 0.45);
         if (w.ranged) {
@@ -310,7 +407,7 @@ export class Player {
       vx: Math.cos(ang) * sp, vy: Math.sin(ang) * sp,
       r: o.heavy ? 6 : 4, team: 'player', mult, kb: w.kb * (o.heavy ? 2 : 1),
       pierce: o.pierce || 0, hit: new Set(), life: (w.range || 500) / sp * (o.heavy ? 1.3 : 1),
-      color: o.heavy ? '#e0c890' : '#d6cdb8', kind: o.heavy ? 'heavyArrow' : 'arrow', heavy: !!o.heavy,
+      color: o.heavy ? '#e0c890' : o.dagger ? '#9fb0a0' : '#d6cdb8', kind: o.heavy ? 'heavyArrow' : 'arrow', heavy: !!o.heavy, full: !!o.full, poison: o.poison || 0,
     });
     this.bowDraw = 0;
     sfx(o.heavy ? 'heavy' : 'arrow');
@@ -340,6 +437,45 @@ export class Player {
     if (r.t >= r.dur) { this.roll = null; this.vx = r.dx * 200; this.vy = r.dy * 200; }
   }
 
+  // Berserker : bond vers une direction, atterrissage qui frappe tout autour
+  leap(a) {
+    const g = this.game;
+    this.dash = { t: 0, dur: 0.32, dx: Math.cos(a), dy: Math.sin(a), hit: new Set(), speed: 560, hits: false, color: '#5a1a12', leap: true,
+      onEnd: () => {
+        const w = this.weapon();
+        const n = g.meleeFromPlayer(this.x, this.y, a, 78, 360, 0.7, 220, 0.4);
+        g.fx.ring(this.x, this.y, '#8a2a1e', 78, 0.3);
+        g.fx.burst(this.x, this.y + 6, '#4a4038', 16, 160, 0.5, 4);
+        g.fx.shake(n ? 6 : 3); sfx('heavy');
+        if (n) this.gainRage(6 * n);
+      } };
+    this.invuln = Math.max(this.invuln, 0.34);
+    sfx('roll');
+  }
+
+  // Ombrelame : pas de l'ombre (téléportation courte), le coup suivant est une embuscade
+  shadowStep(a) {
+    const g = this.game, map = g.scene.map;
+    const ox = this.x, oy = this.y;
+    let d = 0;
+    for (let k = 8; k <= 150; k += 8) { const x = ox + Math.cos(a) * k, y = oy + Math.sin(a) * k; if (map.collides(x, y, this.r - 2)) break; d = k; }
+    g.fx.burst(ox, oy, '#2a2e36', 18, 120, 0.6, 5);
+    this.x = ox + Math.cos(a) * d; this.y = oy + Math.sin(a) * d;
+    this.ghosts.push({ x: ox, y: oy, a: this.angle, t: 0.3 });
+    g.fx.burst(this.x, this.y, '#3a4250', 14, 100, 0.5, 4);
+    this.invuln = Math.max(this.invuln, 0.3);
+    this.buffs = this.buffs.filter((b) => b.id !== 'embuscade');
+    this.buffs.push({ id: 'embuscade', t: 1.6, max: 1.6 });
+    for (const e of g.scene.enemies) if (!e.dead && !e.boss && dist(ox, oy, e.x, e.y) < 60) e.cancelAttack();
+    sfx('cast');
+  }
+
+  gainRage(n) {
+    if (this.spec !== 'berserker') return;
+    this.rage = Math.min(100, this.rage + n);
+    this.rageIdle = 0;
+  }
+
   updateDash(dt) {
     const d = this.dash;
     const g = this.game;
@@ -358,7 +494,7 @@ export class Player {
         }
       }
     }
-    if (d.t >= d.dur || blocked) { this.dash = null; if (d.hits) g.fx.shake(4); }
+    if (d.t >= d.dur || blocked) { this.dash = null; if (d.hits) g.fx.shake(4); if (d.onEnd) d.onEnd(); }
   }
 
   updateWhirl(dt) {
@@ -453,8 +589,8 @@ export class Player {
   // Pièces visibles (recalculées seulement quand l'équipement change)
   look() {
     const eq = this.pd.equipment;
-    const sig = this.pd.cls + Object.keys(eq).map((k) => (eq[k] ? eq[k].uid : '-')).join('|');
-    if (sig !== this._lookSig) { this._lookSig = sig; this._look = lookFor(this.pd.cls, eq); }
+    const sig = this.pd.cls + (this.pd.spec || '') + Object.keys(eq).map((k) => (eq[k] ? eq[k].uid : '-')).join('|');
+    if (sig !== this._lookSig) { this._lookSig = sig; this._look = lookFor(this.pd.cls, eq, this.pd.spec); }
     return this._look;
   }
 

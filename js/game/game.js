@@ -483,7 +483,14 @@ export class Game {
           if (dist(e.x, e.y, pr.x, pr.y) > e.r + pr.r) continue;
           pr.hit.add(e);
           const a = Math.atan2(pr.vy, pr.vx);
-          this.damageEnemy(e, p.rollDamage(pr.mult, e), a, e.boss ? pr.kb * 0.15 : pr.kb);
+          let dm = p.rollDamage(pr.mult, e);
+          if (pr.full) {
+            // Tir pleinement bandé : critique assuré, +50 % si la cible était marquée, puis on la marque
+            if (!dm.crit) dm = { amount: Math.round(dm.amount * (1 + p.stats.critDmg / 100)), crit: true };
+            if (p.marked === e) { dm.amount = Math.round(dm.amount * 1.5); this.fx.text(e.x, e.y - e.r - 22, 'Marque !', '#e0ae6a', 14); }
+            p.marked = e;
+          }
+          this.damageEnemy(e, dm, a, e.boss ? pr.kb * 0.15 : pr.kb, pr.poison);
           if (pr.heavy) this.hitstop(0.03);
           if (pr.pierce-- <= 0) { dead = true; break; }
         }
@@ -552,7 +559,7 @@ export class Game {
     return hits;
   }
 
-  damageEnemy(e, dm, kbAng, kbForce) {
+  damageEnemy(e, dm, kbAng, kbForce, poisonPct = 0) {
     if (e.dead) return;
     const p = this.player;
     e.hp -= dm.amount;
@@ -561,7 +568,12 @@ export class Game {
       if (e.hp <= 0) this.killEnemy(e);
       return;
     }
-    if (p.stats.poison > 0) e.poison = { dps: (dm.amount * p.stats.poison / 100) / 3, t: 3, tick: 0.5 };
+    // Ombrelame : chaque coup de dague empoisonne
+    let pois = p.stats.poison + poisonPct;
+    if (p.spec === 'ombrelame') pois += 30;
+    if (pois > 0) e.poison = { dps: (dm.amount * pois / 100) / 3, t: 3, tick: 0.5 };
+    if (p.lastBackstab && p.spec === 'ombrelame') { p.lastBackstab = false; this.fx.text(e.x, e.y - e.r - 22, 'Dans le dos !', '#9fb0a0', 13); }
+    p.gainRage(dm.crit ? 7 : 5);
     e.flash = 1;
     e.squash = 1;
     if (kbForce) { e.kbx += Math.cos(kbAng) * kbForce; e.kby += Math.sin(kbAng) * kbForce; }
@@ -690,6 +702,40 @@ export class Game {
     const p = this.player;
     if (p.dead || p.invuln > 0) return;
     const m = p.mods();
+    // Gardien : garde levée face à l'attaque
+    if (p.guarding && source) {
+      const a = Math.atan2(source.y - p.y, source.x - p.x);
+      if (Math.abs(angleDiff(p.aim, a)) < 1.3) {
+        if (p.guardT < 0.22) {
+          // Parade parfaite : aucun dégât, l'ennemi est sonné, la riposte est prête
+          this.fx.text(p.x, p.y - 28, 'Parade !', '#e0ae6a', 16, { bold: true });
+          this.fx.ring(p.x, p.y, '#e0ae6a', 40, 0.3);
+          this.fx.burst(p.x + Math.cos(a) * 14, p.y + Math.sin(a) * 14, '#ffd98a', 12, 180, 0.3, 3);
+          if (!source.dead && source.cancelAttack) { source.cancelAttack(); source.stun = Math.max(source.stun || 0, source.boss ? 0.5 : 1.5); }
+          p.buffs = p.buffs.filter((b) => b.id !== 'riposte');
+          p.buffs.push({ id: 'riposte', t: 2, max: 2 });
+          sfx('block'); this.hitstop(0.08);
+          p.invuln = 0.25;
+          return;
+        }
+        const red = Math.min(0.75, p.armor / (p.armor + 40 + 12 * (source.level || 1)));
+        const dmg = Math.max(1, Math.round(amount * (1 - red) * 0.2));
+        p.stamina -= amount * 0.6;
+        p.hp -= dmg;
+        p.invuln = 0.2;
+        const th = (p.stats.thorns + m.thorns) * 2 + 20;
+        if (!source.dead) this.damageEnemy(source, { amount: Math.max(1, Math.round(amount * th / 100)), crit: false }, a, 0);
+        this.fx.text(p.x, p.y - 26, '-' + dmg, '#9ec5ff', 14);
+        this.fx.burst(p.x + Math.cos(a) * 14, p.y + Math.sin(a) * 14, '#9ec5ff', 6, 120, 0.3, 3);
+        sfx('block');
+        if (p.stamina <= 0) {
+          p.stamina = 0; p.guarding = false; p.guardBroken = 1.2;
+          this.fx.text(p.x, p.y - 40, 'Garde brisée', '#ff6a50', 14);
+        }
+        if (p.hp <= 0) this.playerDeath();
+        return;
+      }
+    }
     // Blocage (bouclier)
     if (p.pd.equipment.offhand && chance(p.stats.block / 100)) {
       this.fx.text(p.x, p.y - 26, 'Bloqué', '#9ec5ff', 14);
@@ -706,6 +752,7 @@ export class Game {
     p.hp -= dmg;
     p.flash = 1;
     p.invuln = 0.35;
+    p.gainRage(10);
     if (source) {
       const a = Math.atan2(p.y - source.y, p.x - source.x);
       p.kbx += Math.cos(a) * 180;

@@ -54,12 +54,13 @@ const ATTACKS = {
   arming: ['slash_128', 'backslash_128'], longsword: ['slash_oversize', 'slash_reverse_oversize'],
   waraxe: ['slash_oversize', 'slash_oversize'], mace: ['slash_oversize', 'slash_oversize'], flail: ['slash_oversize', 'slash_oversize'],
   recurve: ['shoot', 'shoot'], great: ['shoot', 'shoot'], crossbow: ['thrust', 'thrust'],
+  dagger: ['slash', 'thrust'],
 };
 // Pose de base pour les calques qui n'ont pas l'animation d'attaque de l'arme
 const FALLBACK = { slash_oversize: 'slash', slash_reverse_oversize: 'slash', slash_128: 'slash', backslash_128: '1h_backslash', thrust_oversize: 'thrust' };
 
 // Liste ordonnée des pièces visibles pour une classe et un équipement.
-export function lookFor(cls, eq) {
+export function lookFor(cls, eq, spec) {
   const out = ['body', 'head'];
   const piece = (slot, fallback) => {
     const it = eq[slot];
@@ -75,7 +76,9 @@ export function lookFor(cls, eq) {
   if (off && off.offType === 'quiver') out.push('quiver');
   else if (off && off.offType === 'shield') out.push((SHIELDS[baseWord(off)] || SHIELDS.Bouclier)[tierOf(off)]);
   const w = eq.weapon;
-  if (w && WEAPON[w.base]) out.push(WEAPON[w.base](tierOf(w)));
+  // L'Ombrelame range son arc et se bat à la dague
+  if (spec === 'ombrelame') { const i = out.indexOf('quiver'); if (i >= 0) out.splice(i, 1); out.push('dagger'); }
+  else if (w && WEAPON[w.base]) out.push(WEAPON[w.base](tierOf(w)));
   return out;
 }
 

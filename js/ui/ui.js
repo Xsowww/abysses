@@ -814,11 +814,12 @@ export class UI {
     let spec = '';
     if (pd.spec) {
       const S = C.specs[pd.spec];
-      spec = `<h3>Voie du ${S.name}</h3><p class="hint" style="margin-top:-4px">${S.desc}</p>${this.treeHTML(S)}`;
+      spec = `<h3>Voie du ${S.name}</h3><p class="hint" style="margin-top:-4px">${S.desc}</p>${S.play ? `<ul class="spec-play">${S.play.map((x) => `<li>${x}</li>`).join('')}</ul>` : ''}${this.treeHTML(S)}`;
     } else {
       const can = pd.level >= SPEC_LEVEL;
       spec = `<h3>Spécialisation</h3><p class="hint" style="margin-top:-4px">${can ? 'Choisissez votre voie. Ce choix pourra être défait contre de l’or, au village.' : `Une voie s’ouvrira au niveau ${SPEC_LEVEL}.`}</p>
-        <div class="spec-cards">${Object.entries(C.specs).map(([id, S]) => `<div class="spec-card ${can ? 'st-avail' : 'locked st-locked'}" style="--c:${S.color}"><div class="spec-name">${S.name}</div><div class="dim" style="font-style:italic">${S.desc}</div>
+        <div class="spec-cards">${Object.entries(C.specs).map(([id, S]) => `<div class="spec-card ${can ? 'st-avail' : 'locked st-locked'}" style="--c:${S.color}"><div class="spec-name">${S.name}</div><div class="dim">${S.desc}</div>
+          ${S.play ? `<ul class="spec-play">${S.play.map((x) => `<li>${x}</li>`).join('')}</ul>` : ''}
           <ul>${S.talents.map((t) => `<li>${t.name}${t.skill ? ' <span class="warn">(compétence)</span>' : ''}</li>`).join('')}</ul>
           ${can ? `<button class="btn main small" data-action="spec" data-arg="${id}">Embrasser cette voie</button>` : `<div class="dim">${icon('lock')} Niveau ${SPEC_LEVEL}</div>`}</div>`).join('')}</div>`;
     }
@@ -1143,6 +1144,7 @@ export class UI {
         <div class="bars">
           <div class="vbar hp"><div class="track"><div class="trail"></div><div class="fill"></div></div><span class="val"></span></div>
           <div class="vbar sta"><div class="track"><div class="trail"></div><div class="fill"></div></div></div>
+          <div class="vbar res hidden"><div class="track"><div class="fill"></div></div><span class="val"></span></div>
           <div class="xpbar" title="Expérience"><div class="ring"></div></div>
           <div id="buffs"></div>
         </div>
@@ -1159,6 +1161,7 @@ export class UI {
       lvlNum: $('.lvl .num', h), lvlRing: $('.xpbar .ring', h),
       hpBar: $('.vbar.hp', h), hpFill: $('.vbar.hp .fill', h), hpTrail: $('.vbar.hp .trail', h), hpText: $('.vbar.hp .val', h),
       staBar: $('.vbar.sta', h), staFill: $('.vbar.sta .fill', h), staTrail: $('.vbar.sta .trail', h),
+      resBar: $('.vbar.res', h), resFill: $('.vbar.res .fill', h), resText: $('.vbar.res .val', h),
       buffs: $('#buffs'), tracker: $('#tracker'),
       boss: $('#boss-bar'), bossName: $('.bb-name', h), bossFill: $('.bb-fill', h), bossTrail: $('.bb-trail', h),
       channel: $('#channel'), chLabel: $('.ch-label', h), chFill: $('.ch-fill', h), prompt: $('#prompt'),
@@ -1229,6 +1232,11 @@ export class UI {
     const staPct = (100 * p.stamina / p.maxStamina).toFixed(1) + '%';
     W(h.staFill, staPct);
     W(h.staTrail, staPct);
+    // Jauge de spécialisation (rage du Berserker, tension de l'arc du Tireur)
+    const res = p.resource();
+    const resCls = res ? 'vbar res r-' + res.cls + (res.v >= res.max * 0.5 ? ' ready' : '') : 'vbar res hidden';
+    if (h.resBar._c !== resCls) { h.resBar._c = resCls; h.resBar.className = resCls; }
+    if (res) { W(h.resFill, (100 * res.v / res.max).toFixed(1) + '%'); T(h.resText, res.label); }
     const need = xpForLevel(pd.level);
     T(h.lvlNum, String(pd.level));
     { const xv = (100 * pd.xp / need).toFixed(1) + '%'; if (h.lvlRing._x !== xv) { h.lvlRing._x = xv; h.lvlRing.style.setProperty('--xp', xv); } }
@@ -1251,7 +1259,7 @@ export class UI {
     }
 
     if (g.scene.mission) { this._misT = (this._misT || 0) - dt; if (this._misT <= 0) { this._misT = 0.5; this.refreshTracker(); } }
-    const iconFor = { cri: 'shout', dechainement: 'rage', murdefer: 'wall', oeil: 'eye', voile: 'veil' };
+    const iconFor = { cri: 'shout', dechainement: 'rage', murdefer: 'wall', oeil: 'eye', voile: 'veil', riposte: 'special', embuscade: 'veil' };
     const bHtml = p.buffs.map((b) => `<div class="buff b-${b.id}">${icon(iconFor[b.id] || 'special')}<span>${Math.ceil(b.t)}</span></div>`).join('');
     if (h.buffs._last !== bHtml) { h.buffs.innerHTML = bHtml; h.buffs._last = bHtml; }
 

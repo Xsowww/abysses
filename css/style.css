@@ -776,3 +776,19 @@ input[type=range] { accent-color: #b9803f; }
 .tr-q.mission b { color: var(--st-avail); }
 .tr-q.mission.ready b { color: var(--st-max); }
 .tr-q.mission.failed b, .tr-q.mission.failed div { color: var(--st-poor); }
+
+/* ---- Jauge de spécialisation (rage / tension) ---- */
+.vbar.res { box-sizing: content-box; height: 12px; border-style: solid; border-color: transparent; border-width: 6px 40px 8px 14px; border-image: url('../assets/ui/bar_frame.png') 3 20 4 7 / 6px 40px 8px 14px / 0 stretch; image-rendering: pixelated; margin-top: -2px; }
+.vbar.res.hidden { display: none; }
+.vbar.res .fill { box-shadow: inset 0 2px 0 rgba(255, 255, 255, 0.25), inset 0 -2px 0 rgba(0, 0, 0, 0.35); }
+.vbar.res.r-rage .fill { background: #8a2a1e; }
+.vbar.res.r-rage.ready .fill { background: #c4402a; animation: pulse 0.9s steps(2) infinite; }
+.vbar.res.r-charge .fill { background: #b08a4a; }
+.vbar.res.r-charge.ready .fill { background: #e0ae6a; }
+.vbar.res .val { font-size: 10px; color: var(--bone); letter-spacing: 1px; }
+.buff.b-riposte { filter: none; outline: 2px solid #e0ae6a; }
+.buff.b-embuscade { outline: 2px solid #6a7a8a; }
+.spec-play { margin: 6px 0 10px; padding: 0; list-style: none; font-size: 13px; color: var(--bone); }
+.spec-play li { position: relative; padding-left: 14px; margin: 4px 0; line-height: 1.35; }
+.spec-play li::before { content: '◆'; position: absolute; left: 0; color: var(--gold); font-size: 9px; top: 3px; }
+.spec-play b { color: var(--gold); font-weight: 600; }

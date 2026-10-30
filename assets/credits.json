@@ -328,6 +328,12 @@
     "url": "https://github.com/ElizaWy/LPC/tree/main/Characters/Props/Sword%2001%20-%20Arming%20Sword"
    },
    {
+    "what": "weapon/sword/dagger/walk",
+    "authors": "bluecarrot16, Johannes Sjölund (wulax), Matthew Krohn (makrohn)",
+    "license": "OGA-BY 3.0, CC-BY-SA 3.0, GPL 3.0",
+    "url": "https://opengameart.org/content/lpc-medieval-fantasy-character-sprites"
+   },
+   {
     "what": "weapon/sword/longsword/walk",
     "authors": "Johannes Sjölund (wulax), bluecarrot16",
     "license": "OGA-BY 3.0, CC-BY-SA 3.0",
