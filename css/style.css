@@ -836,3 +836,63 @@ body:has(#channel:not(.hidden)) #subtitle { bottom: 222px; }
 .slot > span.req { display: block; width: auto; height: auto; left: 4px; top: 2px; font-size: 12px; background: rgba(0, 0, 0, 0.7); padding: 0 3px; line-height: 14px; }
 body:has(#boss-bar:not(.hidden)) #channel { bottom: 190px; }
 body:has(#boss-bar:not(.hidden)):has(#channel:not(.hidden)) #subtitle { bottom: 250px; }
+/* Glisser-déposer */
+.drag-ghost { position: fixed; left: 0; top: 0; width: 52px; height: 52px; z-index: 100; pointer-events: none; display: grid; place-items: center; opacity: .9; filter: drop-shadow(0 4px 6px #000); }
+.drag-ghost .pix { width: 44px; }
+body.dragging, body.dragging * { cursor: grabbing !important; }
+.slot.drag-src { opacity: .35; }
+.slot.drop-over { outline: 2px solid var(--gold); outline-offset: -2px; background-color: rgba(224, 174, 106, 0.12); }
+body.drop-ground .drag-ghost { opacity: .6; filter: drop-shadow(0 0 6px #c4493a) grayscale(.4); }
+body.drop-ground .drag-ghost::after { content: '⤓'; position: absolute; right: -6px; bottom: -8px; font-size: 18px; color: #ff8070; text-shadow: 0 1px 2px #000; }
+
+/* ===================== SUIVI DES QUÊTES : 4 familles ===================== */
+#tracker { top: 258px; right: 14px; width: 250px; max-width: 250px; text-align: left; }
+.trs { position: relative; margin-bottom: 8px; padding: 5px 9px 3px 11px; background: linear-gradient(90deg, rgba(0, 0, 0, 0.6), rgba(0, 0, 0, 0.35)); border-left: 3px solid var(--tc); }
+.trs h4 { margin: 0 0 3px; font: 600 11px var(--fell); letter-spacing: .14em; text-transform: uppercase; color: var(--tc); }
+.trs .tr-q { margin-bottom: 5px; }
+.trs .tr-q b { font-size: 14px; color: var(--bone); font-weight: 500; }
+.trs .tr-q div { font-size: 12.5px; color: var(--ash); }
+.trs .tr-q.ready b, .trs .tr-q.ready div { color: var(--st-max); }
+.trs .tr-q.failed b, .trs .tr-q.failed div { color: var(--st-poor); }
+.tr-more { font-size: 12px; color: var(--ash); }
+.trs.t-run { --tc: #c8bfae; }
+.trs.t-floor { --tc: #f08a3a; }
+.trs.t-story { --tc: #e0ae6a; }
+.trs.t-side { --tc: #9fb4c8; }
+.trs.t-contract, .jfam.t-contract, .qopt.t-contract { --tc: #b48cff; }
+.jfam.t-story, .qopt.t-story { --tc: #e0ae6a; }
+.jfam.t-side, .qopt.t-side { --tc: #9fb4c8; }
+.jfams { display: flex; flex-direction: column; gap: 10px; }
+.jfam { border-left: 3px solid var(--tc); padding: 2px 0 2px 12px; }
+.jfam > h3 { color: var(--tc); margin-top: 4px; }
+.qopt { border-left: 3px solid var(--tc) !important; }
+.qopt i { display: block; font-style: normal; font-size: 11px; letter-spacing: .14em; text-transform: uppercase; color: var(--tc); margin-bottom: 1px; }
+/* Collection d'ensembles (journal) */
+.set-coll { display: flex; flex-direction: column; gap: 8px; }
+.sc-set { padding: 6px 10px; background: rgba(0, 0, 0, 0.3); border-left: 3px solid var(--st-off); }
+.sc-set.st-partial { border-left-color: var(--st-part); }
+.sc-set.st-max { border-left-color: var(--st-max); }
+.sc-head { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 4px; }
+.sc-pieces { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; }
+.sc-piece { padding: 3px 5px; font-size: 12px; background: rgba(255, 255, 255, 0.03); border: 1px solid rgba(255, 255, 255, 0.06); }
+.sc-piece b { display: block; font-weight: 500; color: var(--ash); }
+.sc-piece span { color: var(--muted); font-size: 11px; }
+.sc-piece.own b { color: var(--st-part); }
+.sc-piece.on b { color: var(--st-max); }
+.sc-piece.on { border-color: rgba(224, 174, 106, 0.4); }
+.tt-dup { color: #9fb4c8; font-size: 13px; margin-top: 4px; }
+/* Menu d'actions d'un objet (collé à sa case) */
+.item-menu { position: fixed; z-index: 60; display: flex; flex-direction: column; gap: 4px; min-width: 150px; padding: 8px; border: 12px solid transparent; border-image: url('../assets/ui/tooltip.png') 18 fill / 36px / 0 round; image-rendering: pixelated; }
+.item-menu .im-name { font-size: 13px; font-weight: 600; margin: -2px 0 4px; max-width: 220px; }
+.item-menu .btn { width: 100%; text-align: left; }
+/* Journal : onglets internes */
+.jtabs { display: flex; gap: 6px; margin-bottom: 12px; border-bottom: 1px solid rgba(255, 255, 255, 0.08); padding-bottom: 8px; }
+.jtab { background: none; border: 0; color: var(--ash); font: 500 14px var(--fell); padding: 4px 12px; cursor: pointer; border-bottom: 2px solid transparent; }
+.jtab:hover { color: var(--bone); }
+.jtab.on { color: var(--gold); border-bottom-color: var(--gold); }
+.lore-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 6px; }
+.lore-unk { display: grid; place-items: center; height: 40px; color: var(--muted); background: rgba(0, 0, 0, 0.3); border: 1px dashed rgba(255, 255, 255, 0.08); }
+/* Suivi : un peu plus bas que « Tab · carte », la descente mise en avant */
+#tracker { top: 280px; }
+.trs.t-run b { color: var(--bone); font-size: 15px; }
+.trs.t-run .tr-q div { color: var(--bone2); }

@@ -1010,6 +1010,7 @@ export class Game {
       const dd = dist(p.x, p.y, d.x, d.y);
       // Aimantation de l'or
       if (d.gold && dd < 90) { d.x += (p.x - d.x) * Math.min(1, dt * 8); d.y += (p.y - d.y) * Math.min(1, dt * 8); }
+      if (d.dropped) { if (dd > 70) d.dropped = false; continue; } // jeté par le joueur : pas repris tout de suite
       if (dd > p.r + 16) continue;
       if (d.gold) {
         if (s.type === 'dungeon') this.pd.runGold += d.gold; else this.pd.gold += d.gold;
@@ -1034,6 +1035,19 @@ export class Game {
         this.ui.toast('Inventaire plein !', 'bad', 1.5);
       }
     }
+  }
+
+  // Jeter un objet au sol (glisser hors du panneau, ou bouton « Jeter »)
+  dropFromInventory(ref) {
+    const pd = this.pd, p = this.player;
+    if (ref.c === 'equip' && ref.i === 'pocket' && pd.pocket.some((x) => x)) { this.ui.toast('Videz d’abord votre poche sécurisée.', 'bad', 2); sfx('error'); return; }
+    const it = Inv.removeAt(pd, ref);
+    if (!it) return;
+    const a = rand(0, TAU);
+    this.scene.drops.push({ x: p.x + Math.cos(a) * 18, y: p.y + Math.sin(a) * 18, vx: Math.cos(a) * 90, vy: Math.sin(a) * 90, item: it, t: 0, z: 0, vz: 120, dropped: true });
+    sfx('pickup');
+    p.recalc();
+    this.save();
   }
 
   // ---------------- INTERACTIONS ----------------

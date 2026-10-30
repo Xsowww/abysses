@@ -235,3 +235,38 @@ export function allItems(pd) {
   for (const arr of [pd.inventory, pd.pocket, pd.stash]) for (const it of arr || []) if (it && it.kind === 'equip') out.push(it);
   return out;
 }
+
+// Glisser-déposer : déplace l'objet de « from » vers la case « to » (échange si occupée, empile les consommables).
+// Les références sont { c: 'inv' | 'pocket' | 'stash' | 'equip', i }. Renvoie un message d'erreur ou null.
+export function moveRef(pd, from, to) {
+  if (from.c === to.c && from.i === to.i) return null;
+  const item = getItem(pd, from);
+  if (!item) return null;
+  // vers un emplacement d'équipement
+  if (to.c === 'equip') {
+    if (item.kind !== 'equip' || item.slot !== to.i) return 'Mauvais emplacement.';
+    if (from.c === 'equip') return null;
+    return equip(pd, from);
+  }
+  const dst = container(pd, to.c);
+  if (!dst) return null;
+  if (to.c === 'pocket' && to.i >= pocketSize(pd)) return 'Emplacement verrouillé.';
+  const target = dst[to.i] || null;
+  // depuis l'équipement : on retire la pièce vers cette case (vide), sinon on équipe la cible si elle convient
+  if (from.c === 'equip') {
+    if (from.i === 'pocket' && pd.pocket.some((x) => x)) return 'Videz d’abord votre poche sécurisée.';
+    if (!target) { dst[to.i] = item; pd.equipment[from.i] = null; return null; }
+    if (target.kind === 'equip' && target.slot === from.i) return equip(pd, to);
+    return unequip(pd, from.i);
+  }
+  // empilement de consommables identiques
+  if (target && item.kind === 'consumable' && target.kind === 'consumable' && target.id === item.id && !!target.found === !!item.found) {
+    const max = CONSUMABLES[item.id].stack;
+    const n = Math.min(max - target.qty, item.qty);
+    if (n > 0) { target.qty += n; item.qty -= n; if (item.qty <= 0) setItem(pd, from, null); return null; }
+  }
+  // échange (ou simple déplacement si la case est vide)
+  setItem(pd, to, item);
+  setItem(pd, from, target);
+  return null;
+}

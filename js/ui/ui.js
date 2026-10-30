@@ -78,13 +78,67 @@ export class UI {
       const a = e.target.closest('[data-action]');
       if (a && !a.disabled) { e.preventDefault(); this.action(a.dataset.action, a.dataset.arg, e, a); return; }
       const r = e.target.closest('[data-ref]');
+      if (r && this._noClick) return;
       if (r) {
         if (e.shiftKey) { this.quickPocket(r.dataset.ref); return; }
-        this.selected = r.dataset.ref;
-        this.confirmDestroy = null;
+        const same = this.selected === r.dataset.ref;
+        this.selected = same || !this.refItem(r.dataset.ref) ? null : r.dataset.ref;
         sfx('ui');
         this.refresh();
+      } else if (this.selected && !e.target.closest('.item-menu')) { this.selected = null; this.refresh(); }
+    });
+    // ---- Glisser-déposer : entre les cases, ou hors du panneau pour jeter au sol ----
+    root.addEventListener('mousedown', (e) => {
+      if (e.button !== 0 || e.shiftKey) return;
+      const r = e.target.closest('.slot[data-ref]');
+      if (!r || !this.refItem(r.dataset.ref) || r.dataset.ref.startsWith('shop') || r.dataset.ref.startsWith('cons')) return;
+      this.drag = { ref: r.dataset.ref, x: e.clientX, y: e.clientY, on: false, src: r };
+    });
+    root.addEventListener('mousemove', (e) => {
+      const d = this.drag;
+      if (!d) return;
+      if (!d.on && Math.hypot(e.clientX - d.x, e.clientY - d.y) > 6) {
+        d.on = true;
+        this.hideTip();
+        d.ghost = document.createElement('div');
+        d.ghost.className = 'drag-ghost';
+        d.ghost.innerHTML = d.src.querySelector('span').innerHTML;
+        document.body.appendChild(d.ghost);
+        d.src.classList.add('drag-src');
+        document.body.classList.add('dragging');
       }
+      if (d.on) {
+        d.ghost.style.transform = `translate(${e.clientX - 26}px, ${e.clientY - 26}px)`;
+        const over = document.elementFromPoint(e.clientX, e.clientY);
+        const t = over && over.closest('.slot[data-ref]');
+        document.querySelectorAll('.drop-over').forEach((x) => x !== t && x.classList.remove('drop-over'));
+        if (t && t !== d.src) t.classList.add('drop-over');
+        document.body.classList.toggle('drop-ground', !(over && over.closest('.panel')));
+      }
+    });
+    root.addEventListener('mouseup', (e) => {
+      const d = this.drag;
+      this.drag = null;
+      if (!d || !d.on) return;
+      d.ghost.remove();
+      d.src.classList.remove('drag-src');
+      document.body.classList.remove('dragging', 'drop-ground');
+      document.querySelectorAll('.drop-over').forEach((x) => x.classList.remove('drop-over'));
+      this._noClick = true; setTimeout(() => { this._noClick = false; }, 0);
+      const over = document.elementFromPoint(e.clientX, e.clientY);
+      const parse = (ref) => { const p = ref.split(':'); return { c: p[0], i: p[0] === 'equip' ? p[1] : +p[1] }; };
+      const t = over && over.closest('.slot[data-ref]');
+      if (t) {
+        if (t.dataset.ref === d.ref) return;
+        const err = Inv.moveRef(this.pd, parse(d.ref), parse(t.dataset.ref));
+        if (err) { this.toast(err, 'bad', 2); sfx('error'); } else sfx('pickup');
+      } else if (!(over && over.closest('.panel'))) {
+        this.game.dropFromInventory(parse(d.ref));
+      } else return;
+      this.selected = null;
+      this.game.player.recalc();
+      this.game.save();
+      this.refresh();
     });
     root.addEventListener('contextmenu', (e) => {
       const r = e.target.closest('[data-ref]');
@@ -93,7 +147,7 @@ export class UI {
     });
     root.addEventListener('mouseover', (e) => {
       const r = e.target.closest('[data-ref],[data-talent],[data-skill],[data-tip]');
-      if (!r) return;
+      if (!r || this.drag || (r.dataset.ref && r.dataset.ref === this.selected)) return;
       const html = this.tipFor(r);
       if (!html) return;
       this.el.tip.innerHTML = html;
@@ -217,6 +271,7 @@ export class UI {
     root.classList.add('show');
     const nb = root.querySelector('.panel-body');
     if (nb) nb.scrollTop = scroll;
+    this.placeItemMenu();
   }
 
   // ---------- Cellules d'objets ----------
@@ -229,7 +284,7 @@ export class UI {
   }
 
   cell(item, ref, extra = '') {
-    if (!item) return `<div class="slot empty">${extra}</div>`;
+    if (!item) return `<div class="slot empty"${ref ? ` data-ref="${ref}"` : ''}>${extra}</div>`;
     const col = itemColor(item);
     const sel = this.selected === ref ? ' selected' : '';
     const unsafe = item.found && this.pd.inRun && ref && ref.startsWith('inv') ? '<span class="unsafe" title="Non sécurisé">!</span>' : '';
@@ -275,7 +330,11 @@ export class UI {
     h += '</div>';
     if (item.affixes && item.affixes.length) h += `<div class="tt-aff">${item.affixes.map((a) => `<div>${affixText(a)}</div>`).join('')}</div>`;
     if (item.up) h += `<div class="tt-ok">Renforcé à la forge : +${item.up} (+${item.up * 12} % des statistiques de base)</div>`;
-    if (item.set) h += this.setTipHTML(item);
+    if (item.set) {
+      const dup = Inv.allItems(pd).filter((o) => o !== item && o.set === item.set && o.slot === item.slot).length;
+      if (dup) h += '<div class="tt-dup">Déjà possédée</div>';
+      h += this.setTipHTML(item);
+    }
     if (item.uniq && UNIQUES[item.uniq] && UNIQUES[item.uniq].power) h += `<div class="tt-uniq">◆ ${UNIQUES[item.uniq].power}</div>`;
     const ic = itemClass(item);
     if (ic && ic !== pd.cls) h += `<div class="tt-warn">Réservé : ${CLASSES[ic].name}</div>`;
@@ -309,16 +368,33 @@ export class UI {
     if (c === 'stash') A.push({ l: 'Prendre', a: 'fromStash', main: true });
     if (mode === 'shop' && this.opts.shop === 'atelier') { if (it.set) A.push({ l: 'Donner à Mira · +1 sceau', a: 'recycle', main: true }); }
     else if (mode === 'shop' && c !== 'stash') A.push({ l: `Vendre · ${fmt(sellValue(it))} or`, a: 'sell', main: true });
-    A.push({ l: this.confirmDestroy === ref ? 'Confirmer' : 'Détruire', a: 'destroy', danger: true });
+    A.push({ l: 'Jeter', a: 'destroy', danger: true });
     return A;
   }
 
-  detailHTML() {
-    if (!this.selected) return '<div class="detail empty-detail">Sélectionnez un objet.<br>Clic droit : action rapide · Maj + clic : poche sécurisée</div>';
+  // L'objet sélectionné ouvre un petit menu d'actions collé à sa case (plus de panneau de détail qui déborde)
+  detailHTML() { return ''; }
+  placeItemMenu() {
+    const root = this.el.panel;
+    const old = root.querySelector('.item-menu');
+    if (old) old.remove();
+    if (!this.selected) return;
     const it = this.refItem(this.selected);
-    if (!it) { this.selected = null; return this.detailHTML(); }
-    const acts = this.itemActions(this.selected).map((x) => `<button class="btn small ${x.main ? 'main' : ''} ${x.danger ? 'danger' : ''}" data-action="item" data-arg="${x.a}">${x.l}</button>`).join('');
-    return `<div class="detail">${this.itemTip(it, { compare: !this.selected.startsWith('equip'), ref: this.selected })}<div class="actions">${acts}</div></div>`;
+    const slot = root.querySelector(`.slot[data-ref="${this.selected}"]`);
+    if (!it || !slot) { this.selected = null; return; }
+    const acts = this.itemActions(this.selected);
+    if (!acts.length) return;
+    const m = document.createElement('div');
+    m.className = 'item-menu';
+    m.innerHTML = `<div class="im-name" style="color:${itemColor(it)}">${escapeHtml(itemName(it))}</div>` + acts.map((x) => `<button class="btn small ${x.main ? 'main' : ''} ${x.danger ? 'danger' : ''}" data-action="item" data-arg="${x.a}">${x.l}</button>`).join('');
+    root.appendChild(m);
+    const r = slot.getBoundingClientRect();
+    let x = r.right + 8, y = r.top;
+    if (x + m.offsetWidth > window.innerWidth - 8) x = r.left - m.offsetWidth - 8;
+    if (y + m.offsetHeight > window.innerHeight - 8) y = window.innerHeight - m.offsetHeight - 8;
+    m.style.left = Math.max(8, x) + 'px';
+    m.style.top = Math.max(8, y) + 'px';
+    this.hideTip();
   }
 
   doItemAction(a, ref = this.selected) {
@@ -339,9 +415,7 @@ export class UI {
       case 'sell': g.sell(r); this.selected = null; break;
       case 'recycle': g.recycleSetPiece(r); this.selected = null; break;
       case 'buy': g.buy(p[1], +p[2]); this.selected = null; break;
-      case 'destroy':
-        if (this.confirmDestroy !== ref) { this.confirmDestroy = ref; break; }
-        Inv.removeAt(pd, r); this.selected = null; this.confirmDestroy = null; sfx('error'); break;
+      case 'destroy': g.dropFromInventory(r); this.selected = null; break;
     }
     if (err) { this.toast(err, 'bad', 2); sfx('error'); }
     g.player.recalc();
@@ -415,6 +489,7 @@ export class UI {
       case 'upgrade': { const it = this.pd.equipment[arg]; if (it) g.upgradeItem(it); break; }
       case 'open-shop': this.open('shop', { shop: arg, npc: this.opts.npc }); break;
       case 'open-portal': this.open('portal'); break;
+      case 'jtab': this.opts.jtab = arg; sfx('ui'); this.refresh(); break;
       case 'buy-cons': { const n = +(el && el.dataset.n) || 1; for (let i = 0; i < n; i++) g.buy('consumable', arg); break; }
       case 'descend': {
         const aug = [...(this.opts.aug || [])];
@@ -515,7 +590,7 @@ export class UI {
     let pocket = '';
     for (let i = 0; i < Inv.POCKET_MAX; i++) {
       if (i < ps) pocket += this.cell(pd.pocket[i], 'pocket:' + i);
-      else pocket += `<div class="slot locked" data-tip="Équipez une meilleure poche sécurisée pour débloquer cet emplacement.">${icon('lock')}</div>`;
+      else pocket += `<div class="slot locked">${icon('lock')}</div>`;
     }
     return `
       <div class="bag-head"><h3>Sac <span class="dim">${used} / ${Inv.INV_SIZE}</span></h3><button class="btn small" data-action="sort">Trier</button></div>
@@ -532,7 +607,7 @@ export class UI {
       <div class="col">${this.paperdollHTML()}${this.statsHTML()}</div>
       <div class="col">${this.bagHTML()}${this.detailHTML()}
       </div></div>`;
-    return { sub: `${escapeHtml(pd.name)} · ${C.name}${pd.spec ? ' ' + C.specs[pd.spec].name : ''} · niveau ${pd.level}`, html, cls: 'wide', footer: '<span><kbd>Clic</kbd>Sélectionner</span><span><kbd>Clic D</kbd>Action rapide</span><span><kbd>Maj</kbd>+ clic : poche</span><span><kbd>Échap</kbd>Fermer</span>' };
+    return { sub: `${escapeHtml(pd.name)} · ${C.name}${pd.spec ? ' ' + C.specs[pd.spec].name : ''} · niveau ${pd.level}`, html, cls: 'wide', footer: '<span><kbd>Clic</kbd>Actions</span><span><kbd>Clic D</kbd>Action rapide</span><span><kbd>Glisser</kbd>Déplacer · jeter</span><span><kbd>Maj</kbd>+ clic : poche</span><span><kbd>Échap</kbd>Fermer</span>' };
   }
 
   // ================= COFFRE =================
@@ -544,7 +619,7 @@ export class UI {
         <div class="grid stash">${pd.stash.map((it, i) => this.cell(it, 'stash:' + i)).join('')}</div>
 </div>
       <div class="col">${this.bagHTML()}${this.detailHTML()}</div></div>`;
-    return { title: 'Coffre', sub: 'Un vieux coffre cerclé de fer', html, cls: 'wide', footer: '<span><kbd>Clic D</kbd>Déposer / prendre</span><span><kbd>Échap</kbd>Fermer</span>' };
+    return { title: 'Coffre', sub: 'Un vieux coffre cerclé de fer', html, cls: 'wide', footer: '<span><kbd>Clic D</kbd>Déposer / prendre</span><span><kbd>Glisser</kbd>Déplacer · jeter</span><span><kbd>Échap</kbd>Fermer</span>' };
   }
 
   // ================= MARCHANDS =================
@@ -642,6 +717,29 @@ export class UI {
   }
 
   // Ensemble : pièces (portées = or, possédées = argent, manquantes = gris) et paliers (actif = or).
+  // Collection : pour chaque ensemble, chaque pièce — portée, possédée (où), ou manquante.
+  setsCollectionHTML() {
+    const pd = this.pd;
+    const where = {};
+    const note = (it, loc) => { if (it && it.set) { const k = it.set + ':' + it.slot; (where[k] = where[k] || []).push(loc); } };
+    for (const k in pd.equipment) note(pd.equipment[k], 'porté');
+    for (const it of pd.inventory) note(it, 'sac');
+    for (const it of pd.pocket) note(it, 'poche');
+    for (const it of pd.stash) note(it, 'coffre');
+    const worn = equippedSetCounts(pd.equipment);
+    return '<div class="set-coll">' + Object.entries(SETS).map(([id, S]) => {
+      const slots = Object.entries(S.pieces);
+      const have = slots.filter(([sl]) => where[id + ':' + sl]).length;
+      const cells = slots.map(([sl, base]) => {
+        const w = where[id + ':' + sl];
+        const st = !w ? 'off' : w.includes('porté') ? 'on' : 'own';
+        return `<div class="sc-piece ${st}"><b>${base}</b><span>${w ? [...new Set(w)].join(' · ') : '—'}</span></div>`;
+      }).join('');
+      const n = worn[id] || 0;
+      return `<div class="sc-set ${have === slots.length ? 'st-max' : have ? 'st-partial' : ''}"><div class="sc-head"><b style="color:${S.color}">${S.name}</b><span class="dim">${have} / ${slots.length} · porté ${n}</span></div><div class="sc-pieces">${cells}</div></div>`;
+    }).join('') + '</div>';
+  }
+
   setTipHTML(item) {
     const pd = this.pd;
     const S = SETS[item.set];
@@ -709,9 +807,11 @@ export class UI {
     const avail = g.questsAvailable(id);
     const active = g.questsOf(id, 'active');
     let opts = '';
-    for (const q of ready) opts += `<button class="opt ready" data-action="quest-turnin-talk" data-arg="${q.id}">Rendre — ${q.name}<span class="st-tag avail">?</span></button>`;
-    for (const q of avail) opts += `<button class="opt new" data-action="quest-view" data-arg="${q.id}">${q.main ? 'Histoire' : q.mission ? 'Mission' : q.contract ? 'Contrat' : 'Secondaire'} — ${q.name}<span class="st-tag ${q.main ? 'max' : 'part'}">!</span></button>`;
-    for (const q of active) opts += `<button class="opt" data-action="quest-view" data-arg="${q.id}">${q.name} <span class="dim">(${this.pd.quests[q.id].progress} / ${this.questNeed(q)})</span><span class="st-tag part">En cours</span></button>`;
+    const fam = (q) => (q.main ? 't-story' : q.contract ? 't-contract' : 't-side');
+    const famName = (q) => (q.main ? 'Histoire' : q.contract ? 'Contrat' : 'Secondaire');
+    for (const q of ready) opts += `<button class="opt ready qopt ${fam(q)}" data-action="quest-turnin-talk" data-arg="${q.id}"><i>${famName(q)}</i>✓ ${q.name}<span class="st-tag avail">À rendre</span></button>`;
+    for (const q of avail) opts += `<button class="opt new qopt ${fam(q)}" data-action="quest-view" data-arg="${q.id}"><i>${famName(q)}</i>${q.name}<span class="st-tag ${q.main ? 'max' : 'part'}">Nouvelle</span></button>`;
+    for (const q of active) opts += `<button class="opt qopt ${fam(q)}" data-action="quest-view" data-arg="${q.id}"><i>${famName(q)}</i>${q.name} <span class="dim">${this.pd.quests[q.id].progress} / ${this.questNeed(q)}</span><span class="st-tag part">En cours</span></button>`;
     if (N.contracts) {
       const nAct = active.filter((q) => q.contract).length + ready.filter((q) => q.contract).length;
       const board = (this.pd.contracts || []).filter((c) => !this.pd.quests[c.id]).length;
@@ -742,17 +842,23 @@ export class UI {
         <div class="pbar"><div style="width:${pct}%"></div></div>
         <div class="dim">${this.rewardText(q)}</div></div>`;
     };
-    const ready = rows('ready'), active = rows('active'), done = rows('done');
+    const done = rows('done');
+    const open = allQuests(pd).filter((q) => pd.quests[q.id] && pd.quests[q.id].status !== 'done' && !q.mission)
+      .sort((a, b) => (pd.quests[b.id].status === 'ready') - (pd.quests[a.id].status === 'ready'));
+    const fam = (cls, title, list) => `<section class="jfam ${cls}"><h3>${title} <span class="dim">${list.length}</span></h3>${list.map(qHTML).join('') || '<p class="dim">—</p>'}</section>`;
     const S = pd.stats;
-    const html = `
-      ${ready.length ? `<h3>À rendre</h3>${ready.map(qHTML).join('')}` : ''}
-      <h3>En cours</h3>${active.map(qHTML).join('') || '<p class="dim">—</p>'}
-      <h3>Accomplies <span class="dim">${done.length} / ${QUESTS.length}${pd.stats.contracts ? ` · ${pd.stats.contracts} contrat(s) honoré(s)` : ''}</span></h3>
-      <div class="done-list">${done.map((q) => `<span class="done-q">✓ ${q.name}</span>`).join('') || '<span>—</span>'}</div>
-      <h3>Fragments <span class="dim">${known.length} / ${LORE.length}</span></h3>
-      <div class="lore-list">${LORE.map((l) => known.includes(l.id) ? `<button class="opt" data-action="lore-read" data-arg="${l.id}">${l.title}</button>` : '<div class="opt locked-lore">— fragment non découvert —</div>').join('')}</div>
-      <h3>Chroniques</h3>
-      <div class="stats" style="margin-top:0"><div><span>Créatures abattues</span><b>${fmt(S.kills)}</b></div><div><span>Descentes</span><b>${S.runs}</b></div><div><span>Retours réussis</span><b>${S.extractions}</b></div><div><span>Morts</span><b>${S.deaths}</b></div><div><span>Profondeur atteinte</span><b>${pd.maxDepth}</b></div><div><span>Temps passé</span><b>${Math.floor(pd.playTime / 60)} min</b></div></div>`;
+    // onglets internes : un seul sujet à la fois, sans long défilement
+    const tab = this.opts.jtab || 'quests';
+    const tabs = [['quests', `Quêtes · ${open.length}`], ['sets', 'Ensembles'], ['lore', `Fragments · ${known.length} / ${LORE.length}`], ['stats', 'Chroniques']];
+    const bar = `<div class="jtabs">${tabs.map(([k, l]) => `<button class="jtab ${k === tab ? 'on' : ''}" data-action="jtab" data-arg="${k}">${l}</button>`).join('')}</div>`;
+    let body = '';
+    if (tab === 'quests') body = `<div class="jfams">${fam('t-story', 'Histoire', open.filter((q) => q.main))}${fam('t-side', 'Secondaires', open.filter((q) => !q.main && !q.contract))}${fam('t-contract', 'Contrats', open.filter((q) => q.contract))}</div>
+      <h3>Accomplies <span class="dim">${done.length}</span></h3>
+      <div class="done-list">${done.map((q) => `<span class="done-q">✓ ${q.name}</span>`).join('') || '<span>—</span>'}</div>`;
+    else if (tab === 'sets') body = this.setsCollectionHTML();
+    else if (tab === 'lore') body = `<div class="lore-grid">${LORE.map((l) => known.includes(l.id) ? `<button class="opt" data-action="lore-read" data-arg="${l.id}">${l.title}</button>` : '<div class="lore-unk">?</div>').join('')}</div>`;
+    else body = `<div class="stats" style="margin-top:0"><div><span>Créatures abattues</span><b>${fmt(S.kills)}</b></div><div><span>Descentes</span><b>${S.runs}</b></div><div><span>Retours réussis</span><b>${S.extractions}</b></div><div><span>Morts</span><b>${S.deaths}</b></div><div><span>Profondeur atteinte</span><b>${pd.maxDepth}</b></div><div><span>Temps passé</span><b>${Math.floor(pd.playTime / 60)} min</b></div></div>`;
+    const html = bar + body;
     return { sub: '', html, cls: 'wide' };
   }
 
@@ -1199,27 +1305,32 @@ export class UI {
     this.refreshTracker();
   }
 
+  // Suivi : quatre familles bien séparées, toujours dans le même ordre et la même couleur.
+  //  DESCENTE (mission principale, en donjon) · ÉTAGE (défi de l'étage) · HISTOIRE (quêtes ◆) · SECONDAIRES (quêtes et contrats)
   refreshTracker() {
     if (!this.hud || !this.pd) return;
-    const pd = this.pd;
-    const ms = missionStatus(this.game);
-    const all = allQuests(pd).filter((q) => pd.quests[q.id] && pd.quests[q.id].status !== 'done' && !(q.mission && ms));
-    all.sort((a, b) => (b.mission ? 2 : b.main ? 1 : 0) - (a.mission ? 2 : a.main ? 1 : 0) || (pd.quests[b.id].status === 'ready') - (pd.quests[a.id].status === 'ready'));
-    const qs = all.slice(0, 4);
-    const nx = this.game.nextMainStep && this.game.nextMainStep();
-    let hint = '';
-    const G = this.game.scene && this.game.scene.gate;
-    if (ms) hint = `<div class="tr-q mission ${ms.done ? 'ready' : ''} ${ms.failed ? 'failed' : ''}"><b>⚔ ${ms.name}</b><div>${ms.line}</div></div>` + hint;
-    const sc = this.game.scene;
-    if (sc && sc.type === 'dungeon') {
-      const run = this.game.run;
-      hint = `<div class="tr-q main-run"><b>▼ Profondeur ${sc.depth}</b><div>Record ${pd.maxDepth || sc.depth}${run && run.sceaux ? ` · ${run.sceaux} Sceaux en jeu` : ''}</div></div>` + hint;
-    }
-    this.hud.tracker.innerHTML = (qs.length || hint) ? '<div class="tr-title">Quêtes</div>' + hint + qs.map((q) => {
+    const pd = this.pd, g = this.game, sc = g.scene;
+    const sec = (cls, title, body) => body ? `<section class="trs ${cls}"><h4>${title}</h4>${body}</section>` : '';
+    const line = (name, sub, state = '') => `<div class="tr-q ${state}"><b>${name}</b>${sub ? `<div>${sub}</div>` : ''}</div>`;
+    const qline = (q) => {
       const st = pd.quests[q.id];
-      return `<div class="tr-q ${st.status} ${q.mission ? 'mission' : ''}"><b>${q.main ? '◆ ' : q.mission ? '⚔ ' : ''}${q.name}</b><div>${st.status === 'ready' ? `Retournez voir ${NPCS[q.giver].name}` : this.questObjText(q, st)}</div></div>`;
-    }).join('') : '';
+      return st.status === 'ready' ? line('✓ ' + q.name, `À rendre · ${NPCS[q.giver].name}`, 'ready') : line(q.name, this.questObjText(q, st));
+    };
+    const active = allQuests(pd).filter((q) => pd.quests[q.id] && pd.quests[q.id].status !== 'done' && !q.mission);
+    active.sort((a, b) => (pd.quests[b.id].status === 'ready') - (pd.quests[a.id].status === 'ready'));
+    let h = '';
+    if (sc && sc.type === 'dungeon') {
+      const run = g.run;
+      h += sec('t-run', 'Descente', line(`Profondeur ${sc.depth}`, `Record ${pd.maxDepth || sc.depth}${run && run.sceaux ? ` · ${run.sceaux} Sceaux en jeu` : ''}`));
+      const ms = missionStatus(g);
+      if (ms) h += sec('t-floor', 'Étage', line(ms.name, ms.line, ms.failed ? 'failed' : ms.done ? 'ready' : ''));
+    }
+    h += sec('t-story', 'Histoire', active.filter((q) => q.main).slice(0, 2).map(qline).join(''));
+    const side = active.filter((q) => !q.main);
+    h += sec('t-side', 'Secondaires', side.slice(0, 3).map(qline).join('') + (side.length > 3 ? `<div class="tr-more">+${side.length - 3}</div>` : ''));
+    if (this.hud.tracker._h !== h) { this.hud.tracker._h = h; this.hud.tracker.innerHTML = h; }
   }
+
 
   updateHud(dt) {
     const g = this.game;
